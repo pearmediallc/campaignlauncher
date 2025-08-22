@@ -123,28 +123,31 @@ async function startServer() {
     // await db.sequelize.sync({ alter: false });
     // console.log('Database models synchronized.');
     
-    // Run pending migrations if in development
-    if (process.env.NODE_ENV === 'development') {
-      const { exec } = require('child_process');
-      const util = require('util');
-      const execPromise = util.promisify(exec);
-      
-      try {
-        console.log('Running database migrations...');
-        const { stdout, stderr } = await execPromise('npx sequelize-cli db:migrate');
-        if (stdout) console.log('Migration output:', stdout);
-        if (stderr && !stderr.includes('No migrations were executed')) {
-          console.error('Migration warnings:', stderr);
-        }
-      } catch (migrationError) {
-        // If migrations fail, it might be because they're already applied
-        console.log('Migration status:', migrationError.message);
+    // Run pending migrations
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
+    
+    try {
+      console.log('Running database migrations...');
+      const { stdout, stderr } = await execPromise('npx sequelize-cli db:migrate');
+      if (stdout) console.log('Migration output:', stdout);
+      if (stderr && !stderr.includes('No migrations were executed')) {
+        console.error('Migration warnings:', stderr);
       }
+    } catch (migrationError) {
+      console.log('Migration error:', migrationError.message);
+      // Don't fail if migrations are already applied
     }
     
-    // Create default roles and permissions
-    await PermissionService.createDefaultRolesAndPermissions();
-    console.log('Default roles and permissions created.');
+    // Create default roles and permissions (with error handling)
+    try {
+      await PermissionService.createDefaultRolesAndPermissions();
+      console.log('Default roles and permissions created.');
+    } catch (permError) {
+      console.log('Permissions setup status:', permError.message);
+      // Don't fail server startup if permissions already exist
+    }
     
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

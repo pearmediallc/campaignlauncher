@@ -14,4 +14,10 @@ echo "📦 Installing backend dependencies..."
 cd backend
 npm install
 
+# Run database migrations in production
+if [ "$NODE_ENV" = "production" ]; then
+  echo "🗄️ Running database migrations..."
+  npx sequelize-cli db:migrate
+fi
+
 echo "✅ Build complete!"
