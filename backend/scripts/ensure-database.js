@@ -4,10 +4,18 @@
  * This prevents foreign key constraint errors
  */
 
-const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 async function ensureDatabase() {
+  // Skip database checks in production with PostgreSQL
+  // Migrations will handle table creation
+  if (process.env.NODE_ENV === 'production') {
+    console.log('✅ Skipping database checks in production (PostgreSQL)');
+    return;
+  }
+  
+  // Only run MySQL checks in development
+  const mysql = require('mysql2/promise');
   let connection;
   
   try {

@@ -10,13 +10,16 @@ class PermissionService {
   async getUserPermissions(userId) {
     const cacheKey = `${this.cachePrefix}user:${userId}`;
     
-    try {
-      const cached = await redis.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached);
+    // Only use cache if Redis is available
+    if (redis) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      } catch (error) {
+        console.error('Redis get error:', error);
       }
-    } catch (error) {
-      console.error('Redis get error:', error);
     }
 
     const user = await User.findByPk(userId, {
@@ -48,10 +51,12 @@ class PermissionService {
 
     const permissionArray = Array.from(permissions);
 
-    try {
-      await redis.setex(cacheKey, this.cacheTTL, JSON.stringify(permissionArray));
-    } catch (error) {
-      console.error('Redis set error:', error);
+    if (redis) {
+      try {
+        await redis.setex(cacheKey, this.cacheTTL, JSON.stringify(permissionArray));
+      } catch (error) {
+        console.error('Redis set error:', error);
+      }
     }
 
     return permissionArray;
@@ -60,13 +65,15 @@ class PermissionService {
   async getUserResources(userId, resourceType = null) {
     const cacheKey = `${this.cachePrefix}resources:${userId}:${resourceType || 'all'}`;
     
-    try {
-      const cached = await redis.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached);
+    if (redis) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      } catch (error) {
+        console.error('Redis get error:', error);
       }
-    } catch (error) {
-      console.error('Redis get error:', error);
     }
 
     const whereClause = resourceType ? { type: resourceType } : {};
@@ -98,10 +105,12 @@ class PermissionService {
       metadata: resource.metadata
     }));
 
-    try {
-      await redis.setex(cacheKey, this.cacheTTL, JSON.stringify(resources));
-    } catch (error) {
-      console.error('Redis set error:', error);
+    if (redis) {
+      try {
+        await redis.setex(cacheKey, this.cacheTTL, JSON.stringify(resources));
+      } catch (error) {
+        console.error('Redis set error:', error);
+      }
     }
 
     return resources;
@@ -196,6 +205,8 @@ class PermissionService {
   }
 
   async invalidateUserCache(userId) {
+    if (!redis) return;
+    
     const patterns = [
       `${this.cachePrefix}user:${userId}`,
       `${this.cachePrefix}resources:${userId}:*`
@@ -214,6 +225,8 @@ class PermissionService {
   }
 
   async invalidateAllCache() {
+    if (!redis) return;
+    
     try {
       const keys = await redis.keys(`${this.cachePrefix}*`);
       if (keys.length > 0) {
