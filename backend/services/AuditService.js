@@ -4,7 +4,7 @@ class AuditService {
   async log(data) {
     try {
       const logEntry = await AuditLog.create({
-        userId: data.userId,
+        userId: data.userId || null,  // Allow null userId for anonymous actions
         action: data.action,
         resourceType: data.resourceType || null,
         resourceId: data.resourceId || null,

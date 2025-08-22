@@ -9,7 +9,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     userId: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,  // Allow null for anonymous actions like failed logins
       field: 'user_id',
       references: {
         model: 'users',

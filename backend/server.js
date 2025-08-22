@@ -18,6 +18,11 @@ const dataDeletionRoutes = require('./routes/dataDeletion');
 
 const app = express();
 
+// Trust proxy for Render deployment
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security middleware
 app.use(helmet());
 app.use(cors());
