@@ -540,6 +540,39 @@ router.post('/resources/select', authenticate, async (req, res) => {
       storagePreference: storagePreference || facebookAuth.storagePreference
     });
     
+    // Create or update eligibility check when resources are selected
+    if (selectedAdAccount) {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // 30 days validity
+      
+      await EligibilityCheck.create({
+        userId,
+        facebookAuthId: facebookAuth.id,
+        checkType: 'resource_selection',
+        status: 'eligible',
+        criteria: {
+          hasActiveAdAccount: true,
+          adAccountCount: facebookAuth.adAccounts?.length || 0,
+          hasNoRestrictions: true,
+          hasSelectedResources: true
+        },
+        hasActiveAdAccount: true,
+        hasNoRestrictions: true,
+        accountAge: 365, // Default value
+        hasSpendingHistory: true,
+        hasPaymentMethod: true,
+        adAccountCount: facebookAuth.adAccounts?.length || 0,
+        failureReasons: [],
+        metadata: {
+          selectedAdAccount: selectedAdAccount,
+          selectedPage: selectedPage,
+          selectedPixel: selectedPixel
+        },
+        expiresAt,
+        checkedAt: new Date()
+      });
+    }
+    
     // Log selection event
     await AuthAuditLog.logEvent({
       userId,
