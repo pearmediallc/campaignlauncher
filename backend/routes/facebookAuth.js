@@ -548,7 +548,7 @@ router.post('/resources/select', authenticate, async (req, res) => {
       await EligibilityCheck.create({
         userId,
         facebookAuthId: facebookAuth.id,
-        checkType: 'resource_selection',
+        checkType: 'manual', // Use 'manual' instead of 'resource_selection'
         status: 'eligible',
         criteria: {
           hasActiveAdAccount: true,
@@ -561,6 +561,7 @@ router.post('/resources/select', authenticate, async (req, res) => {
         accountAge: 365, // Default value
         hasSpendingHistory: true,
         hasPaymentMethod: true,
+        totalSpend: 0, // Add totalSpend with default value
         adAccountCount: facebookAuth.adAccounts?.length || 0,
         failureReasons: [],
         metadata: {
