@@ -1,0 +1,48 @@
+{
+  "name": "fb-campaign-backend",
+  "version": "1.0.0",
+  "description": "Facebook Campaign Launcher Backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:https": "node server-https.js",
+    "dev": "nodemon server.js",
+    "dev:https": "nodemon server-https.js",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "fix-db": "node scripts/fix-database.js",
+    "seed": "sequelize-cli db:seed:all"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.0.1",
+    "express-session": "^1.18.2",
+    "express-validator": "^7.0.1",
+    "form-data": "^4.0.0",
+    "got": "^14.4.7",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "metascraper": "^5.49.1",
+    "metascraper-description": "^5.49.1",
+    "metascraper-image": "^5.49.1",
+    "metascraper-publisher": "^5.49.1",
+    "metascraper-title": "^5.49.1",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.14.3",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
+    "redis": "^5.8.0",
+    "sequelize": "^6.37.7",
+    "sequelize-cli": "^6.6.3",
+    "sharp": "^0.34.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

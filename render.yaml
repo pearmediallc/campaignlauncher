@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: fb-campaign-launcher
+    runtime: node
+    repo: https://github.com/YOUR_GITHUB_USERNAME/fb-campaign-launcher # Update with your repo
+    buildCommand: |
+      cd frontend && npm install && npm run build && cd ../backend && npm install
+    startCommand: cd backend && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DB_HOST
+        sync: false # Add your database host
+      - key: DB_NAME
+        sync: false # Add your database name
+      - key: DB_USER
+        sync: false # Add your database user
+      - key: DB_PASSWORD
+        sync: false # Add your database password
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        sync: false # Add your encryption key
+      - key: FB_APP_ID
+        sync: false # Add your Facebook App ID
+      - key: FB_APP_SECRET
+        sync: false # Add your Facebook App Secret
+      - key: FB_REDIRECT_URI
+        sync: false # Will be updated after deployment
+      - key: FRONTEND_URL
+        sync: false # Will be updated after deployment
+      - key: REDIS_URL
+        sync: false # Add if using Redis

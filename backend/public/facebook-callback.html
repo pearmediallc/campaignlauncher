@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Facebook OAuth Callback Handler</title>
+</head>
+<body>
+    <h1>Facebook OAuth Callback</h1>
+    <div id="status">Processing...</div>
+    
+    <script>
+        // This page handles the Facebook OAuth callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const state = urlParams.get('state');
+        const error = urlParams.get('error');
+        const errorDescription = urlParams.get('error_description');
+        
+        if (error) {
+            document.getElementById('status').innerHTML = `
+                <h2>Error from Facebook:</h2>
+                <p><strong>Error:</strong> ${error}</p>
+                <p><strong>Description:</strong> ${errorDescription || 'No description'}</p>
+                <p><strong>Full URL:</strong> ${window.location.href}</p>
+            `;
+        } else if (code) {
+            document.getElementById('status').innerHTML = `
+                <h2>Success! Received authorization code</h2>
+                <p><strong>Code:</strong> ${code.substring(0, 20)}...</p>
+                <p><strong>State:</strong> ${state ? state.substring(0, 20) + '...' : 'None'}</p>
+                <p>Now processing with backend...</p>
+            `;
+            
+            // Now send this to our backend
+            window.location.href = `/api/auth/facebook/callback?code=${code}&state=${state}`;
+        } else {
+            document.getElementById('status').innerHTML = `
+                <h2>No code or error received</h2>
+                <p><strong>URL:</strong> ${window.location.href}</p>
+            `;
+        }
+    </script>
+</body>
+</html>

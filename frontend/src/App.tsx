@@ -1,0 +1,147 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Container, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './components/Login';
+import Register from './components/Register';
+import CampaignForm from './components/CampaignForm';
+import StatusChecker from './components/StatusChecker';
+import Navigation from './components/Navigation';
+import UserManagement from './pages/UserManagement';
+import AuditLogs from './pages/AuditLogs';
+import Profile from './pages/Profile';
+import FacebookAuth from './components/FacebookAuth';
+import FacebookSDKAuth from './components/FacebookSDKAuth';
+import FacebookAuthCallback from './pages/FacebookAuthCallback';
+import FacebookSDKTest from './pages/FacebookSDKTest';
+import ResourcesManagement from './pages/ResourcesManagement';
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1877f2',
+    },
+    secondary: {
+      main: '#42b883',
+    },
+  },
+  typography: {
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+  },
+});
+
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <>
+                    <Navigation />
+                    <Container maxWidth="lg" sx={{ py: 4 }}>
+                      <FacebookAuth />
+                      <CampaignForm />
+                    </Container>
+                  </>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/auth/facebook/callback" element={<FacebookAuthCallback />} />
+            <Route
+              path="/facebook-sdk-test"
+              element={
+                <ProtectedRoute>
+                  <>
+                    <Navigation />
+                    <FacebookSDKTest />
+                  </>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <>
+                    <Navigation />
+                    <Container maxWidth="lg" sx={{ py: 4 }}>
+                      <CampaignForm />
+                    </Container>
+                  </>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute>
+                  <>
+                    <Navigation />
+                    <UserManagement />
+                  </>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/audit-logs"
+              element={
+                <ProtectedRoute>
+                  <>
+                    <Navigation />
+                    <AuditLogs />
+                  </>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <>
+                    <Navigation />
+                    <Profile />
+                  </>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/resources"
+              element={
+                <ProtectedRoute>
+                  <>
+                    <Navigation />
+                    <ResourcesManagement />
+                  </>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+        <ToastContainer
+          position="bottom-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+        />
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+
+export default App;

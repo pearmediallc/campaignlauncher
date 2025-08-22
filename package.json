@@ -1,0 +1,15 @@
+{
+  "name": "fb-campaign-launcher",
+  "version": "1.0.0",
+  "description": "Facebook Campaign Launcher Application",
+  "scripts": {
+    "build": "./build.sh",
+    "start": "cd backend && NODE_ENV=production node server.js",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm start\"",
+    "install-all": "cd frontend && npm install && cd ../backend && npm install"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
