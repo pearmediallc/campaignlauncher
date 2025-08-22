@@ -135,14 +135,24 @@ async function startServer() {
     
     try {
       console.log('Running database migrations...');
-      const { stdout, stderr } = await execPromise('npx sequelize-cli db:migrate');
+      const migrationEnv = process.env.NODE_ENV === 'production' ? 'NODE_ENV=production ' : '';
+      const { stdout, stderr } = await execPromise(`${migrationEnv}npx sequelize-cli db:migrate`);
       if (stdout) console.log('Migration output:', stdout);
       if (stderr && !stderr.includes('No migrations were executed')) {
         console.error('Migration warnings:', stderr);
       }
+      console.log('Migrations completed or already up to date.');
+      
+      // Run seeders to create admin user
+      console.log('Running database seeders...');
+      const { stdout: seedStdout, stderr: seedStderr } = await execPromise(`${migrationEnv}npx sequelize-cli db:seed:all`);
+      if (seedStdout) console.log('Seeder output:', seedStdout);
+      if (seedStderr && !seedStderr.includes('already exists')) {
+        console.error('Seeder warnings:', seedStderr);
+      }
     } catch (migrationError) {
-      console.log('Migration error:', migrationError.message);
-      // Don't fail if migrations are already applied
+      console.error('Migration/Seeder error details:', migrationError);
+      // Continue anyway - migrations might already be applied
     }
     
     // Create default roles and permissions (with error handling)

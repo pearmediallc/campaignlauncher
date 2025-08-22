@@ -3,6 +3,13 @@ const { AuditLog } = require('../models');
 class AuditService {
   async log(data) {
     try {
+      // If userId is null and it's a failed login, skip logging for now
+      // This is a temporary workaround until migration runs
+      if (!data.userId && data.action === 'user.login' && data.status === 'failure') {
+        console.log('Skipping audit log for failed login (no userId) - migration pending');
+        return null;
+      }
+
       const logEntry = await AuditLog.create({
         userId: data.userId || null,  // Allow null userId for anonymous actions
         action: data.action,
