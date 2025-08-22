@@ -16,8 +16,22 @@ if (config.use_env_variable) {
     console.error('Please ensure your database is connected in Render');
     process.exit(1);
   }
+  console.log('Using DATABASE_URL for connection');
+  // Parse URL to check components
+  try {
+    const url = new URL(dbUrl);
+    console.log('Database connection details:');
+    console.log('  Protocol:', url.protocol);
+    console.log('  Host:', url.hostname);
+    console.log('  Port:', url.port || '5432');
+    console.log('  Database:', url.pathname.slice(1));
+  } catch (e) {
+    console.error('Invalid DATABASE_URL format');
+  }
   sequelize = new Sequelize(dbUrl, config);
 } else {
+  console.log('Using individual database credentials');
+  console.log('Database host:', config.host);
   sequelize = new Sequelize(config.database, config.username, config.password, config);
 }
 
