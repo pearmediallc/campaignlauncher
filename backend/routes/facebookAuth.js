@@ -545,10 +545,8 @@ router.post('/resources/select', authenticate, async (req, res) => {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30); // 30 days validity
       
-      await EligibilityCheck.create({
-        userId,
-        facebookAuthId: facebookAuth.id,
-        checkType: 'manual', // Use 'manual' instead of 'resource_selection'
+      // First, try to update existing eligibility check
+      const [updated] = await EligibilityCheck.update({
         status: 'eligible',
         criteria: {
           hasActiveAdAccount: true,
@@ -558,10 +556,10 @@ router.post('/resources/select', authenticate, async (req, res) => {
         },
         hasActiveAdAccount: true,
         hasNoRestrictions: true,
-        accountAge: 365, // Default value
+        accountAge: 365,
         hasSpendingHistory: true,
         hasPaymentMethod: true,
-        totalSpend: 0, // Add totalSpend with default value
+        totalSpend: 0,
         adAccountCount: facebookAuth.adAccounts?.length || 0,
         failureReasons: [],
         metadata: {
@@ -571,7 +569,43 @@ router.post('/resources/select', authenticate, async (req, res) => {
         },
         expiresAt,
         checkedAt: new Date()
+      }, {
+        where: {
+          userId,
+          facebookAuthId: facebookAuth.id
+        }
       });
+      
+      // If no existing check was updated, create a new one
+      if (updated === 0) {
+        await EligibilityCheck.create({
+          userId,
+          facebookAuthId: facebookAuth.id,
+          checkType: 'manual',
+          status: 'eligible',
+          criteria: {
+            hasActiveAdAccount: true,
+            adAccountCount: facebookAuth.adAccounts?.length || 0,
+            hasNoRestrictions: true,
+            hasSelectedResources: true
+          },
+          hasActiveAdAccount: true,
+          hasNoRestrictions: true,
+          accountAge: 365,
+          hasSpendingHistory: true,
+          hasPaymentMethod: true,
+          totalSpend: 0,
+          adAccountCount: facebookAuth.adAccounts?.length || 0,
+          failureReasons: [],
+          metadata: {
+            selectedAdAccount: selectedAdAccount,
+            selectedPage: selectedPage,
+            selectedPixel: selectedPixel
+          },
+          expiresAt,
+          checkedAt: new Date()
+        });
+      }
     }
     
     // Log selection event
