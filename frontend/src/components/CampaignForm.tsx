@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -31,6 +32,7 @@ import {
   RadioGroup,
   Tabs,
   Tab,
+  Snackbar,
 } from '@mui/material';
 import { 
   CloudUpload, 
@@ -213,9 +215,11 @@ const PLACEMENT_OPTIONS = {
 
 const CampaignForm: React.FC = () => {
   const { hasPermission, user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [variations, setVariations] = useState<AdVariation[]>([]);
   const [bulkMode, setBulkMode] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [carouselImages, setCarouselImages] = useState<File[]>([]);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -284,8 +288,85 @@ const CampaignForm: React.FC = () => {
 
   const watchUrl = watch('url');
   
+  // Handle import token from Ad Scraper
+  useEffect(() => {
+    const importToken = searchParams.get('importToken');
+    const prefillId = searchParams.get('prefill');
+    
+    if (importToken) {
+      // Handle direct import with token
+      handleImportToken(importToken);
+    } else if (prefillId) {
+      // Handle prefill from stored variation
+      loadPrefillData(prefillId);
+    }
+  }, [searchParams]);
+  
+  const handleImportToken = async (token: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/variations/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ exportToken: token })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.variation) {
+        // Prefill form with variation data
+        prefillFormWithVariation(data.variation);
+        setImportMessage('Ad variation imported successfully!');
+      } else {
+        setImportMessage('Failed to import variation: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      setImportMessage('Failed to import variation');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const loadPrefillData = async (variationId: string) => {
+    try {
+      const response = await fetch(`/api/variations/prefill/${variationId}`);
+      const data = await response.json();
+      
+      if (data.success && data.prefillData) {
+        prefillFormWithVariation(data.prefillData);
+        setImportMessage('Form pre-filled with variation data');
+      }
+    } catch (error) {
+      console.error('Prefill error:', error);
+    }
+  };
+  
+  const prefillFormWithVariation = (variation: any) => {
+    // Prefill text fields
+    if (variation.headline) setValue('headline', variation.headline);
+    if (variation.description) setValue('description', variation.description);
+    if (variation.primaryText) setValue('primaryText', variation.primaryText);
+    if (variation.mediaType) {
+      setValue('mediaType', variation.mediaType);
+      setMediaType(variation.mediaType);
+    }
+    if (variation.callToAction) setValue('callToAction', variation.callToAction);
+    
+    // Handle image URLs - may need to download or reference them
+    // This is a simplified version - you might need more complex handling
+    if (variation.imageUrl) {
+      // Store the image URL for display
+      // In production, you might want to download and convert to File
+      console.log('Image URL to handle:', variation.imageUrl);
+    }
+  };
+  
   // Load current resources on component mount
-  React.useEffect(() => {
+  useEffect(() => {
     const loadResources = async () => {
       try {
         const resources = await getCurrentResources();
@@ -522,9 +603,26 @@ const CampaignForm: React.FC = () => {
   }
 
   return (
-    <Paper elevation={3} sx={{ p: 4, maxWidth: 1200, mx: 'auto' }}>
-      <Typography variant="h4" gutterBottom color="primary">
-        Facebook Campaign Launcher
+    <>
+      {/* Import notification */}
+      <Snackbar
+        open={!!importMessage}
+        autoHideDuration={6000}
+        onClose={() => setImportMessage(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setImportMessage(null)} 
+          severity={importMessage?.includes('success') ? 'success' : 'error'}
+          sx={{ width: '100%' }}
+        >
+          {importMessage}
+        </Alert>
+      </Snackbar>
+      
+      <Paper elevation={3} sx={{ p: 4, maxWidth: 1200, mx: 'auto' }}>
+        <Typography variant="h4" gutterBottom color="primary">
+          Facebook Campaign Launcher
       </Typography>
       
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -1500,6 +1598,7 @@ const CampaignForm: React.FC = () => {
         </Box>
       </form>
     </Paper>
+    </>
   );
 };
 

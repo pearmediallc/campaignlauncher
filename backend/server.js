@@ -15,6 +15,7 @@ const mediaRoutes = require('./routes/media');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const dataDeletionRoutes = require('./routes/dataDeletion');
+const variationsRoutes = require('./routes/variations');
 
 const app = express();
 
@@ -39,7 +40,35 @@ app.use(helmet({
     }
   }
 }));
-app.use(cors());
+
+// CORS configuration - Allow configured origins including Ad Forge
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
+    
+    // Parse allowed origins from environment variable
+    const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+      .split(',')
+      .map(url => url.trim());
+    
+    // Always allow localhost in development
+    if (process.env.NODE_ENV !== 'production') {
+      allowedOrigins.push('http://localhost:3000', 'http://localhost:8080');
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true, // Allow cookies for session management
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 // Rate limiting - more permissive for development
 const limiter = rateLimit({
@@ -95,6 +124,9 @@ app.use('/api/media', mediaRoutes);
 
 // New resource management routes (separate from existing auth)
 app.use('/api/resources', require('./routes/resourceManager'));
+
+// Variations import routes for Ad Scraper integration
+app.use('/api/variations', variationsRoutes);
 
 // Data deletion endpoints (required for Facebook App Review)
 app.use('/api/data-deletion', dataDeletionRoutes);
