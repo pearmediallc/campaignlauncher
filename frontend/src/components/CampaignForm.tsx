@@ -12,6 +12,7 @@ import {
   Paper,
   InputAdornment,
   Alert,
+  AlertTitle,
   CircularProgress,
   Chip,
   IconButton,
@@ -243,6 +244,10 @@ const CampaignForm: React.FC = () => {
   // const [availablePages, setAvailablePages] = useState<{id: string, name: string}[]>([]);
   const [currentResources, setCurrentResources] = useState<any>(null);
   
+  // Ad Scraper integration state
+  const [importedImageUrl, setImportedImageUrl] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  
   const canCreateCampaign = hasPermission('campaign', 'create');
 
   const {
@@ -288,7 +293,7 @@ const CampaignForm: React.FC = () => {
 
   const watchUrl = watch('url');
   
-  // Handle import token from Ad Scraper
+  // Handle import token from Ad Scraper and check for Ad Scraper data
   useEffect(() => {
     const importToken = searchParams.get('importToken');
     const prefillId = searchParams.get('prefill');
@@ -299,6 +304,9 @@ const CampaignForm: React.FC = () => {
     } else if (prefillId) {
       // Handle prefill from stored variation
       loadPrefillData(prefillId);
+    } else {
+      // Check for Ad Scraper import data (localStorage and URL params)
+      checkForImportedAd();
     }
   }, [searchParams]);
   
@@ -383,6 +391,160 @@ const CampaignForm: React.FC = () => {
     };
     loadResources();
   }, [setValue]);
+
+  // Ad Scraper Integration Functions
+  const checkForImportedAd = async () => {
+    console.log('🔍 Checking for imported ad data...');
+    
+    let adData = null;
+    let importSource = null;
+    
+    // Method 1: Check LocalStorage (Primary - most reliable)
+    try {
+      const stored = localStorage.getItem('adScraperTransfer');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        
+        // Verify data freshness (5 minutes timeout)
+        if (Date.now() - parsed.timestamp < 300000) {
+          adData = parsed.ads?.[0]; // Take first ad
+          importSource = 'localStorage';
+          console.log('✅ Found ad data in localStorage');
+          
+          // Clear after successful read (one-time use)
+          localStorage.removeItem('adScraperTransfer');
+        } else {
+          console.log('⏰ LocalStorage data expired (older than 5 minutes)');
+          localStorage.removeItem('adScraperTransfer');
+        }
+      }
+    } catch (e) {
+      console.log('No valid localStorage data found');
+    }
+    
+    // Method 2: Check URL Parameters (Fallback)
+    if (!adData) {
+      const params = new URLSearchParams(window.location.search);
+      
+      if (params.get('source') === 'ad_scraper') {
+        // Reconstruct ad data from shortened URL params
+        adData = {
+          headline: params.get('h') || '',
+          primaryText: params.get('p') || '',
+          description: params.get('d') || '',
+          callToAction: params.get('c') || 'LEARN_MORE',
+          imageUrl: decodeURIComponent(params.get('i') || '')
+        };
+        
+        // Verify timestamp if present
+        const timestamp = params.get('t');
+        if (timestamp && Date.now() - parseInt(timestamp) < 300000) {
+          importSource = 'url';
+          console.log('✅ Found ad data in URL parameters');
+        } else if (!timestamp) {
+          // Accept without timestamp for backward compatibility
+          importSource = 'url';
+          console.log('✅ Found ad data in URL (no timestamp)');
+        }
+        
+        // Clean URL without page reload
+        if (window.history && window.history.replaceState) {
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+        }
+      }
+    }
+    
+    // Method 3: Apply imported data to form
+    if (adData && importSource) {
+      console.log('📝 Applying imported ad data from:', importSource);
+      applyImportedData(adData, importSource);
+    } else {
+      console.log('No ad import data found');
+    }
+  };
+
+  const applyImportedData = (adData: any, source: string) => {
+    try {
+      // Apply text fields using React Hook Form setValue
+      if (adData.headline) {
+        setValue('headline', adData.headline);
+        console.log('Set headline:', adData.headline);
+      }
+      
+      if (adData.primaryText) {
+        setValue('primaryText', adData.primaryText);
+        console.log('Set primaryText:', adData.primaryText);
+      }
+      
+      if (adData.description) {
+        setValue('description', adData.description);
+        console.log('Set description:', adData.description);
+      }
+      
+      if (adData.callToAction) {
+        setValue('callToAction', adData.callToAction);
+        console.log('Set callToAction:', adData.callToAction);
+      }
+      
+      // Handle image URL
+      if (adData.imageUrl) {
+        handleImportedImage(adData.imageUrl);
+      }
+      
+      // Show success notification
+      toast.success(`✅ Ad imported successfully from Ad Scraper (via ${source})`, {
+        position: 'top-center',
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true
+      });
+      
+      // Visual feedback - highlight imported fields
+      highlightImportedFields();
+      
+      // Log for debugging
+      console.log('✅ Ad data applied successfully:', adData);
+      
+    } catch (error) {
+      console.error('Error applying imported data:', error);
+      toast.error('Failed to import some fields. Please check the data.');
+    }
+  };
+
+  const handleImportedImage = (imageUrl: string) => {
+    // Store the image URL for later use
+    setImportedImageUrl(imageUrl);
+    
+    // Show image preview
+    setImagePreview(imageUrl);
+    
+    console.log('Set image URL:', imageUrl);
+  };
+
+  const highlightImportedFields = () => {
+    const fields = ['headline', 'primaryText', 'description', 'callToAction'];
+    
+    fields.forEach(fieldName => {
+      setTimeout(() => {
+        const field = document.querySelector(`[name="${fieldName}"]`) as HTMLElement;
+        if (field) {
+          // Add highlight
+          field.style.transition = 'all 0.3s ease';
+          field.style.border = '2px solid #10b981';
+          field.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+          
+          // Remove highlight after 3 seconds
+          setTimeout(() => {
+            field.style.border = '';
+            field.style.boxShadow = '';
+          }, 3000);
+        }
+      }, 100); // Small delay to ensure DOM is ready
+    });
+  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -517,11 +679,26 @@ const CampaignForm: React.FC = () => {
         return;
       }
 
+      // Handle imported image from Ad Scraper
+      let processedImageFile = imageFile;
+      if (importedImageUrl && !imageFile && mediaType === 'single_image') {
+        try {
+          console.log('📥 Downloading imported image from:', importedImageUrl);
+          const response = await fetch(importedImageUrl);
+          const blob = await response.blob();
+          processedImageFile = new File([blob], 'imported-ad-image.jpg', { type: 'image/jpeg' });
+          console.log('✅ Successfully downloaded imported image');
+        } catch (error) {
+          console.error('Failed to download imported image:', error);
+          toast.error('Failed to download imported image. Campaign will be created without image.');
+        }
+      }
+
       const campaignData = { 
         ...data, 
         budgetType,
         mediaType,
-        image: mediaType === 'single_image' ? imageFile || undefined : undefined,
+        image: mediaType === 'single_image' ? processedImageFile || undefined : undefined,
         images: mediaType === 'carousel' ? carouselImages : undefined,
         video: mediaType === 'video' ? videoFile || undefined : undefined,
         schedule: (scheduleEnabled || budgetType === 'lifetime') ? {
@@ -629,6 +806,30 @@ const CampaignForm: React.FC = () => {
         <Alert severity="info" sx={{ flex: 1, mr: 2 }}>
           All campaigns will be created with [REVIEW] prefix in PAUSED status for your approval
         </Alert>
+        
+        {/* Ad Scraper import notification */}
+        {(importedImageUrl || imagePreview) && (
+          <Alert severity="info" sx={{ flex: 1, mr: 2 }}>
+            <AlertTitle>Ad Imported from Ad Scraper</AlertTitle>
+            Your ad creative has been imported successfully. Review and complete the remaining fields.
+            {imagePreview && (
+              <Box sx={{ mt: 1 }}>
+                <img 
+                  src={imagePreview} 
+                  alt="Imported ad" 
+                  style={{ 
+                    maxWidth: '150px', 
+                    maxHeight: '100px',
+                    objectFit: 'cover',
+                    borderRadius: '4px',
+                    border: '2px solid #0ea5e9'
+                  }} 
+                />
+              </Box>
+            )}
+          </Alert>
+        )}
+        
         {user && (
           <Typography variant="body2" color="textSecondary">
             Logged in as: {user.firstName} {user.lastName}
