@@ -703,9 +703,18 @@ const CampaignForm: React.FC = () => {
               dataUrlLength: imageData.length
             });
             
-            // Convert base64 data URL to File object
-            const response = await fetch(imageData);
-            const blob = await response.blob();
+            // Convert base64 data URL to File object (direct conversion - no CSP issues)
+            const base64Data = imageData.split(',')[1]; // Remove "data:image/png;base64," prefix
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            
+            // Convert binary string to byte array
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            // Create blob from byte array
+            const blob = new Blob([bytes], { type: contentType });
             
             // Extract file extension from content type
             const fileExtension = contentType.split('/')[1] || 'jpg';
@@ -715,7 +724,9 @@ const CampaignForm: React.FC = () => {
             console.log('✅ Successfully downloaded and converted imported image:', {
               fileName,
               fileSize: blob.size,
-              fileType: contentType
+              fileType: contentType,
+              originalBase64Size: base64Data.length,
+              convertedBlobSize: blob.size
             });
           } else {
             const errorData = await proxyResponse.json();
