@@ -812,21 +812,6 @@ const CampaignForm: React.FC = () => {
           <Alert severity="info" sx={{ flex: 1, mr: 2 }}>
             <AlertTitle>Ad Imported from Ad Scraper</AlertTitle>
             Your ad creative has been imported successfully. Review and complete the remaining fields.
-            {imagePreview && (
-              <Box sx={{ mt: 1 }}>
-                <img 
-                  src={imagePreview} 
-                  alt="Imported ad" 
-                  style={{ 
-                    maxWidth: '150px', 
-                    maxHeight: '100px',
-                    objectFit: 'cover',
-                    borderRadius: '4px',
-                    border: '2px solid #0ea5e9'
-                  }} 
-                />
-              </Box>
-            )}
           </Alert>
         )}
         
@@ -1068,6 +1053,44 @@ const CampaignForm: React.FC = () => {
               </ToggleButton>
             </ToggleButtonGroup>
           </Box>
+
+          {/* Imported Image Preview - positioned near Media Type */}
+          {(importedImageUrl || imagePreview) && imagePreview && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ color: 'primary.main', fontWeight: 600 }}>
+                📥 Imported Image Preview
+              </Typography>
+              <Box sx={{ 
+                p: 2, 
+                border: '2px dashed #0ea5e9', 
+                borderRadius: 2, 
+                backgroundColor: '#f0f9ff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2
+              }}>
+                <img 
+                  src={imagePreview} 
+                  alt="Imported ad" 
+                  style={{ 
+                    maxWidth: '150px', 
+                    maxHeight: '100px',
+                    objectFit: 'cover',
+                    borderRadius: '8px',
+                    border: '1px solid #0ea5e9'
+                  }} 
+                />
+                <Box>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+                    This image was imported from Ad Scraper and will be used for your campaign.
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'primary.main' }}>
+                    You can still upload a different image below if needed.
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          )}
 
           {/* Media Upload based on type */}
           <Box>
