@@ -369,7 +369,7 @@ const CampaignForm: React.FC = () => {
     if (variation.imageUrl) {
       // Store the image URL for display
       // In production, you might want to download and convert to File
-      console.log('Image URL to handle:', variation.imageUrl);
+      handleImportedImage(variation.imageUrl);
     }
   };
   
