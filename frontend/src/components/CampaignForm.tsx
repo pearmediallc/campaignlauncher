@@ -679,17 +679,51 @@ const CampaignForm: React.FC = () => {
         return;
       }
 
-      // Handle imported image from Ad Scraper
+      // Handle imported image from Ad Scraper using backend proxy
       let processedImageFile = imageFile;
       if (importedImageUrl && !imageFile && mediaType === 'single_image') {
         try {
-          console.log('📥 Downloading imported image from:', importedImageUrl);
-          const response = await fetch(importedImageUrl);
-          const blob = await response.blob();
-          processedImageFile = new File([blob], 'imported-ad-image.jpg', { type: 'image/jpeg' });
-          console.log('✅ Successfully downloaded imported image');
+          console.log('📥 Downloading imported image via backend proxy from:', importedImageUrl);
+          
+          // Use backend proxy to download image (bypasses CSP restrictions)
+          const proxyResponse = await fetch('/api/images/proxy-download', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+            },
+            body: JSON.stringify({ imageUrl: importedImageUrl })
+          });
+          
+          if (proxyResponse.ok) {
+            const { imageData, contentType, originalSize } = await proxyResponse.json();
+            console.log('📨 Received image data via proxy:', {
+              contentType,
+              originalSize,
+              dataUrlLength: imageData.length
+            });
+            
+            // Convert base64 data URL to File object
+            const response = await fetch(imageData);
+            const blob = await response.blob();
+            
+            // Extract file extension from content type
+            const fileExtension = contentType.split('/')[1] || 'jpg';
+            const fileName = `imported-image-${Date.now()}.${fileExtension}`;
+            
+            processedImageFile = new File([blob], fileName, { type: contentType });
+            console.log('✅ Successfully downloaded and converted imported image:', {
+              fileName,
+              fileSize: blob.size,
+              fileType: contentType
+            });
+          } else {
+            const errorData = await proxyResponse.json();
+            console.error('❌ Backend proxy failed:', errorData);
+            toast.error(`Failed to download image: ${errorData.error}`);
+          }
         } catch (error) {
-          console.error('Failed to download imported image:', error);
+          console.error('Failed to download imported image via proxy:', error);
           toast.error('Failed to download imported image. Campaign will be created without image.');
         }
       }

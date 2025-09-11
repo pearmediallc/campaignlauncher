@@ -128,6 +128,9 @@ app.use('/api/resources', require('./routes/resourceManager'));
 // Variations import routes for Ad Scraper integration
 app.use('/api/variations', variationsRoutes);
 
+// Image proxy routes for external image downloads
+app.use('/api/images', require('./routes/images'));
+
 // Data deletion endpoints (required for Facebook App Review)
 app.use('/api/data-deletion', dataDeletionRoutes);
 
