@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta Business Suite</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            line-height: 1.4;
+        }
+        
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar {
+            width: 280px;
+            background-color: #ffffff;
+            border-right: 1px solid #e4e6eb;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e4e6eb;
+        }
+        
+        .sidebar-header h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1c1e21;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 15px;
+            color: #1c1e21;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+        
+        .nav-item:hover {
+            background-color: #f0f2f5;
+        }
+        
+        .nav-item.active {
+            background-color: #e7f3ff;
+            color: #1977F2;
+            font-weight: 600;
+        }
+        
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            fill: currentColor;
+        }
+        
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 20px;
+        }
+        
+        .content-section {
+            display: none;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        .content-section.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .section-header {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        
+        .section-header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .section-header p {
+            color: #65676b;
+            font-size: 14px;
+        }
+        
+        /* Cards and Tables */
+        .data-card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .data-table th {
+            text-align: left;
+            padding: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            color: #65676b;
+            border-bottom: 1px solid #e4e6eb;
+        }
+        
+        .data-table td {
+            padding: 16px 12px;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f2f5;
+        }
+        
+        .data-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        /* Status Toggle */
+        .status-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        
+        .toggle-switch {
+            width: 44px;
+            height: 24px;
+            background-color: #e4e6eb;
+            border-radius: 12px;
+            position: relative;
+            transition: background-color 0.3s;
+        }
+        
+        .toggle-switch.active {
+            background-color: #1977F2;
+        }
+        
+        .toggle-slider {
+            width: 20px;
+            height: 20px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(20px);
+        }
+        
+        .status-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status-text.active {
+            color: #1977F2;
+        }
+        
+        .status-text.paused {
+            color: #65676b;
+        }
+        
+        /* Metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-card {
+            background: #ffffff;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #e4e6eb;
+        }
+        
+        .metric-label {
+            font-size: 13px;
+            color: #65676b;
+            margin-bottom: 4px;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1c1e21;
+        }
+        
+        .metric-change {
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        
+        .metric-change.positive {
+            color: #42b883;
+        }
+        
+        .metric-change.negative {
+            color: #fa383e;
+        }
+        
+        /* Lead Form Fields */
+        .lead-fields {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e4e6eb;
+        }
+        
+        .field-item {
+            font-size: 13px;
+        }
+        
+        .field-label {
+            color: #65676b;
+        }
+        
+        .field-value {
+            color: #1c1e21;
+            font-weight: 500;
+        }
+        
+        /* Loading Animation */
+        .loading-pulse {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #1977F2;
+            border-radius: 50%;
+            animation: pulse 1.4s infinite ease-in-out;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            50% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+        }
+        
+        /* Page List */
+        .page-list {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .page-item {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background: #ffffff;
+            border: 1px solid #e4e6eb;
+            border-radius: 8px;
+            transition: box-shadow 0.2s;
+        }
+        
+        .page-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .page-avatar {
+            width: 48px;
+            height: 48px;
+            background-color: #e4e6eb;
+            border-radius: 8px;
+            margin-right: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: #1977F2;
+        }
+        
+        .page-details {
+            flex: 1;
+        }
+        
+        .page-name {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+        
+        .page-info {
+            font-size: 13px;
+            color: #65676b;
+        }
+        
+        .page-stats {
+            text-align: right;
+        }
+        
+        .page-followers {
+            font-weight: 600;
+            font-size: 16px;
+            color: #1c1e21;
+        }
+        
+        .page-label {
+            font-size: 12px;
+            color: #65676b;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Business Suite</h2>
+            </div>
+            <nav>
+                <button class="nav-item active" data-section="ads-overview">
+                    <svg viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12zm0-10a1 1 0 00-1 1v4a1 1 0 002 0V7a1 1 0 00-1-1zm0 8a1 1 0 100-2 1 1 0 000 2z"/></svg>
+                    Ads Overview
+                </button>
+                <button class="nav-item" data-section="pages-engagement">
+                    <svg viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 00-2 2v6a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-.09a1 1 0 100-2H14a4 4 0 014 4v6a4 4 0 01-4 4H6a4 4 0 01-4-4V7a4 4 0 012-2z"/></svg>
+                    Pages & Engagement
+                </button>
+                <button class="nav-item" data-section="lead-generation">
+                    <svg viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v10H5V5zm2 2a1 1 0 000 2h6a1 1 0 100-2H7zm0 4a1 1 0 000 2h6a1 1 0 100-2H7z"/></svg>
+                    Lead Generation
+                </button>
+                <button class="nav-item" data-section="campaign-management">
+                    <svg viewBox="0 0 20 20"><path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
+                    Campaign Management
+                </button>
+                <button class="nav-item" data-section="ad-management">
+                    <svg viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm2 0v8h12V6H4z"/></svg>
+                    Ad Management
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Ads Overview Section -->
+            <section id="ads-overview" class="content-section active">
+                <div class="section-header">
+                    <h1>Ads Overview</h1>
+                    <p>Performance metrics across all active campaigns</p>
+                </div>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Total Spend</div>
+                        <div class="metric-value">$124,892</div>
+                        <div class="metric-change positive">↑ 12.4% from last month</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Impressions</div>
+                        <div class="metric-value">18.7M</div>
+                        <div class="metric-change positive">↑ 8.2% from last month</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Average CPM</div>
+                        <div class="metric-value">$6.67</div>
+                        <div class="metric-change negative">↑ 3.1% from last month</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Average CTR</div>
+                        <div class="metric-value">2.84%</div>
+                        <div class="metric-change positive">↑ 0.3% from last month</div>
+                    </div>
+                </div>
+
+                <div class="data-card">
+                    <h3 style="margin-bottom: 16px; font-size: 18px;">Campaign Performance</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Campaign Name</th>
+                                <th>Status</th>
+                                <th>Spend</th>
+                                <th>Impressions</th>
+                                <th>CPM</th>
+                                <th>CTR</th>
+                                <th>Conversions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>TechVault B2B - Lead Gen Q1</td>
+                                <td><span class="loading-pulse"></span> Active</td>
+                                <td>$12,450</td>
+                                <td>1.8M</td>
+                                <td>$6.92</td>
+                                <td>3.2%</td>
+                                <td>486</td>
+                            </tr>
+                            <tr>
+                                <td>Luxe Beauty - Winter Collection</td>
+                                <td><span class="loading-pulse"></span> Active</td>
+                                <td>$28,920</td>
+                                <td>4.1M</td>
+                                <td>$7.05</td>
+                                <td>2.9%</td>
+                                <td>1,247</td>
+                            </tr>
+                            <tr>
+                                <td>AutoMax Chicago - Year End Sale</td>
+                                <td><span class="loading-pulse"></span> Active</td>
+                                <td>$15,780</td>
+                                <td>2.6M</td>
+                                <td>$6.07</td>
+                                <td>2.4%</td>
+                                <td>324</td>
+                            </tr>
+                            <tr>
+                                <td>FitLife Miami - New Year Promo</td>
+                                <td><span class="loading-pulse"></span> Active</td>
+                                <td>$9,340</td>
+                                <td>1.4M</td>
+                                <td>$6.67</td>
+                                <td>3.8%</td>
+                                <td>892</td>
+                            </tr>
+                            <tr>
+                                <td>GreenBite Seattle - Vegan Menu</td>
+                                <td><span class="loading-pulse"></span> Active</td>
+                                <td>$7,890</td>
+                                <td>980K</td>
+                                <td>$8.05</td>
+                                <td>2.1%</td>
+                                <td>156</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Pages & Engagement Section -->
+            <section id="pages-engagement" class="content-section">
+                <div class="section-header">
+                    <h1>Pages & Engagement</h1>
+                    <p>Manage and monitor page performance</p>
+                </div>
+
+                <div class="page-list">
+                    <div class="page-item">
+                        <div class="page-avatar">TV</div>
+                        <div class="page-details">
+                            <div class="page-name">TechVault Solutions</div>
+                            <div class="page-info">Software Company • San Francisco, CA</div>
+                        </div>
+                        <div class="page-stats">
+                            <div class="page-followers">48,923</div>
+                            <div class="page-label">followers</div>
+                        </div>
+                    </div>
+                    
+                    <div class="page-item">
+                        <div class="page-avatar">LB</div>
+                        <div class="page-details">
+                            <div class="page-name">Luxe Beauty</div>
+                            <div class="page-info">Beauty & Cosmetics • New York, NY</div>
+                        </div>
+                        <div class="page-stats">
+                            <div class="page-followers">267,450</div>
+                            <div class="page-label">followers</div>
+                        </div>
+                    </div>
+                    
+                    <div class="page-item">
+                        <div class="page-avatar">AM</div>
+                        <div class="page-details">
+                            <div class="page-name">AutoMax Chicago</div>
+                            <div class="page-info">Automotive Dealership • Chicago, IL</div>
+                        </div>
+                        <div class="page-stats">
+                            <div class="page-followers">19,847</div>
+                            <div class="page-label">followers</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="data-card" style="margin-top: 20px;">
+                    <h3 style="margin-bottom: 16px; font-size: 18px;">Engagement Metrics</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Page</th>
+                                <th>Weekly Reach</th>
+                                <th>Engagement Rate</th>
+                                <th>Post Interactions</th>
+                                <th>Page Views</th>
+                                <th>New Followers</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>TechVault Solutions</td>
+                                <td>142,890</td>
+                                <td>4.8%</td>
+                                <td>6,859</td>
+                                <td>28,450</td>
+                                <td>+1,247</td>
+                            </tr>
+                            <tr>
+                                <td>Luxe Beauty</td>
+                                <td>892,340</td>
+                                <td>6.2%</td>
+                                <td>55,325</td>
+                                <td>167,890</td>
+                                <td>+8,923</td>
+                            </tr>
+                            <tr>
+                                <td>AutoMax Chicago</td>
+                                <td>67,230</td>
+                                <td>3.1%</td>
+                                <td>2,084</td>
+                                <td>14,567</td>
+                                <td>+423</td>
+                            </tr>
+                            <tr>
+                                <td>FitLife Miami</td>
+                                <td>234,567</td>
+                                <td>5.4%</td>
+                                <td>12,667</td>
+                                <td>45,890</td>
+                                <td>+2,156</td>
+                            </tr>
+                            <tr>
+                                <td>GreenBite Seattle</td>
+                                <td>45,678</td>
+                                <td>7.2%</td>
+                                <td>3,289</td>
+                                <td>12,340</td>
+                                <td>+567</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Lead Generation Section -->
+            <section id="lead-generation" class="content-section">
+                <div class="section-header">
+                    <h1>Lead Generation</h1>
+                    <p>Track and manage lead forms and submissions</p>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Total Leads</div>
+                        <div class="metric-value">12,847</div>
+                        <div class="metric-change positive">↑ 18.2% from last month</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Cost Per Lead</div>
+                        <div class="metric-value">$28.45</div>
+                        <div class="metric-change positive">↓ 12.3% from last month</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Lead Quality Score</div>
+                        <div class="metric-value">78%</div>
+                        <div class="metric-change positive">↑ 4.2% from last month</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Conversion Rate</div>
+                        <div class="metric-value">34.2%</div>
+                        <div class="metric-change positive">↑ 2.8% from last month</div>
+                    </div>
+                </div>
+
+                <div class="data-card">
+                    <h3 style="margin-bottom: 16px; font-size: 18px;">Lead Form Performance</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Campaign</th>
+                                <th>Form Name</th>
+                                <th>Status</th>
+                                <th>Submissions</th>
+                                <th>Cost/Lead</th>
+                                <th>Quality Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>TechVault B2B</td>
+                                <td>Enterprise Demo Request</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch active">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text active">Active</span>
+                                    </div>
+                                </td>
+                                <td>1,847</td>
+                                <td>$32.50</td>
+                                <td>82%</td>
+                            </tr>
+                            <tr>
+                                <td>Insurance Quotes</td>
+                                <td>Free Quote Form</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch active">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text active">Active</span>
+                                    </div>
+                                </td>
+                                <td>3,256</td>
+                                <td>$24.80</td>
+                                <td>75%</td>
+                            </tr>
+                            <tr>
+                                <td>Real Estate LA</td>
+                                <td>Property Inquiry</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text paused">Paused</span>
+                                    </div>
+                                </td>
+                                <td>892</td>
+                                <td>$45.20</td>
+                                <td>68%</td>
+                            </tr>
+                            <tr>
+                                <td>FitLife Membership</td>
+                                <td>Free Trial Signup</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch active">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text active">Active</span>
+                                    </div>
+                                </td>
+                                <td>2,145</td>
+                                <td>$18.90</td>
+                                <td>85%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="lead-fields">
+                        <div class="field-item">
+                            <span class="field-label">Most Common Fields: </span>
+                            <span class="field-value">Email, Phone, Company Size</span>
+                        </div>
+                        <div class="field-item">
+                            <span class="field-label">Average Form Completion: </span>
+                            <span class="field-value">78.4%</span>
+                        </div>
+                        <div class="field-item">
+                            <span class="field-label">Peak Submission Time: </span>
+                            <span class="field-value">2:00 PM - 4:00 PM EST</span>
+                        </div>
+                        <div class="field-item">
+                            <span class="field-label">Mobile vs Desktop: </span>
+                            <span class="field-value">62% Mobile, 38% Desktop</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Campaign Management Section -->
+            <section id="campaign-management" class="content-section">
+                <div class="section-header">
+                    <h1>Campaign Management</h1>
+                    <p>Control and optimize your advertising campaigns</p>
+                </div>
+
+                <div class="data-card">
+                    <h3 style="margin-bottom: 16px; font-size: 18px;">Active Campaigns</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Campaign</th>
+                                <th>Objective</th>
+                                <th>Budget</th>
+                                <th>Schedule</th>
+                                <th>Performance</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>TechVault Q1 Lead Gen</td>
+                                <td>Lead Generation</td>
+                                <td>$15,000/month</td>
+                                <td>Jan 1 - Mar 31</td>
+                                <td>Above Target (+18%)</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch active">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text active">Active</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Luxe Winter Sale 2025</td>
+                                <td>Conversions</td>
+                                <td>$45,000/month</td>
+                                <td>Dec 15 - Feb 28</td>
+                                <td>On Target</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch active">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text active">Active</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>AutoMax Clearance Event</td>
+                                <td>Store Traffic</td>
+                                <td>$20,000/month</td>
+                                <td>Jan 10 - Jan 31</td>
+                                <td>Below Target (-8%)</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text paused">Paused</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Insurance Open Enrollment</td>
+                                <td>Lead Generation</td>
+                                <td>$35,000/month</td>
+                                <td>Nov 1 - Jan 15</td>
+                                <td>Above Target (+24%)</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch active">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text active">Active</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="data-card">
+                    <h3 style="margin-bottom: 16px; font-size: 18px;">Budget Allocation</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th>Monthly Budget</th>
+                                <th>Spent This Month</th>
+                                <th>Remaining</th>
+                                <th>Pace</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>TechVault Solutions</td>
+                                <td>$15,000</td>
+                                <td>$8,234</td>
+                                <td>$6,766</td>
+                                <td>On Track</td>
+                            </tr>
+                            <tr>
+                                <td>Luxe Beauty</td>
+                                <td>$45,000</td>
+                                <td>$24,567</td>
+                                <td>$20,433</td>
+                                <td>On Track</td>
+                            </tr>
+                            <tr>
+                                <td>AutoMax Chicago</td>
+                                <td>$20,000</td>
+                                <td>$12,890</td>
+                                <td>$7,110</td>
+                                <td>Overpacing</td>
+                            </tr>
+                            <tr>
+                                <td>SecureLife Insurance</td>
+                                <td>$35,000</td>
+                                <td>$18,923</td>
+                                <td>$16,077</td>
+                                <td>On Track</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Ad Management Section -->
+            <section id="ad-management" class="content-section">
+                <div class="section-header">
+                    <h1>Ad Management</h1>
+                    <p>Manage individual ad performance and creative</p>
+                </div>
+
+                <div class="data-card">
+                    <h3 style="margin-bottom: 16px; font-size: 18px;">Ad Performance</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Ad Name</th>
+                                <th>Ad Set</th>
+                                <th>Format</th>
+                                <th>Impressions</th>
+                                <th>CTR</th>
+                                <th>CPC</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Tech Solutions - Video A</td>
+                                <td>B2B Decision Makers</td>
+                                <td>Video</td>
+                                <td>847,293</td>
+                                <td>3.8%</td>
+                                <td>$1.24</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch active">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text active">Active</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Winter Collection - Carousel</td>
+                                <td>Fashion Enthusiasts 25-45</td>
+                                <td>Carousel</td>
+                                <td>1,234,567</td>
+                                <td>4.2%</td>
+                                <td>$0.89</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch active">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text active">Active</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Auto Deal - Image B</td>
+                                <td>Local Car Buyers</td>
+                                <td>Single Image</td>
+                                <td>567,890</td>
+                                <td>2.1%</td>
+                                <td>$2.45</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text paused">Paused</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Insurance Quote - Lead Form</td>
+                                <td>Homeowners 35-65</td>
+                                <td>Lead Form</td>
+                                <td>923,456</td>
+                                <td>5.2%</td>
+                                <td>$3.12</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch active">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text active">Active</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Fitness Trial - Collection</td>
+                                <td>Health Conscious 18-35</td>
+                                <td>Collection</td>
+                                <td>678,234</td>
+                                <td>3.5%</td>
+                                <td>$1.67</td>
+                                <td>
+                                    <div class="status-toggle" onclick="toggleStatus(this)">
+                                        <div class="toggle-switch active">
+                                            <div class="toggle-slider"></div>
+                                        </div>
+                                        <span class="status-text active">Active</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Best Performing Ad</div>
+                        <div class="metric-value" style="font-size: 16px;">Insurance Quote - Lead Form</div>
+                        <div class="metric-change positive">CTR: 5.2%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Lowest CPC</div>
+                        <div class="metric-value" style="font-size: 16px;">Winter Collection - Carousel</div>
+                        <div class="metric-change positive">CPC: $0.89</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Most Impressions</div>
+                        <div class="metric-value" style="font-size: 16px;">Winter Collection - Carousel</div>
+                        <div class="metric-change">1.2M impressions</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Navigation functionality
+        const navItems = document.querySelectorAll('.nav-item');
+        const sections = document.querySelectorAll('.content-section');
+
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const targetSection = item.getAttribute('data-section');
+                
+                // Update active nav item
+                navItems.forEach(nav => nav.classList.remove('active'));
+                item.classList.add('active');
+                
+                // Show corresponding section
+                sections.forEach(section => {
+                    section.classList.remove('active');
+                    if (section.id === targetSection) {
+                        section.classList.add('active');
+                    }
+                });
+            });
+        });
+
+        // Toggle status functionality
+        function toggleStatus(element) {
+            const toggleSwitch = element.querySelector('.toggle-switch');
+            const statusText = element.querySelector('.status-text');
+            
+            if (toggleSwitch.classList.contains('active')) {
+                toggleSwitch.classList.remove('active');
+                statusText.classList.remove('active');
+                statusText.classList.add('paused');
+                statusText.textContent = 'Paused';
+            } else {
+                toggleSwitch.classList.add('active');
+                statusText.classList.add('active');
+                statusText.classList.remove('paused');
+                statusText.textContent = 'Active';
+            }
+        }
+
+        // Simulate real-time data updates
+        function updateMetrics() {
+            // Update impressions randomly
+            const impressionElements = document.querySelectorAll('.metric-value');
+            impressionElements.forEach(el => {
+                if (el.textContent.includes('M') || el.textContent.includes('K')) {
+                    const currentValue = el.textContent;
+                    const numericValue = parseFloat(currentValue);
+                    const variation = (Math.random() - 0.5) * 0.01; // ±0.5% variation
+                    const newValue = numericValue * (1 + variation);
+                    
+                    if (currentValue.includes('M')) {
+                        el.textContent = newValue.toFixed(1) + 'M';
+                    } else if (currentValue.includes('K')) {
+                        el.textContent = newValue.toFixed(0) + 'K';
+                    }
+                }
+            });
+        }
+
+        // Update metrics every 5 seconds
+        setInterval(updateMetrics, 5000);
+
+        // Add loading animation to active campaigns
+        function animateLoadingPulse() {
+            const pulses = document.querySelectorAll('.loading-pulse');
+            pulses.forEach(pulse => {
+                pulse.style.opacity = Math.random() * 0.5 + 0.5;
+            });
+        }
+
+        setInterval(animateLoadingPulse, 1400);
+    </script>
+</body>
+</html>
