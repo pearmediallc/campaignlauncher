@@ -10,9 +10,10 @@ import {
   Menu,
   MenuItem,
   Divider,
-  Chip
+  Chip,
+  Button
 } from '@mui/material';
-import { AccountCircle, Dashboard, People, History, Person, Campaign } from '@mui/icons-material';
+import { AccountCircle, Dashboard, People, History, Person, Campaign, BarChart } from '@mui/icons-material';
 import ResourceSwitcher from './ResourceSwitcher';
 
 const Navigation: React.FC = () => {
@@ -74,7 +75,27 @@ const Navigation: React.FC = () => {
           <Box display="flex" alignItems="center" gap={2}>
             {/* Resource Switcher - Only show if user is authenticated */}
             <ResourceSwitcher />
-            
+
+            {/* Temporary Analytics Button - Remove when no longer needed */}
+            <Button
+              variant="contained"
+              startIcon={<BarChart />}
+              onClick={() => window.location.href = '/analytics.html'}
+              sx={{
+                backgroundColor: '#1877f2',
+                color: '#fff',
+                textTransform: 'none',
+                fontWeight: 500,
+                fontSize: '14px',
+                px: 2,
+                '&:hover': {
+                  backgroundColor: '#166fe5'
+                }
+              }}
+            >
+              Analytics
+            </Button>
+
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Typography variant="body2" sx={{ 
                 fontSize: '14px',
