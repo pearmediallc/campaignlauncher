@@ -128,6 +128,9 @@ app.use('/api/resources', require('./routes/resourceManager'));
 // Variations import routes for Ad Scraper integration
 app.use('/api/variations', variationsRoutes);
 
+// Strategy 1-50-1 routes
+app.use('/api/campaigns/strategy-150', require('./routes/strategy150'));
+
 // Image proxy routes for external image downloads
 app.use('/api/images', require('./routes/images'));
 

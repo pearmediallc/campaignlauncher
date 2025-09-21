@@ -628,16 +628,219 @@ class FacebookAPI {
     }
   }
 
+  // Strategy 150 specific methods
+  async createStrategy150Campaign(campaignData) {
+    try {
+      // Create campaign with Strategy 150 specific settings
+      const campaign = await this.createCampaign({
+        name: campaignData.campaignName,
+        objective: this.mapObjective(campaignData.objective),
+        buyingType: campaignData.buyingType.toUpperCase(),
+        specialAdCategories: campaignData.specialAdCategories
+      });
+
+      // Create ad set with Strategy 150 specific settings
+      const adSet = await this.createAdSet({
+        campaignId: campaign.id,
+        campaignName: campaignData.campaignName,
+        budgetType: campaignData.budgetType,
+        dailyBudget: campaignData.dailyBudget,
+        lifetimeBudget: campaignData.lifetimeBudget,
+        conversionLocation: campaignData.conversionLocation,
+        targeting: campaignData.targeting,
+        placements: campaignData.placements,
+        schedule: campaignData.schedule,
+        performanceGoal: campaignData.performanceGoal,
+        conversionEvent: campaignData.conversionEvent,
+        attributionSetting: campaignData.attributionSetting,
+        attributionWindow: campaignData.attributionWindow
+      });
+
+      // Create initial ad
+      const mediaAssets = await this.prepareMediaAssets(campaignData);
+      const ad = await this.createAd({
+        campaignName: campaignData.campaignName,
+        adsetId: adSet.id,
+        url: campaignData.url,
+        primaryText: campaignData.primaryText,
+        headline: campaignData.headline,
+        description: campaignData.description,
+        callToAction: campaignData.callToAction || 'LEARN_MORE',
+        mediaType: campaignData.mediaType || 'single_image',
+        publishDirectly: campaignData.publishDirectly,
+        ...mediaAssets
+      });
+
+      return {
+        campaign,
+        adSet,
+        ads: [ad]
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async getPostIdFromAd(adId) {
+    try {
+      // Method 1: Get creative from ad and extract post ID
+      const adResponse = await axios.get(`${this.baseURL}/${adId}`, {
+        params: {
+          fields: 'creative',
+          access_token: this.accessToken
+        }
+      });
+
+      if (adResponse.data.creative && adResponse.data.creative.id) {
+        const creativeResponse = await axios.get(`${this.baseURL}/${adResponse.data.creative.id}`, {
+          params: {
+            fields: 'effective_object_story_id',
+            access_token: this.accessToken
+          }
+        });
+
+        if (creativeResponse.data.effective_object_story_id) {
+          return creativeResponse.data.effective_object_story_id;
+        }
+      }
+
+      // Method 2: Fallback - search recent page posts
+      const now = new Date();
+      const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+
+      const postsResponse = await axios.get(`${this.baseURL}/${this.pageId}/posts`, {
+        params: {
+          fields: 'id,created_time,message',
+          since: Math.floor(fifteenMinutesAgo.getTime() / 1000),
+          access_token: this.accessToken
+        }
+      });
+
+      if (postsResponse.data.data && postsResponse.data.data.length > 0) {
+        // Return the most recent post (likely to be our ad)
+        return postsResponse.data.data[0].id;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error getting post ID from ad:', error);
+      return null;
+    }
+  }
+
+  async duplicateAdSetsWithExistingPost({ campaignId, originalAdSetId, postId, count, formData, userId }) {
+    const results = {
+      adSets: [],
+      errors: []
+    };
+
+    try {
+      // Get original ad set data
+      const originalAdSetResponse = await axios.get(`${this.baseURL}/${originalAdSetId}`, {
+        params: {
+          fields: 'name,targeting,bid_amount,billing_event,optimization_goal,bid_strategy,daily_budget,lifetime_budget,campaign_id',
+          access_token: this.accessToken
+        }
+      });
+
+      const originalAdSet = originalAdSetResponse.data;
+
+      // Create 49 duplicate ad sets
+      for (let i = 1; i <= count; i++) {
+        try {
+          // Create duplicate ad set
+          const duplicateAdSetData = {
+            name: `${originalAdSet.name} - Copy ${i}`,
+            campaign_id: campaignId,
+            billing_event: originalAdSet.billing_event,
+            optimization_goal: originalAdSet.optimization_goal,
+            bid_strategy: originalAdSet.bid_strategy,
+            targeting: JSON.stringify(originalAdSet.targeting),
+            status: 'PAUSED',
+            access_token: this.accessToken
+          };
+
+          // Add budget information
+          if (originalAdSet.daily_budget) {
+            duplicateAdSetData.daily_budget = originalAdSet.daily_budget;
+          }
+          if (originalAdSet.lifetime_budget) {
+            duplicateAdSetData.lifetime_budget = originalAdSet.lifetime_budget;
+          }
+
+          const adSetResponse = await axios.post(
+            `${this.baseURL}/act_${this.adAccountId}/adsets`,
+            null,
+            { params: duplicateAdSetData }
+          );
+
+          const newAdSetId = adSetResponse.data.id;
+
+          // Create ad using existing post
+          const adData = {
+            name: `${formData.campaignName} - Ad Copy ${i}`,
+            adset_id: newAdSetId,
+            creative: JSON.stringify({
+              object_story_id: postId,
+              page_id: this.pageId
+            }),
+            status: 'PAUSED',
+            access_token: this.accessToken
+          };
+
+          await axios.post(
+            `${this.baseURL}/act_${this.adAccountId}/ads`,
+            null,
+            { params: adData }
+          );
+
+          results.adSets.push({
+            id: newAdSetId,
+            name: duplicateAdSetData.name
+          });
+
+          console.log(`✅ Created ad set copy ${i}: ${newAdSetId}`);
+
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+        } catch (error) {
+          console.error(`❌ Error creating ad set copy ${i}:`, error);
+          results.errors.push({
+            adSetIndex: i,
+            error: error.message
+          });
+        }
+      }
+
+      console.log(`Strategy 1-50-1 duplication completed. Success: ${results.adSets.length}, Errors: ${results.errors.length}`);
+      return results;
+
+    } catch (error) {
+      console.error('Error in duplicateAdSetsWithExistingPost:', error);
+      throw error;
+    }
+  }
+
+  mapObjective(objective) {
+    const objectiveMap = {
+      'leads': 'OUTCOME_LEADS',
+      'conversions': 'CONVERSIONS',
+      'traffic': 'LINK_CLICKS'
+    };
+    return objectiveMap[objective] || 'OUTCOME_LEADS';
+  }
+
   handleError(error) {
     if (error.response) {
       const fbError = error.response.data.error;
       const errorMessage = fbError ? fbError.message : 'Facebook API Error';
       const errorCode = fbError ? fbError.code : 'UNKNOWN';
-      
+
       const customError = new Error(`Facebook API Error: ${errorMessage} (Code: ${errorCode})`);
       customError.status = error.response.status;
       customError.fbError = fbError;
-      
+
       throw customError;
     } else if (error.request) {
       throw new Error('No response from Facebook API');

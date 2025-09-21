@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const FacebookAuthService = require('../services/FacebookAuthService');
 const { AuthAuditLog, User, FacebookAuth, EligibilityCheck } = require('../models');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireFacebookAuth, refreshFacebookToken } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 
 // Rate limiting for auth endpoints
@@ -844,6 +845,126 @@ router.post('/sdk-callback', authenticate, authLimiter, async (req, res) => {
       success: false,
       error: 'Failed to process authentication'
     });
+  }
+});
+
+/**
+ * @route   GET /api/auth/facebook/pixels
+ * @desc    Get Facebook pixels for authenticated user
+ * @access  Private
+ */
+router.get('/pixels', authenticate, async (req, res) => {
+  try {
+    const facebookAuth = await FacebookAuth.findOne({
+      where: {
+        userId: req.userId,
+        isActive: true
+      }
+    });
+
+    if (!facebookAuth) {
+      return res.status(401).json({ error: 'Facebook authentication required' });
+    }
+
+    // Get pixels from stored data or fetch from Facebook
+    let pixels = facebookAuth.pixels || [];
+
+    // If no pixels stored or we need to refresh, fetch from Facebook
+    if (pixels.length === 0 || req.query.refresh === 'true') {
+      const accessToken = await FacebookAuthService.decryptToken(facebookAuth.accessToken);
+      const db = require('../models');
+
+      // Get the selected ad account
+      const adAccountId = facebookAuth.selectedAdAccount?.id;
+
+      if (adAccountId) {
+        try {
+          // Fetch pixels from Facebook Graph API
+          const pixelsResponse = await axios.get(
+            `https://graph.facebook.com/v18.0/${adAccountId}/adspixels`,
+            {
+              params: {
+                access_token: accessToken,
+                fields: 'id,name,code,last_fired_time,is_unavailable'
+              }
+            }
+          );
+
+          pixels = pixelsResponse.data.data || [];
+
+          // Update stored pixels
+          await facebookAuth.update({ pixels });
+        } catch (fbError) {
+          console.error('Facebook API error fetching pixels:', fbError.response?.data);
+          // Return stored pixels if Facebook API fails
+        }
+      }
+    }
+
+    res.json({ pixels });
+  } catch (error) {
+    console.error('Error fetching pixels:', error);
+    res.status(500).json({ error: 'Failed to fetch pixels' });
+  }
+});
+
+/**
+ * @route   GET /api/auth/facebook/audiences
+ * @desc    Get custom and lookalike audiences
+ * @access  Private
+ */
+router.get('/audiences', authenticate, async (req, res) => {
+  try {
+    const facebookAuth = await FacebookAuth.findOne({
+      where: {
+        userId: req.userId,
+        isActive: true
+      }
+    });
+
+    if (!facebookAuth || !facebookAuth.selectedAdAccount) {
+      return res.status(400).json({ error: 'No ad account selected' });
+    }
+
+    const accessToken = await FacebookAuthService.decryptToken(facebookAuth.accessToken);
+    const adAccountId = facebookAuth.selectedAdAccount.id;
+
+    let customAudiences = [];
+    let lookalikeAudiences = [];
+
+    try {
+      // Fetch custom audiences
+      const customAudiencesResponse = await axios.get(
+        `https://graph.facebook.com/v18.0/${adAccountId}/customaudiences`,
+        {
+          params: {
+            access_token: accessToken,
+            fields: 'id,name,description,approximate_count,time_created',
+            limit: 100
+          }
+        }
+      );
+
+      customAudiences = customAudiencesResponse.data.data || [];
+
+      // Filter for lookalike audiences
+      lookalikeAudiences = customAudiences.filter(audience =>
+        audience.name?.toLowerCase().includes('lookalike') ||
+        audience.description?.toLowerCase().includes('lookalike')
+      );
+
+    } catch (fbError) {
+      console.error('Facebook API error fetching audiences:', fbError.response?.data);
+      // Return empty arrays if Facebook API fails
+    }
+
+    res.json({
+      customAudiences,
+      lookalikeAudiences
+    });
+  } catch (error) {
+    console.error('Error fetching audiences:', error);
+    res.status(500).json({ error: 'Failed to fetch audiences' });
   }
 });
 
