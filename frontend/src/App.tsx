@@ -18,6 +18,7 @@ import FacebookSDKAuth from './components/FacebookSDKAuth';
 import FacebookAuthCallback from './pages/FacebookAuthCallback';
 import FacebookSDKTest from './pages/FacebookSDKTest';
 import ResourcesManagement from './pages/ResourcesManagement';
+import Strategy150Container from './components/Strategy150/Strategy150Container';
 
 const theme = createTheme({
   palette: {
@@ -121,6 +122,17 @@ function App() {
                   <>
                     <Navigation />
                     <ResourcesManagement />
+                  </>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/strategy-1-50-1"
+              element={
+                <ProtectedRoute>
+                  <>
+                    <Navigation />
+                    <Strategy150Container />
                   </>
                 </ProtectedRoute>
               }

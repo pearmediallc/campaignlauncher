@@ -1,0 +1,347 @@
+export interface Strategy150FormData {
+  // Base campaign fields
+  campaignName: string;
+  budgetType?: 'daily' | 'lifetime';
+  conversionLocation?: 'website' | 'calls';
+
+  // Campaign Level Extensions
+  buyingType: 'AUCTION' | 'RESERVED';
+  objective: 'OUTCOME_AWARENESS' | 'OUTCOME_ENGAGEMENT' | 'OUTCOME_LEADS' | 'OUTCOME_SALES' | 'OUTCOME_TRAFFIC' | 'OUTCOME_APP_PROMOTION';
+  budgetLevel: 'campaign' | 'adset';
+  specialAdCategories: string[];
+  campaignBudgetOptimization?: boolean;
+  bidStrategy?: 'LOWEST_COST_WITHOUT_CAP' | 'LOWEST_COST_WITH_BID_CAP' | 'COST_CAP' | 'LOWEST_COST_WITH_MIN_ROAS';
+
+  // Campaign Budget Options
+  campaignBudget?: {
+    dailyBudget?: number;
+    lifetimeBudget?: number;
+  };
+
+  // Ad Set Level Extensions
+  performanceGoal: 'maximize_conversions' | 'cost_per_result' | 'lowest_cost';
+  pixel?: string; // Renamed from dataset
+  conversionEvent: 'PageView' | 'ViewContent' | 'Search' | 'AddToCart' | 'AddToWishlist' | 'InitiateCheckout' | 'AddPaymentInfo' | 'Purchase' | 'Lead' | 'CompleteRegistration' | 'Contact' | 'SubmitApplication' | 'Schedule' | 'StartTrial' | 'Subscribe' | 'CustomizeProduct' | 'Donate' | 'FindLocation';
+  attributionSetting: 'standard' | '1_day_view' | '7_day_click' | '28_day_click';
+  attributionWindow: '1_day' | '7_day' | '28_day';
+
+  // Ad Set Budget & Schedule
+  adSetBudget?: {
+    dailyBudget?: number;
+    lifetimeBudget?: number;
+    startDate?: string;
+    endDate?: string;
+    scheduleType?: 'run_continuously' | 'scheduled';
+    dayparting?: Array<{
+      days: string[];
+      startTime: string;
+      endTime: string;
+    }>;
+    spendingLimits?: {
+      daily?: number;
+      lifetime?: number;
+    };
+  };
+
+  // Enhanced Targeting
+  targeting?: {
+    locations?: {
+      countries?: string[];
+      regions?: string[];
+      cities?: string[];
+      zips?: string[];
+      addressRadius?: {
+        address: string;
+        radius: number;
+        distanceUnit: 'mile' | 'kilometer';
+      }[];
+    };
+    ageMin?: number;
+    ageMax?: number;
+    genders?: string[];
+    languages?: string[];
+    detailedTargeting?: {
+      interests?: string[];
+      behaviors?: string[];
+      demographics?: string[];
+    };
+    customAudiences?: string[];
+    lookalikeAudiences?: string[];
+    connections?: {
+      include?: string[];
+      exclude?: string[];
+    };
+  };
+
+  // Enhanced Placements
+  placementType?: 'automatic' | 'manual';
+  placements?: {
+    facebook?: string[];
+    instagram?: string[];
+    messenger?: string[];
+    audienceNetwork?: string[];
+    devices?: string[];
+    platforms?: string[];
+    publisherPlatforms?: string[];
+  };
+
+  // Ad Level Extensions
+  facebookPage?: string;
+  instagramAccount?: string;
+  urlType?: 'website' | 'app_deeplink' | 'facebook_event' | 'messenger' | 'whatsapp' | 'lead_gen' | 'call' | 'none';
+  url?: string;
+  primaryText: string;
+  headline: string;
+  description?: string;
+  callToAction?: string;
+  displayLink?: string;
+
+  // Media fields
+  mediaType?: 'single_image' | 'video' | 'carousel';
+  mediaFiles?: File[];
+  image?: File;
+  video?: File;
+  images?: File[];
+
+  // Media Specifications
+  mediaSpecs?: {
+    imageSpecs?: {
+      aspectRatio?: '1:1' | '4:5' | '16:9' | '9:16' | '2:3';
+      minWidth?: number;
+      minHeight?: number;
+      maxFileSize?: number;
+    };
+    videoSpecs?: {
+      aspectRatio?: '1:1' | '4:5' | '16:9' | '9:16' | '2:3';
+      minDuration?: number;
+      maxDuration?: number;
+      maxFileSize?: number;
+    };
+    carouselSpecs?: {
+      cardCount?: number;
+      mixedMedia?: boolean;
+    };
+  };
+
+  // Duplication Settings for 49 Ad Sets
+  duplicationSettings?: {
+    defaultBudgetPerAdSet?: number;
+    customBudgets?: Array<{
+      adSetIndex: number;
+      budget: number;
+    }>;
+    budgetDistributionType?: 'equal' | 'custom' | 'weighted';
+  };
+
+  // Process Control
+  publishDirectly: boolean;
+  postId?: string;
+  manualPostId?: string;
+  useExistingPost?: boolean;
+
+  // Additional fields for type compatibility
+  costCap?: number;
+  minRoas?: number;
+  campaignSpendingLimit?: number;
+  manualPixelId?: string;
+}
+
+export interface Strategy150Response {
+  success: boolean;
+  message: string;
+  data?: {
+    phase: 'initial' | 'waiting' | 'duplicating' | 'completed';
+    campaign: { id: string; name: string };
+    adSet: { id: string; name: string };
+    ads: Array<{ id: string; name: string }>;
+    postId?: string;
+    duplicatedAdSets?: Array<{ id: string; name: string }>;
+    progress?: number;
+  };
+  error?: string;
+}
+
+export interface PostIdResponse {
+  success: boolean;
+  postId?: string;
+  error?: string;
+  requiresManualInput?: boolean;
+}
+
+export interface DuplicationProgress {
+  completed: number;
+  total: number;
+  currentOperation: string;
+  adSets: Array<{ id: string; name: string }>;
+  errors: Array<{ adSetIndex: number; error: string }>;
+}
+
+export type Strategy150Phase = 'setup' | 'creating' | 'waiting' | 'manual' | 'duplicating' | 'completed' | 'error';
+
+// Meta API Options - Complete Set
+export const BUYING_TYPE_OPTIONS = [
+  { value: 'AUCTION', label: 'Auction' },
+  { value: 'RESERVED', label: 'Reach and Frequency' }
+];
+
+export const OBJECTIVE_OPTIONS = [
+  // Awareness
+  { value: 'OUTCOME_AWARENESS', label: 'Awareness', category: 'Awareness' },
+  { value: 'BRAND_AWARENESS', label: 'Brand awareness', category: 'Awareness' },
+  { value: 'REACH', label: 'Reach', category: 'Awareness' },
+  { value: 'VIDEO_VIEWS', label: 'Video views', category: 'Awareness' },
+
+  // Traffic
+  { value: 'OUTCOME_TRAFFIC', label: 'Traffic', category: 'Traffic' },
+  { value: 'LINK_CLICKS', label: 'Link clicks', category: 'Traffic' },
+  { value: 'LANDING_PAGE_VIEWS', label: 'Landing page views', category: 'Traffic' },
+
+  // Engagement
+  { value: 'OUTCOME_ENGAGEMENT', label: 'Engagement', category: 'Engagement' },
+  { value: 'POST_ENGAGEMENT', label: 'Post engagement', category: 'Engagement' },
+  { value: 'PAGE_LIKES', label: 'Page likes', category: 'Engagement' },
+  { value: 'EVENT_RESPONSES', label: 'Event responses', category: 'Engagement' },
+  { value: 'MESSAGES', label: 'Messages', category: 'Engagement' },
+
+  // Leads
+  { value: 'OUTCOME_LEADS', label: 'Leads', category: 'Leads' },
+  { value: 'LEAD_GENERATION', label: 'Lead generation', category: 'Leads' },
+  { value: 'INSTANT_FORMS', label: 'Instant forms', category: 'Leads' },
+  { value: 'MESSENGER_LEADS', label: 'Messenger leads', category: 'Leads' },
+  { value: 'PHONE_CALL', label: 'Calls', category: 'Leads' },
+
+  // App Promotion
+  { value: 'OUTCOME_APP_PROMOTION', label: 'App promotion', category: 'App' },
+  { value: 'APP_INSTALLS', label: 'App installs', category: 'App' },
+  { value: 'APP_EVENTS', label: 'App events', category: 'App' },
+
+  // Sales
+  { value: 'OUTCOME_SALES', label: 'Sales', category: 'Sales' },
+  { value: 'CONVERSIONS', label: 'Conversions', category: 'Sales' },
+  { value: 'CATALOG_SALES', label: 'Catalog sales', category: 'Sales' },
+  { value: 'STORE_VISITS', label: 'Store traffic', category: 'Sales' }
+];
+
+export const BUDGET_LEVEL_OPTIONS = [
+  { value: 'campaign', label: 'Campaign Budget Optimization (CBO)' },
+  { value: 'adset', label: 'Ad Set Budget' }
+];
+
+export const BID_STRATEGY_OPTIONS = [
+  { value: 'LOWEST_COST_WITHOUT_CAP', label: 'Lowest cost (no cap)' },
+  { value: 'LOWEST_COST_WITH_BID_CAP', label: 'Lowest cost with bid cap' },
+  { value: 'COST_CAP', label: 'Cost cap' },
+  { value: 'LOWEST_COST_WITH_MIN_ROAS', label: 'Minimum ROAS' }
+];
+
+export const SPECIAL_AD_CATEGORIES = [
+  { value: 'NONE', label: 'None' },
+  { value: 'CREDIT', label: 'Credit' },
+  { value: 'EMPLOYMENT', label: 'Employment' },
+  { value: 'HOUSING', label: 'Housing' },
+  { value: 'SOCIAL_ISSUES', label: 'Social issues, elections or politics' },
+  { value: 'ONLINE_GAMBLING_AND_GAMING', label: 'Online gambling and gaming' }
+];
+
+export const PERFORMANCE_GOAL_OPTIONS = [
+  { value: 'maximize_conversions', label: 'Maximize number of conversions' },
+  { value: 'maximize_value', label: 'Maximize value of conversions' },
+  { value: 'cost_per_result', label: 'Cost per result goal' },
+  { value: 'lowest_cost', label: 'Lowest cost' },
+  { value: 'roas', label: 'Return on ad spend (ROAS)' }
+];
+
+export const CONVERSION_EVENT_OPTIONS = [
+  // Standard Events
+  { value: 'PageView', label: 'Page View' },
+  { value: 'ViewContent', label: 'View Content' },
+  { value: 'Search', label: 'Search' },
+  { value: 'AddToCart', label: 'Add to Cart' },
+  { value: 'AddToWishlist', label: 'Add to Wishlist' },
+  { value: 'InitiateCheckout', label: 'Initiate Checkout' },
+  { value: 'AddPaymentInfo', label: 'Add Payment Info' },
+  { value: 'Purchase', label: 'Purchase' },
+  { value: 'Lead', label: 'Lead' },
+  { value: 'CompleteRegistration', label: 'Complete Registration' },
+  { value: 'Contact', label: 'Contact' },
+  { value: 'SubmitApplication', label: 'Submit Application' },
+  { value: 'Schedule', label: 'Schedule' },
+  { value: 'StartTrial', label: 'Start Trial' },
+  { value: 'Subscribe', label: 'Subscribe' },
+  { value: 'CustomizeProduct', label: 'Customize Product' },
+  { value: 'Donate', label: 'Donate' },
+  { value: 'FindLocation', label: 'Find Location' }
+];
+
+export const ATTRIBUTION_SETTING_OPTIONS = [
+  { value: 'standard', label: 'Standard' },
+  { value: '1_day_click', label: '1-day click' },
+  { value: '7_day_click', label: '7-day click' },
+  { value: '1_day_click_1_day_view', label: '1-day click or 1-day view' },
+  { value: '7_day_click_1_day_view', label: '7-day click or 1-day view' },
+  { value: '28_day_click_1_day_view', label: '28-day click or 1-day view' }
+];
+
+export const ATTRIBUTION_WINDOW_OPTIONS = [
+  { value: '1_day', label: '1 day' },
+  { value: '7_day', label: '7 days' },
+  { value: '28_day', label: '28 days' }
+];
+
+// Placement Options
+export const PLACEMENT_OPTIONS = {
+  facebook: [
+    { value: 'feed', label: 'Feed' },
+    { value: 'instant_article', label: 'Instant Articles' },
+    { value: 'marketplace', label: 'Marketplace' },
+    { value: 'video_feeds', label: 'Video Feeds' },
+    { value: 'stories', label: 'Stories' },
+    { value: 'search', label: 'Search Results' },
+    { value: 'reels', label: 'Reels' },
+    { value: 'shops', label: 'Shops' },
+    { value: 'groups', label: 'Groups Feed' }
+  ],
+  instagram: [
+    { value: 'stream', label: 'Feed' },
+    { value: 'stories', label: 'Stories' },
+    { value: 'reels', label: 'Reels' },
+    { value: 'profile_feed', label: 'Profile Feed' },
+    { value: 'explore', label: 'Explore' },
+    { value: 'explore_home', label: 'Explore Home' },
+    { value: 'shops', label: 'Shop' },
+    { value: 'search', label: 'Search Results' }
+  ],
+  messenger: [
+    { value: 'inbox', label: 'Inbox' },
+    { value: 'stories', label: 'Stories' },
+    { value: 'sponsored_messages', label: 'Sponsored Messages' }
+  ],
+  audience_network: [
+    { value: 'classic', label: 'Native, Banner and Interstitial' },
+    { value: 'rewarded_video', label: 'Rewarded Video' },
+    { value: 'instream_video', label: 'In-Stream Video' }
+  ]
+};
+
+export const DEVICE_OPTIONS = [
+  { value: 'mobile', label: 'Mobile' },
+  { value: 'desktop', label: 'Desktop' },
+  { value: 'connected_tv', label: 'Connected TV' }
+];
+
+export const PLATFORM_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'ios', label: 'iOS' },
+  { value: 'android', label: 'Android' }
+];
+
+export const URL_TYPE_OPTIONS = [
+  { value: 'website', label: 'Website URL' },
+  { value: 'app_deeplink', label: 'App Deep Link' },
+  { value: 'facebook_event', label: 'Facebook Event' },
+  { value: 'messenger', label: 'Messenger' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'lead_gen', label: 'Lead Form' },
+  { value: 'call', label: 'Call' },
+  { value: 'none', label: 'None' }
+];

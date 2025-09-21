@@ -13,7 +13,7 @@ import {
   Chip,
   Button
 } from '@mui/material';
-import { AccountCircle, Dashboard, People, History, Person, Campaign, BarChart } from '@mui/icons-material';
+import { AccountCircle, Dashboard, People, History, Person, Campaign, BarChart, AutoAwesome } from '@mui/icons-material';
 import ResourceSwitcher from './ResourceSwitcher';
 
 const Navigation: React.FC = () => {
@@ -75,6 +75,28 @@ const Navigation: React.FC = () => {
           <Box display="flex" alignItems="center" gap={2}>
             {/* Resource Switcher - Only show if user is authenticated */}
             <ResourceSwitcher />
+
+            {/* Strategy 1-50-1 Button */}
+            <Button
+              variant="outlined"
+              startIcon={<AutoAwesome />}
+              onClick={() => navigate('/strategy-1-50-1')}
+              sx={{
+                borderColor: '#1877f2',
+                color: '#1877f2',
+                textTransform: 'none',
+                fontWeight: 500,
+                fontSize: '14px',
+                px: 2,
+                '&:hover': {
+                  borderColor: '#166fe5',
+                  color: '#166fe5',
+                  backgroundColor: 'rgba(24, 119, 242, 0.04)'
+                }
+              }}
+            >
+              Strategy 1-50-1
+            </Button>
 
             {/* Temporary Analytics Button - Remove when no longer needed */}
             <Button
