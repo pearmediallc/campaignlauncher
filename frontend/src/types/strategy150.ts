@@ -58,6 +58,7 @@ export interface Strategy150FormData {
     };
     ageMin?: number;
     ageMax?: number;
+    ageRange?: number[];
     genders?: string[];
     languages?: string[];
     detailedTargeting?: {

@@ -185,16 +185,19 @@ const Strategy150Container: React.FC = () => {
         campaignName: campaignData.campaignName,
         primaryText: campaignData.primaryText,
         headline: campaignData.headline,
-        description: campaignData.description,
-        url: campaignData.url,
-        urlType: campaignData.urlType,
-        callToAction: campaignData.callToAction,
+        description: campaignData.description || '',
+        url: campaignData.url || '',
+        urlType: (campaignData.urlType === 'lead_gen' || campaignData.urlType === 'call') ? campaignData.urlType : 'lead_gen',
+        callToAction: campaignData.callToAction || 'LEARN_MORE',
         displayLink: campaignData.displayLink,
 
         // Budget
         budgetType: campaignData.budgetType,
         dailyBudget: campaignData.dailyBudget,
         lifetimeBudget: campaignData.lifetimeBudget,
+
+        // Required field for CampaignFormData
+        conversionLocation: campaignData.conversionLocation || 'website',
 
         // Meta API fields
         objective: campaignData.objective,
@@ -203,19 +206,24 @@ const Strategy150Container: React.FC = () => {
         conversionEvent: campaignData.conversionEvent,
         bidStrategy: campaignData.bidStrategy,
 
-        // Targeting in working format
+        // Targeting in working format (simplified for CampaignForm compatibility)
         targeting: {
           locations: campaignData.targeting?.locations || { countries: ['US'] },
-          ageMin: campaignData.targeting?.ageMin || 18,
-          ageMax: campaignData.targeting?.ageMax || 65,
+          ageMin: 18, // Use default values since CampaignForm expects simple structure
+          ageMax: 65,
         },
 
         // Media
-        mediaType: campaignData.mediaType,
+        mediaType: campaignData.mediaType || 'single_image',
         image: campaignData.image,
 
-        // Placements
-        placements: campaignData.placementType === 'automatic' ? {} : campaignData.placements
+        // Placements (provide defaults to match CampaignFormData structure)
+        placements: {
+          facebook: campaignData.placements?.facebook || ['feed'],
+          instagram: campaignData.placements?.instagram || ['stream'],
+          audience_network: campaignData.placements?.audienceNetwork || [],
+          messenger: campaignData.placements?.messenger || []
+        }
       };
 
       console.log('📤 Sending to working endpoint:', workingCampaignData);
@@ -226,59 +234,54 @@ const Strategy150Container: React.FC = () => {
 
       console.log('📥 Response from working endpoint:', result);
 
-      // Enhanced error logging
-      if (result.errors && Array.isArray(result.errors)) {
-        console.error('❌ Validation errors detected:', result.errors.length, 'error(s)');
-        result.errors.forEach((err: any, index: number) => {
-          console.error(`  Error ${index + 1}:`, {
-            field: err.path || err.param || 'unknown',
-            message: err.msg || err.message || 'no message',
-            value: err.value !== undefined ? err.value : 'undefined',
-            location: err.location || 'body',
-            type: err.type || 'unknown'
-          });
-        });
-        // Also log the raw error for debugging
-        console.error('  Raw error object:', JSON.stringify(result.errors, null, 2));
+      // Enhanced error logging (CampaignResponse only has 'error' field, not 'errors')
+      if (result.error) {
+        console.error('❌ Campaign creation error:', result.error);
       }
 
       if (result.success) {
-        // Transform response to Strategy150Response format
+        // Transform CampaignResponse to Strategy150Response format
         const strategy150Result: Strategy150Response = {
           success: true,
           message: result.message || 'Campaign created successfully',
           data: {
-            phase: result.data?.phase || 'waiting',
+            phase: 'waiting', // Set to waiting since we'll capture Post ID next
             campaign: result.data?.campaign || {
-              id: result.data?.campaignId,
+              id: 'unknown',
               name: data.campaignName
             },
             adSet: result.data?.adSet || {
-              id: result.data?.adSetId,
+              id: 'unknown',
               name: `${data.campaignName} - Ad Set 1`
             },
             ads: result.data?.ads || [{
-              id: result.data?.adId,
+              id: 'unknown',
               name: `${data.campaignName} - Ad 1`
             }]
           }
         };
 
+        console.log('📝 Transformed response:', strategy150Result);
         setCampaignResult(strategy150Result);
         setPhase('waiting');
 
-        // Start automatic post ID capture
-        setTimeout(() => {
-          handleAutoPostCapture(result.data.adId);
-        }, 30000); // Wait 30 seconds before trying to fetch post ID
-      } else {
-        // Handle validation errors
-        if (result.errors && Array.isArray(result.errors)) {
-          const errorMessages = result.errors.map((e: any) => e.msg || e.message || e).join('; ');
-          throw new Error(`Validation failed: ${errorMessages}`);
+        // Extract ad ID from the first ad for Post ID capture
+        const adId = result.data?.ads?.[0]?.id;
+        console.log('🎯 Extracted ad ID for Post ID capture:', adId);
+
+        if (adId) {
+          // Start automatic post ID capture with extracted ad ID
+          setTimeout(() => {
+            console.log('⏰ Starting Post ID capture for ad:', adId);
+            handleAutoPostCapture(adId);
+          }, 30000); // Wait 30 seconds before trying to fetch post ID
         } else {
-          throw new Error(result.error || 'Failed to create campaign');
+          console.warn('⚠️ No ad ID found in response, switching to manual input');
+          setPhase('manual');
         }
+      } else {
+        // Handle errors (CampaignResponse only has 'error' field)
+        throw new Error(result.error || 'Failed to create campaign');
       }
     } catch (error) {
       console.error('Phase 1 error:', error);
