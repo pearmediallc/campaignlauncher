@@ -33,14 +33,37 @@ class FacebookAPI {
   async createCampaign(campaignData) {
     try {
       const url = `${this.baseURL}/act_${this.adAccountId}/campaigns`;
+
+      // Use passed parameters instead of hardcoded values
       const params = {
         name: `[REVIEW] ${campaignData.name}`,
-        objective: 'OUTCOME_LEADS',
-        status: 'PAUSED',
-        special_ad_categories: JSON.stringify([]),
-        buying_type: 'AUCTION',
+        objective: campaignData.objective || 'OUTCOME_LEADS',
+        status: campaignData.status || 'PAUSED',
+        special_ad_categories: JSON.stringify(campaignData.specialAdCategories || []),
+        buying_type: campaignData.buyingType || 'AUCTION',
         access_token: this.accessToken
       };
+
+      // Add bid strategy at campaign level
+      if (campaignData.bidStrategy) {
+        params.bid_strategy = campaignData.bidStrategy;
+      }
+
+      // Add optional parameters if provided
+      if (campaignData.spend_cap) {
+        params.spend_cap = Math.round(parseFloat(campaignData.spend_cap) * 100);
+      }
+      if (campaignData.daily_budget) {
+        params.daily_budget = Math.round(parseFloat(campaignData.daily_budget) * 100);
+      }
+      if (campaignData.lifetime_budget) {
+        params.lifetime_budget = Math.round(parseFloat(campaignData.lifetime_budget) * 100);
+      }
+
+      console.log('Creating campaign with params:', {
+        ...params,
+        access_token: '[HIDDEN]'
+      });
 
       const response = await axios.post(url, null, { params });
       return response.data;
@@ -72,19 +95,37 @@ class FacebookAPI {
         name: `[REVIEW] ${adSetData.campaignName} - AdSet`,
         campaign_id: adSetData.campaignId,
         billing_event: 'IMPRESSIONS',
-        optimization_goal: adSetData.conversionLocation === 'calls' ? 'CALLS' : 'OFFSITE_CONVERSIONS',
-        bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
-        promoted_object: adSetData.conversionLocation === 'calls' ? 
-          JSON.stringify({
-            page_id: this.pageId
-          }) : 
-          JSON.stringify({
-            pixel_id: this.pixelId,
-            custom_event_type: 'LEAD'
-          }),
+        optimization_goal: this.getOptimizationGoal(adSetData),
+        bid_strategy: adSetData.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
+        promoted_object: this.getPromotedObject(adSetData),
         status: 'PAUSED',
         access_token: this.accessToken
       };
+
+      // Add performance goal if provided
+      if (adSetData.performanceGoal) {
+        params.performance_goal = adSetData.performanceGoal;
+      }
+
+      // Add attribution spec if provided
+      if (adSetData.attributionSetting || adSetData.attributionWindow) {
+        const attributionSpec = [];
+        if (adSetData.attributionWindow?.click || adSetData.attributionWindow?.['1_day_click']) {
+          attributionSpec.push({
+            event_type: 'CLICK_THROUGH',
+            window_days: parseInt(adSetData.attributionWindow?.click || adSetData.attributionWindow?.['1_day_click'] || 1)
+          });
+        }
+        if (adSetData.attributionWindow?.view || adSetData.attributionWindow?.['1_day_view']) {
+          attributionSpec.push({
+            event_type: 'VIEW_THROUGH',
+            window_days: parseInt(adSetData.attributionWindow?.view || adSetData.attributionWindow?.['1_day_view'] || 1)
+          });
+        }
+        if (attributionSpec.length > 0) {
+          params.attribution_spec = JSON.stringify(attributionSpec);
+        }
+      }
       
       // Handle budget based on type
       if (adSetData.budgetType === 'lifetime') {
@@ -94,14 +135,50 @@ class FacebookAPI {
         const dailyBudgetCents = Math.round(adSetData.dailyBudget * 100);
         params.daily_budget = dailyBudgetCents;
       }
+
+      // Add bid caps and constraints if provided
+      if (adSetData.costCap) {
+        params.bid_cap = Math.round(parseFloat(adSetData.costCap) * 100);
+      }
+      if (adSetData.minRoas) {
+        params.min_roas = parseFloat(adSetData.minRoas);
+      }
+      if (adSetData.bidAmount) {
+        params.bid_amount = Math.round(parseFloat(adSetData.bidAmount) * 100);
+      }
       
-      // Build targeting from provided data
+      // Build targeting from provided data with correct field names
       const targeting = {
-        age_min: adSetData.targeting?.ageMin || 18,
-        age_max: adSetData.targeting?.ageMax || 65,
+        age_min: adSetData.targeting?.ageMin || adSetData.targeting?.age_min || 18,
+        age_max: adSetData.targeting?.ageMax || adSetData.targeting?.age_max || 65,
       };
-      
-      // Add location targeting
+
+      // Handle gender targeting - check both locations for gender data
+      const genderSource = adSetData.targeting?.demographics?.genders || adSetData.targeting?.genders;
+      if (genderSource) {
+        const genders = Array.isArray(genderSource) ? genderSource : [genderSource];
+        if (!genders.includes('all')) {
+          // Map gender strings to Meta API numbers
+          const genderMap = { 'male': 1, 'female': 2 };
+          const mappedGenders = genders.map(g => genderMap[g] || g).filter(g => typeof g === 'number');
+          if (mappedGenders.length > 0) {
+            targeting.genders = mappedGenders;
+          }
+        }
+        // If 'all' is selected, don't set genders field - Meta defaults to all
+      }
+
+      // Handle age targeting - check for demographics object
+      if (adSetData.targeting?.demographics) {
+        if (adSetData.targeting.demographics.ageMin !== undefined) {
+          targeting.age_min = adSetData.targeting.demographics.ageMin;
+        }
+        if (adSetData.targeting.demographics.ageMax !== undefined) {
+          targeting.age_max = adSetData.targeting.demographics.ageMax;
+        }
+      }
+
+      // Add location targeting with correct structure
       if (adSetData.targeting?.locations) {
         targeting.geo_locations = {};
         if (adSetData.targeting.locations.countries && adSetData.targeting.locations.countries.length > 0) {
@@ -140,7 +217,7 @@ class FacebookAPI {
       }
       
       // Add platform and placement targeting
-      if (adSetData.placements) {
+      if (adSetData.placementType === 'manual' && adSetData.placements) {
         const platforms = [];
         const positions = {};
         
@@ -165,13 +242,9 @@ class FacebookAPI {
           targeting.publisher_platforms = platforms;
           Object.assign(targeting, positions);
         }
-      } else {
-        // Default placements
-        targeting.publisher_platforms = ['facebook', 'instagram', 'audience_network', 'messenger'];
-        targeting.facebook_positions = ['feed', 'right_hand_column', 'instant_article', 'marketplace', 'video_feeds', 'story'];
-        targeting.instagram_positions = ['stream', 'story', 'explore', 'reels'];
-        targeting.audience_network_positions = ['classic', 'rewarded_video'];
-        targeting.messenger_positions = ['messenger_home', 'story'];
+      } else if (adSetData.placementType !== 'manual') {
+        // Automatic placements - don't specify platforms or positions
+        // Meta will optimize placement automatically
       }
       
       console.log('Targeting object before stringify:', JSON.stringify(targeting, null, 2));
@@ -635,8 +708,12 @@ class FacebookAPI {
       const campaign = await this.createCampaign({
         name: campaignData.campaignName,
         objective: this.mapObjective(campaignData.objective),
-        buyingType: campaignData.buyingType.toUpperCase(),
-        specialAdCategories: campaignData.specialAdCategories
+        buyingType: campaignData.buyingType ? campaignData.buyingType.toUpperCase() : 'AUCTION',
+        specialAdCategories: campaignData.specialAdCategories,
+        bidStrategy: campaignData.bidStrategy,
+        status: campaignData.status || 'PAUSED',
+        daily_budget: campaignData.campaignBudgetOptimization && campaignData.campaignBudget?.dailyBudget ? campaignData.campaignBudget.dailyBudget : undefined,
+        lifetime_budget: campaignData.campaignBudgetOptimization && campaignData.campaignBudget?.lifetimeBudget ? campaignData.campaignBudget.lifetimeBudget : undefined
       });
 
       // Create ad set with Strategy 150 specific settings
@@ -648,12 +725,17 @@ class FacebookAPI {
         lifetimeBudget: campaignData.lifetimeBudget,
         conversionLocation: campaignData.conversionLocation,
         targeting: campaignData.targeting,
+        placementType: campaignData.placementType,
         placements: campaignData.placements,
         schedule: campaignData.schedule,
         performanceGoal: campaignData.performanceGoal,
         conversionEvent: campaignData.conversionEvent,
         attributionSetting: campaignData.attributionSetting,
-        attributionWindow: campaignData.attributionWindow
+        attributionWindow: campaignData.attributionWindow,
+        bidStrategy: campaignData.bidStrategy,
+        costCap: campaignData.costCap,
+        minRoas: campaignData.minRoas,
+        objective: campaignData.objective
       });
 
       // Create initial ad
@@ -820,6 +902,81 @@ class FacebookAPI {
       console.error('Error in duplicateAdSetsWithExistingPost:', error);
       throw error;
     }
+  }
+
+  getOptimizationGoal(adSetData) {
+    // Map optimization goals based on objective and conversion location
+    if (adSetData.conversionLocation === 'calls') {
+      return 'QUALITY_CALL';
+    }
+
+    // For OUTCOME_LEADS objective
+    if (adSetData.performanceGoal === 'maximize_conversions') {
+      return 'OFFSITE_CONVERSIONS';
+    } else if (adSetData.performanceGoal === 'maximize_leads') {
+      return 'LEAD_GENERATION';
+    }
+
+    // Default based on conversion event
+    const conversionEventMap = {
+      'Lead': 'OFFSITE_CONVERSIONS',
+      'Purchase': 'OFFSITE_CONVERSIONS',
+      'AddToCart': 'OFFSITE_CONVERSIONS',
+      'CompleteRegistration': 'OFFSITE_CONVERSIONS',
+      'ViewContent': 'LANDING_PAGE_VIEWS'
+    };
+
+    return conversionEventMap[adSetData.conversionEvent] || 'OFFSITE_CONVERSIONS';
+  }
+
+  getPromotedObject(adSetData) {
+    const promotedObject = {};
+
+    if (adSetData.conversionLocation === 'calls') {
+      promotedObject.page_id = this.pageId;
+    } else if (adSetData.conversionLocation === 'website' && this.pixelId) {
+      promotedObject.pixel_id = this.pixelId;
+
+      // Map conversion events to proper Meta API case-sensitive format
+      const eventMap = {
+        'LEAD': 'Lead',
+        'lead': 'Lead',
+        'Lead': 'Lead',
+        'PURCHASE': 'Purchase',
+        'purchase': 'Purchase',
+        'Purchase': 'Purchase',
+        'ADD_TO_CART': 'AddToCart',
+        'add_to_cart': 'AddToCart',
+        'AddToCart': 'AddToCart',
+        'COMPLETE_REGISTRATION': 'CompleteRegistration',
+        'complete_registration': 'CompleteRegistration',
+        'CompleteRegistration': 'CompleteRegistration',
+        'PAGE_VIEW': 'PageView',
+        'page_view': 'PageView',
+        'PageView': 'PageView',
+        'VIEW_CONTENT': 'ViewContent',
+        'view_content': 'ViewContent',
+        'ViewContent': 'ViewContent',
+        'INITIATE_CHECKOUT': 'InitiateCheckout',
+        'initiate_checkout': 'InitiateCheckout',
+        'InitiateCheckout': 'InitiateCheckout',
+        'ADD_PAYMENT_INFO': 'AddPaymentInfo',
+        'add_payment_info': 'AddPaymentInfo',
+        'AddPaymentInfo': 'AddPaymentInfo'
+      };
+
+      const conversionEvent = adSetData.conversionEvent || 'Lead';
+      promotedObject.custom_event_type = eventMap[conversionEvent] || conversionEvent;
+
+    } else if (adSetData.conversionLocation === 'app') {
+      promotedObject.application_id = adSetData.applicationId || process.env.FB_APP_ID;
+      promotedObject.object_store_url = adSetData.appStoreUrl;
+      if (adSetData.conversionEvent) {
+        promotedObject.custom_event_type = adSetData.conversionEvent;
+      }
+    }
+
+    return JSON.stringify(promotedObject);
   }
 
   mapObjective(objective) {
