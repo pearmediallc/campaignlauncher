@@ -1147,7 +1147,7 @@ class FacebookAPI {
         });
 
         if (creativeResponse.data.effective_object_story_id) {
-          return creativeResponse.data.effective_object_story_id.replace('_', '');
+          return creativeResponse.data.effective_object_story_id.replace(/_/g, '');
         }
       }
 
@@ -1165,7 +1165,7 @@ class FacebookAPI {
 
       if (postsResponse.data.data && postsResponse.data.data.length > 0) {
         // Return the most recent post (likely to be our ad)
-        return postsResponse.data.data[0].id.replace('_', '');
+        return postsResponse.data.data[0].id.replace(/_/g, '');
       }
 
       return null;

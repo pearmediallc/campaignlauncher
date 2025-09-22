@@ -452,13 +452,17 @@ const Strategy150Container: React.FC = () => {
   };
 
   const handlePostIdCaptured = (capturedPostId: string) => {
-    setPostId(capturedPostId);
+    // Normalize post ID by removing underscores
+    const normalizedPostId = capturedPostId.replace(/_/g, '');
+    setPostId(normalizedPostId);
     setPhase('duplicating');
     setActiveStep(2);
   };
 
   const handleManualPostId = (manualPostId: string) => {
-    setPostId(manualPostId);
+    // Normalize post ID by removing underscores
+    const normalizedPostId = manualPostId.replace(/_/g, '');
+    setPostId(normalizedPostId);
     setPhase('duplicating');
     setActiveStep(2);
   };

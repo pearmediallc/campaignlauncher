@@ -221,8 +221,8 @@ const validateStrategy150 = [
   body('publishDirectly').optional().isBoolean()
 ];
 
-// Create initial campaign (1-1-1) - JSON endpoint
-router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, requirePermission('campaign', 'create'), validateStrategy150, async (req, res) => {
+// Create initial campaign (1-1-1) - supports file uploads
+router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, requirePermission('campaign', 'create'), uploadSingle, validateStrategy150, async (req, res) => {
   try {
     console.log('📝 Strategy 1-50-1 creation request received:', {
       body: req.body,
@@ -358,14 +358,38 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       selectedPageId = req.body.selectedPageId;
     }
 
-    // Handle media files from base64 if present
+    // Handle media files using multer (same as campaigns.js)
     let mediaPath = null;
     let imagePaths = [];
 
-    if (req.body.mediaBase64) {
-      // Handle base64 media upload later if needed
-      // For now, we'll skip media handling to fix validation first
-      console.log('Media upload detected but skipped for JSON endpoint');
+    console.log('📎 Upload check:', {
+      mediaType: req.body.mediaType,
+      hasFile: !!req.file,
+      hasFiles: !!req.files,
+      fileDetails: req.file ? {
+        filename: req.file.filename,
+        path: req.file.path,
+        size: req.file.size
+      } : null
+    });
+
+    // Handle both req.file and req.files for single image (multer inconsistency)
+    if (req.body.mediaType === 'single_image') {
+      if (req.file) {
+        mediaPath = req.file.path;
+        console.log('✅ Single image detected (file):', mediaPath);
+      } else if (req.files && req.files.length > 0) {
+        mediaPath = req.files[0].path;
+        console.log('✅ Single image detected (files[0]):', mediaPath);
+      } else {
+        console.log('⚠️ No image file detected');
+      }
+    } else if (req.body.mediaType === 'carousel' && req.files) {
+      imagePaths = req.files.map(file => file.path);
+      console.log('✅ Carousel images detected:', imagePaths.length, 'images');
+    } else if (req.body.mediaType === 'video' && req.file) {
+      mediaPath = req.file.path;
+      console.log('✅ Video detected:', mediaPath);
     }
 
     // Parse and validate budget values (keep in dollars, FacebookAPI will convert to cents)
@@ -614,8 +638,10 @@ router.get('/verify-post/:postId', authenticate, requireFacebookAuth, async (req
 
     // Verify post exists by trying to fetch it
     const axios = require('axios');
+    // Normalize post ID for Facebook API (remove underscores)
+    const normalizedPostId = postId.replace(/_/g, '');
     try {
-      await axios.get(`https://graph.facebook.com/v18.0/${postId}`, {
+      await axios.get(`https://graph.facebook.com/v18.0/${normalizedPostId}`, {
         params: {
           access_token: decryptedToken,
           fields: 'id,message,created_time'
@@ -678,10 +704,13 @@ router.post('/duplicate', authenticate, requireFacebookAuth, async (req, res) =>
     });
 
     // Start the duplication process with custom budgets
+    // Ensure post ID has no underscores (Facebook format change)
+    const normalizedPostId = postId.replace(/_/g, '');
+
     const duplicateData = {
       campaignId,
       originalAdSetId,
-      postId,
+      postId: normalizedPostId,
       count,
       formData,
       userId: req.user.id
