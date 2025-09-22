@@ -837,6 +837,25 @@ class FacebookAPI {
       const errorMessage = fbError ? fbError.message : 'Facebook API Error';
       const errorCode = fbError ? fbError.code : 'UNKNOWN';
 
+      // Enhanced error logging for debugging
+      console.error('🔴 Facebook API Error Details:');
+      console.error('  Error Code:', errorCode);
+      console.error('  Error Message:', errorMessage);
+      if (fbError) {
+        console.error('  Error Type:', fbError.type);
+        console.error('  Error Subcode:', fbError.error_subcode);
+        console.error('  Error User Title:', fbError.error_user_title);
+        console.error('  Error User Message:', fbError.error_user_msg);
+        console.error('  Fbtrace ID:', fbError.fbtrace_id);
+        if (fbError.error_data) {
+          console.error('  Error Data:', JSON.stringify(fbError.error_data, null, 2));
+        }
+        console.error('  Full Error Object:', JSON.stringify(fbError, null, 2));
+      }
+      console.error('  Request URL:', error.config?.url);
+      console.error('  Request Method:', error.config?.method);
+      console.error('  Request Data:', error.config?.data);
+
       const customError = new Error(`Facebook API Error: ${errorMessage} (Code: ${errorCode})`);
       customError.status = error.response.status;
       customError.fbError = fbError;

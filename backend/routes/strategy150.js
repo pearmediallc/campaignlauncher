@@ -485,6 +485,16 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       publishDirectly: campaignData.publishDirectly
     });
 
+    // Log the final data being sent to Facebook API
+    console.log('📤 Sending to Facebook API:');
+    console.log('  Campaign Name:', campaignData.campaignName);
+    console.log('  Objective:', campaignData.objective);
+    console.log('  Daily Budget:', campaignData.dailyBudget, typeof campaignData.dailyBudget);
+    console.log('  Page ID:', campaignData.facebookPage || selectedPageId);
+    console.log('  Pixel ID:', campaignData.pixel);
+    console.log('  Media Type:', campaignData.mediaType);
+    console.log('  Has Image:', !!campaignData.imagePath);
+
     // Create the initial 1-1-1 campaign structure
     const result = await userFacebookApi.createStrategy150Campaign(campaignData);
 
