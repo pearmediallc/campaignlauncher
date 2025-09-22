@@ -97,7 +97,7 @@ const Strategy150Container: React.FC = () => {
     console.log('  - Campaign Name:', data.campaignName);
     console.log('  - Objective:', data.objective);
     console.log('  - Budget Type:', data.budgetType);
-    console.log('  - Daily Budget:', data.dailyBudget);
+    console.log('  - Daily Budget:', data.adSetBudget?.dailyBudget || 'Not set');
     console.log('  - Conversion Event:', data.conversionEvent);
 
     try {
@@ -193,8 +193,8 @@ const Strategy150Container: React.FC = () => {
       console.log('📤 Using working campaign creation flow');
       console.log('📝 Budget configuration:');
       console.log('  - Budget Type:', data.budgetType);
-      console.log('  - Daily Budget:', data.dailyBudget);
-      console.log('  - Lifetime Budget:', data.lifetimeBudget);
+      console.log('  - Daily Budget:', data.adSetBudget?.dailyBudget || 'Not set');
+      console.log('  - Lifetime Budget:', data.adSetBudget?.lifetimeBudget || 'Not set');
 
       // Transform to match working CampaignForm structure
       // IMPORTANT: Only send fields that backend validates and expects

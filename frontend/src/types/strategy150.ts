@@ -153,7 +153,11 @@ export interface Strategy150Response {
   data?: {
     phase: 'initial' | 'waiting' | 'duplicating' | 'completed';
     campaign: { id: string; name: string };
-    adSet: { id: string; name: string };
+    adSet: {
+      id: string;
+      name: string;
+      _skippedFields?: any; // Fields that were skipped in safe mode
+    };
     ads: Array<{ id: string; name: string }>;
     postId?: string;
     duplicatedAdSets?: Array<{ id: string; name: string }>;

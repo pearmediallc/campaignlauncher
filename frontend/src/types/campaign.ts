@@ -82,7 +82,11 @@ export interface CampaignResponse {
   message: string;
   data?: {
     campaign: { id: string; name: string };
-    adSet: { id: string; name: string };
+    adSet: {
+      id: string;
+      name: string;
+      _skippedFields?: any; // Optional: fields skipped when using safe mode fallback
+    };
     ads: Array<{ id: string; name: string }>;
   };
   error?: string;
