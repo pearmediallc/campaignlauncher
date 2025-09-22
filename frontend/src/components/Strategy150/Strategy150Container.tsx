@@ -260,13 +260,35 @@ const Strategy150Container: React.FC = () => {
       });
 
       console.log('\n📤 Sending Request to Backend...');
-      console.log('🔗 Endpoint: /api/campaigns/create');
+      console.log('🔗 Endpoint: /api/campaigns/strategy-150/create');
       console.log('📦 Payload size:', JSON.stringify(workingCampaignData).length, 'bytes');
       console.log('📊 Request data:', workingCampaignData);
 
-      // Use the working API method
-      const { campaignApi } = await import('../../services/api');
-      const result = await campaignApi.createCampaign(workingCampaignData);
+      // Use Strategy 1-50-1 specific endpoint with all our enhancements
+      const formData = new FormData();
+
+      // Add all campaign data fields to FormData
+      Object.keys(workingCampaignData).forEach(key => {
+        if (workingCampaignData[key] !== undefined && workingCampaignData[key] !== null) {
+          if (key === 'targeting' || key === 'placements' || key === 'schedule') {
+            formData.append(key, JSON.stringify(workingCampaignData[key]));
+          } else if (key === 'media' && workingCampaignData[key] instanceof File) {
+            formData.append('media', workingCampaignData[key]);
+          } else {
+            formData.append(key, workingCampaignData[key]);
+          }
+        }
+      });
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5002/api'}/campaigns/strategy-150/create`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+
+      const result = await response.json();
 
       console.log('📥 Response from working endpoint:', result);
 
