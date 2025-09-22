@@ -124,17 +124,23 @@ const Strategy150Container: React.FC = () => {
         publishDirectly: data.publishDirectly,
 
         // Budget configuration
-        budgetType: data.budgetType,
+        budgetType: data.budgetType || 'daily',
         budgetLevel: data.budgetLevel || 'adset',
+
+        // Send budgets at root level for backend compatibility
+        dailyBudget: data.adSetBudget?.dailyBudget ||
+                    (data.budgetType === 'daily' || !data.budgetType ? 50 : undefined),
+        lifetimeBudget: data.adSetBudget?.lifetimeBudget ||
+                       (data.budgetType === 'lifetime' ? 350 : undefined),
 
         // Campaign budget (for CBO)
         campaignBudget: data.campaignBudget,
         campaignBudgetOptimization: data.campaignBudgetOptimization,
 
-        // Ad set budget
+        // Ad set budget (keep for backward compatibility)
         adSetBudget: data.adSetBudget || {
-          dailyBudget: data.budgetType === 'daily' ? 1 : undefined,
-          lifetimeBudget: data.budgetType === 'lifetime' ? 7 : undefined
+          dailyBudget: data.budgetType === 'daily' ? 50 : undefined,
+          lifetimeBudget: data.budgetType === 'lifetime' ? 350 : undefined
         },
 
         // Meta API compliance fields

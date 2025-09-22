@@ -38,6 +38,115 @@ import {
 import { useFacebookResources } from '../../../hooks/useFacebookResources';
 import axios from 'axios';
 
+// Full list of countries for targeting
+const COUNTRIES = [
+  { code: 'US', name: 'United States' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'IN', name: 'India' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'CN', name: 'China' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'NO', name: 'Norway' },
+  { code: 'DK', name: 'Denmark' },
+  { code: 'FI', name: 'Finland' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'RU', name: 'Russia' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'CL', name: 'Chile' },
+  { code: 'CO', name: 'Colombia' },
+  { code: 'PE', name: 'Peru' },
+  { code: 'VE', name: 'Venezuela' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'VN', name: 'Vietnam' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'TW', name: 'Taiwan' },
+  { code: 'HK', name: 'Hong Kong' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'EG', name: 'Egypt' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'TR', name: 'Turkey' },
+  { code: 'GR', name: 'Greece' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'CZ', name: 'Czech Republic' },
+  { code: 'HU', name: 'Hungary' },
+  { code: 'RO', name: 'Romania' },
+  { code: 'AT', name: 'Austria' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'IE', name: 'Ireland' },
+  { code: 'NZ', name: 'New Zealand' }
+];
+
+// US States for targeting
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' },
+  { code: 'AK', name: 'Alaska' },
+  { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' },
+  { code: 'CA', name: 'California' },
+  { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' },
+  { code: 'DE', name: 'Delaware' },
+  { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' },
+  { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' },
+  { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' },
+  { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' },
+  { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' },
+  { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' },
+  { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' },
+  { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' },
+  { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' },
+  { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' },
+  { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' },
+  { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' },
+  { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' },
+  { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' },
+  { code: 'WY', name: 'Wyoming' },
+  { code: 'DC', name: 'District of Columbia' }
+];
+
 const AdSetSection: React.FC = () => {
   const { control, watch, setValue } = useFormContext<Strategy150FormData>();
   const { resources, loading: loadingResources } = useFacebookResources();
@@ -493,9 +602,25 @@ const AdSetSection: React.FC = () => {
               <Autocomplete
                 {...field}
                 multiple
-                options={['US', 'CA', 'GB', 'AU', 'FR', 'DE', 'IT', 'ES', 'NL', 'BR', 'MX', 'IN', 'JP', 'CN']}
-                value={field.value || []}
-                onChange={(_, value) => field.onChange(value)}
+                options={COUNTRIES}
+                getOptionLabel={(option) => {
+                  if (typeof option === 'string') {
+                    const country = COUNTRIES.find(c => c.code === option);
+                    return country ? country.name : option;
+                  }
+                  return option.name;
+                }}
+                value={field.value?.map(code => COUNTRIES.find(c => c.code === code) || { code, name: code }) || []}
+                onChange={(_, value) => {
+                  const codes = value.map(v => typeof v === 'string' ? v : v.code);
+                  field.onChange(codes);
+                }}
+                renderOption={(props, option) => (
+                  <Box component="li" {...props}>
+                    <span style={{ marginRight: 8 }}>{option.code}</span>
+                    {option.name}
+                  </Box>
+                )}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -506,13 +631,66 @@ const AdSetSection: React.FC = () => {
                 )}
                 renderTags={(value, getTagProps) =>
                   value.map((option, index) => (
-                    <Chip label={option} {...getTagProps({ index })} />
+                    <Chip label={typeof option === 'string' ? option : option.name} {...getTagProps({ index })} />
                   ))
                 }
               />
             )}
           />
         </Box>
+
+        {/* Regions/States (shows when US is selected) */}
+        {watch('targeting.locations.countries')?.includes('US') && (
+          <Box sx={{ width: "100%", mt: 2 }}>
+            <Controller
+              name="targeting.locations.regions"
+              control={control}
+              defaultValue={[]}
+              render={({ field }) => (
+                <Autocomplete
+                  {...field}
+                  multiple
+                  options={US_STATES}
+                  getOptionLabel={(option) => {
+                    if (typeof option === 'string') {
+                      const state = US_STATES.find(s => s.code === option);
+                      return state ? state.name : option;
+                    }
+                    return option.name;
+                  }}
+                  value={field.value?.map(code => US_STATES.find(s => s.code === code) || { code, name: code }) || []}
+                  onChange={(_, value) => {
+                    const codes = value.map(v => typeof v === 'string' ? v : v.code);
+                    field.onChange(codes);
+                  }}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props}>
+                      <span style={{ marginRight: 8 }}>{option.code}</span>
+                      {option.name}
+                    </Box>
+                  )}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="States/Regions"
+                      placeholder="Select US states"
+                      helperText="Target users in specific states (US only)"
+                    />
+                  )}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        size="small"
+                        label={typeof option === 'string' ? option : option.name}
+                        {...getTagProps({ index })}
+                      />
+                    ))
+                  }
+                />
+              )}
+            />
+          </Box>
+        )}
 
         {/* Age Range */}
         <Box sx={{ width: "100%" }}>

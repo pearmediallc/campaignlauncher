@@ -915,9 +915,11 @@ router.get('/pixels', authenticate, async (req, res) => {
  */
 router.get('/audiences', authenticate, async (req, res) => {
   try {
+    const userId = req.userId || req.user?.id;
+
     const facebookAuth = await FacebookAuth.findOne({
       where: {
-        userId: req.userId,
+        userId: userId,
         isActive: true
       }
     });
@@ -926,7 +928,14 @@ router.get('/audiences', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'No ad account selected' });
     }
 
-    const accessToken = await FacebookAuthService.decryptToken(facebookAuth.accessToken);
+    let accessToken;
+    try {
+      accessToken = await FacebookAuthService.decryptToken(facebookAuth.accessToken);
+    } catch (decryptError) {
+      console.error('Token decryption error:', decryptError);
+      return res.status(401).json({ error: 'Failed to decrypt access token. Please reconnect Facebook.' });
+    }
+
     const adAccountId = facebookAuth.selectedAdAccount.id;
 
     let customAudiences = [];
