@@ -477,13 +477,18 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       conversionLocation: req.body.conversionLocation || 'website'
     };
 
-    console.log('Creating Strategy 1-50-1 campaign with data:', {
+    console.log('🟢 Creating Strategy 1-50-1 campaign with data:', {
       campaignName: campaignData.campaignName,
       buyingType: campaignData.buyingType,
       objective: campaignData.objective,
       performanceGoal: campaignData.performanceGoal,
-      publishDirectly: campaignData.publishDirectly
+      publishDirectly: campaignData.publishDirectly,
+      specialAdCategories: campaignData.specialAdCategories,
+      bidStrategy: campaignData.bidStrategy
     });
+
+    console.log('🟢 Special Ad Categories detail:', JSON.stringify(campaignData.specialAdCategories));
+    console.log('🟢 Targeting detail:', JSON.stringify(campaignData.targeting));
 
     // Log the final data being sent to Facebook API
     console.log('📤 Sending to Facebook API:');

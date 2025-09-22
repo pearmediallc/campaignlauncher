@@ -60,10 +60,13 @@ class FacebookAPI {
         params.lifetime_budget = Math.round(parseFloat(campaignData.lifetime_budget) * 100);
       }
 
-      console.log('Creating campaign with params:', {
+      console.log('🔵 Creating campaign with params:', {
         ...params,
         access_token: '[HIDDEN]'
       });
+      console.log('🔵 Special Ad Categories being sent:', params.special_ad_categories);
+      console.log('🔵 Objective being sent:', params.objective);
+      console.log('🔵 Buying Type being sent:', params.buying_type);
 
       const response = await axios.post(url, null, { params });
       return response.data;
@@ -1028,6 +1031,7 @@ class FacebookAPI {
       console.error('  Request URL:', error.config?.url);
       console.error('  Request Method:', error.config?.method);
       console.error('  Request Data:', error.config?.data);
+      console.error('  Request Params:', error.config?.params);
 
       const customError = new Error(`Facebook API Error: ${errorMessage} (Code: ${errorCode})`);
       customError.status = error.response.status;
