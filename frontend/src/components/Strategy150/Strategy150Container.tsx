@@ -264,28 +264,54 @@ const Strategy150Container: React.FC = () => {
       console.log('📦 Payload size:', JSON.stringify(workingCampaignData).length, 'bytes');
       console.log('📊 Request data:', workingCampaignData);
 
-      // Use Strategy 1-50-1 specific endpoint with all our enhancements
-      const formData = new FormData();
+      // Use Strategy 1-50-1 specific endpoint with JSON payload
+      // Media files need to be handled separately or converted to base64
+      let mediaData = null;
+      if (workingCampaignData.media instanceof File) {
+        // Convert media to base64 for JSON transport
+        const reader = new FileReader();
+        mediaData = await new Promise((resolve) => {
+          reader.onload = () => resolve({
+            data: reader.result,
+            name: workingCampaignData.media.name,
+            type: workingCampaignData.media.type
+          });
+          reader.readAsDataURL(workingCampaignData.media);
+        });
+      }
 
-      // Add all campaign data fields to FormData
-      Object.keys(workingCampaignData).forEach(key => {
-        if (workingCampaignData[key] !== undefined && workingCampaignData[key] !== null) {
-          if (key === 'targeting' || key === 'placements' || key === 'schedule') {
-            formData.append(key, JSON.stringify(workingCampaignData[key]));
-          } else if (key === 'media' && workingCampaignData[key] instanceof File) {
-            formData.append('media', workingCampaignData[key]);
-          } else {
-            formData.append(key, workingCampaignData[key]);
-          }
-        }
-      });
+      // Prepare JSON payload with proper field conversions
+      const jsonPayload = {
+        ...workingCampaignData,
+        // Convert budgets to cents for Meta API
+        dailyBudget: workingCampaignData.dailyBudget ? workingCampaignData.dailyBudget * 100 : undefined,
+        lifetimeBudget: workingCampaignData.lifetimeBudget ? workingCampaignData.lifetimeBudget * 100 : undefined,
+        // Ensure arrays are properly formatted
+        specialAdCategories: Array.isArray(workingCampaignData.specialAdCategories)
+          ? workingCampaignData.specialAdCategories
+          : workingCampaignData.specialAdCategories ? [workingCampaignData.specialAdCategories] : [],
+        // Include media if present
+        mediaBase64: mediaData,
+        // Remove the File object
+        media: undefined
+      };
+
+      // Handle nested budget object
+      if (jsonPayload.adSetBudget) {
+        jsonPayload.adSetBudget = {
+          ...jsonPayload.adSetBudget,
+          dailyBudget: jsonPayload.adSetBudget.dailyBudget ? jsonPayload.adSetBudget.dailyBudget * 100 : undefined,
+          lifetimeBudget: jsonPayload.adSetBudget.lifetimeBudget ? jsonPayload.adSetBudget.lifetimeBudget * 100 : undefined
+        };
+      }
 
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5002/api'}/campaigns/strategy-150/create`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
         },
-        body: formData
+        body: JSON.stringify(jsonPayload)
       });
 
       const result = await response.json();
