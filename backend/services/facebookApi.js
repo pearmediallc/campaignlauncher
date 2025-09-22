@@ -154,15 +154,17 @@ class FacebookAPI {
       // For special ad categories, age_max should be 65+ (which is represented as no age_max or 65)
       const hasSpecialAdCategories = adSetData.specialAdCategories && adSetData.specialAdCategories.length > 0;
 
-      const targeting = {
-        age_min: adSetData.targeting?.ageMin || adSetData.targeting?.age_min || 18,
-      };
+      const targeting = {};
 
-      // Only set age_max if it's not a special ad category campaign
-      if (!hasSpecialAdCategories) {
+      // For special ad categories (HOUSING/EMPLOYMENT/CREDIT), use broader age targeting
+      if (hasSpecialAdCategories) {
+        targeting.age_min = 18;
+        // Don't set age_max to allow 65+ (Facebook requirement for special ad categories)
+      } else {
+        // Regular campaigns can use specific age targeting
+        targeting.age_min = adSetData.targeting?.ageMin || adSetData.targeting?.age_min || 18;
         targeting.age_max = adSetData.targeting?.ageMax || adSetData.targeting?.age_max || 65;
       }
-      // For special ad categories, omit age_max to allow 65+ (Facebook default)
 
       // Handle gender targeting - check both locations for gender data
       // BUT: If special ad categories include HOUSING, EMPLOYMENT, or CREDIT, skip gender targeting
