@@ -499,7 +499,18 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
     console.log('  Has Image:', !!campaignData.imagePath);
 
     // Create the initial 1-1-1 campaign structure
-    const result = await userFacebookApi.createStrategy150Campaign(campaignData);
+    let result;
+    try {
+      result = await userFacebookApi.createStrategy150Campaign(campaignData);
+    } catch (error) {
+      console.error('❌ Strategy 1-50-1 Campaign Creation Error:');
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.fbError?.code || error.status || 'Unknown');
+      if (error.fbError) {
+        console.error('Facebook Error Details:', JSON.stringify(error.fbError, null, 2));
+      }
+      throw error;
+    }
 
     await AuditService.logRequest(req, 'strategy150.create', 'campaign', result.campaign?.id);
 

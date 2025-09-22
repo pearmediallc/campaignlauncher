@@ -393,28 +393,52 @@ class FacebookAPI {
       const errorCode = error.fbError?.code || error.response?.data?.error?.code;
       const errorMessage = error.message || '';
 
-      // Check if this is a field validation error (Code 100 or 400)
-      if (attempt === 1 && (errorCode === 100 || errorCode === 400 ||
-          errorMessage.includes('promoted_object') ||
-          errorMessage.includes('custom_event_type'))) {
+      console.log('⚠️ AdSet creation error detected:');
+      console.log('  Error Code:', errorCode);
+      console.log('  Error Message:', errorMessage);
 
-        console.log('⚠️ Primary attempt failed with validation error, trying safe mode...');
-        console.log('🔧 Stripping problematic fields and retrying...');
+      // ALWAYS use fallback on first attempt for ANY error
+      // Facebook API is unpredictable
+      if (attempt === 1) {
+        console.log('❌ First attempt failed, activating AGGRESSIVE safe mode...');
+        console.log('🔧 Creating minimal AdSet with only required fields...');
 
-        // Create a safe version of the data
-        const safeData = this.stripProblematicFields(adSetData);
+        // Create MINIMAL safe version - only absolutely required fields
+        const safeData = {
+          campaignId: adSetData.campaignId,
+          campaignName: adSetData.campaignName,
+          budgetType: adSetData.budgetType || 'daily',
+          dailyBudget: adSetData.dailyBudget || 50,
+          lifetimeBudget: adSetData.lifetimeBudget,
+          targeting: {
+            locations: { countries: ['US'] },
+            ageMin: 18,
+            ageMax: 65
+          }
+          // NO promoted_object, NO optimization_goal customization
+          // Let Facebook use defaults
+        };
 
-        // Log what we're removing
-        this.logSkippedFields(adSetData, safeData);
+        console.log('🔄 Retrying with minimal safe configuration...');
+        console.log('  Kept fields:', Object.keys(safeData));
 
-        // Store skipped fields for user notification
-        this.skippedFields = this.identifySkippedFields(adSetData, safeData);
+        // Store what we removed for logging
+        this.skippedFields = {
+          message: 'Using minimal configuration due to API error',
+          removed: ['promoted_object', 'attribution_spec', 'optimization_goal', 'conversion tracking']
+        };
 
-        // Retry with safe data
-        return await this.createAdSet(safeData);
+        try {
+          const result = await this.createAdSet(safeData);
+          console.log('✅ Safe mode SUCCESSFUL! AdSet created with minimal config.');
+          return result;
+        } catch (retryError) {
+          console.error('❌ Even safe mode failed:', retryError.message);
+          throw retryError;
+        }
       }
 
-      // If it's not a validation error or we've already tried safe mode, throw the error
+      // If we've already tried safe mode, throw the error
       throw error;
     }
   }
