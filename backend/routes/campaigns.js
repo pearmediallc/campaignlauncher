@@ -30,12 +30,18 @@ const validateCampaign = [
     .withMessage('Lifetime budget must be at least $1'),
   body('urlType')
     .optional()
-    .isIn(['lead_gen', 'call', 'website'])
+    .isIn(['lead_gen', 'call', 'website', 'app_deeplink', 'facebook_event', 'messenger', 'whatsapp', 'none'])
     .withMessage('Invalid URL type'),
-  body('url').isURL().withMessage('Valid URL is required'),
+  body('url')
+    .optional()
+    .isURL()
+    .withMessage('Valid URL is required'),
   body('primaryText').notEmpty().withMessage('Primary text is required'),
   body('headline').notEmpty().withMessage('Headline is required'),
-  body('description').notEmpty().withMessage('Description is required')
+  body('description')
+    .optional()
+    .notEmpty()
+    .withMessage('Description is required')
 ];
 
 // Make image upload optional
