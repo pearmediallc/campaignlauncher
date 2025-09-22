@@ -205,6 +205,14 @@ const Strategy150Container: React.FC = () => {
         headline: campaignData.headline,
         description: campaignData.description || '',
 
+        // CRITICAL: Include objective from Strategy150 data
+        objective: campaignData.objective || 'OUTCOME_LEADS',
+        buyingType: campaignData.buyingType || 'AUCTION',
+        budgetLevel: campaignData.budgetLevel || 'adset',
+        specialAdCategories: campaignData.specialAdCategories || [],
+        performanceGoal: campaignData.performanceGoal || 'maximize_conversions',
+        conversionEvent: campaignData.conversionEvent || 'Lead',
+
         // URL fields
         url: campaignData.url || '',
         urlType: (campaignData.urlType === 'lead_gen' || campaignData.urlType === 'call') ? campaignData.urlType : 'lead_gen',

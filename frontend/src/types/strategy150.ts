@@ -6,7 +6,7 @@ export interface Strategy150FormData {
 
   // Campaign Level Extensions
   buyingType: 'AUCTION' | 'RESERVED';
-  objective: 'OUTCOME_AWARENESS' | 'OUTCOME_ENGAGEMENT' | 'OUTCOME_LEADS' | 'OUTCOME_SALES' | 'OUTCOME_TRAFFIC' | 'OUTCOME_APP_PROMOTION';
+  objective: 'OUTCOME_LEADS' | 'PHONE_CALL';
   budgetLevel: 'campaign' | 'adset';
   specialAdCategories: string[];
   campaignBudgetOptimization?: boolean;
@@ -190,41 +190,9 @@ export const BUYING_TYPE_OPTIONS = [
 ];
 
 export const OBJECTIVE_OPTIONS = [
-  // Awareness
-  { value: 'OUTCOME_AWARENESS', label: 'Awareness', category: 'Awareness' },
-  { value: 'BRAND_AWARENESS', label: 'Brand awareness', category: 'Awareness' },
-  { value: 'REACH', label: 'Reach', category: 'Awareness' },
-  { value: 'VIDEO_VIEWS', label: 'Video views', category: 'Awareness' },
-
-  // Traffic
-  { value: 'OUTCOME_TRAFFIC', label: 'Traffic', category: 'Traffic' },
-  { value: 'LINK_CLICKS', label: 'Link clicks', category: 'Traffic' },
-  { value: 'LANDING_PAGE_VIEWS', label: 'Landing page views', category: 'Traffic' },
-
-  // Engagement
-  { value: 'OUTCOME_ENGAGEMENT', label: 'Engagement', category: 'Engagement' },
-  { value: 'POST_ENGAGEMENT', label: 'Post engagement', category: 'Engagement' },
-  { value: 'PAGE_LIKES', label: 'Page likes', category: 'Engagement' },
-  { value: 'EVENT_RESPONSES', label: 'Event responses', category: 'Engagement' },
-  { value: 'MESSAGES', label: 'Messages', category: 'Engagement' },
-
-  // Leads
+  // Leads only
   { value: 'OUTCOME_LEADS', label: 'Leads', category: 'Leads' },
-  { value: 'LEAD_GENERATION', label: 'Lead generation', category: 'Leads' },
-  { value: 'INSTANT_FORMS', label: 'Instant forms', category: 'Leads' },
-  { value: 'MESSENGER_LEADS', label: 'Messenger leads', category: 'Leads' },
-  { value: 'PHONE_CALL', label: 'Calls', category: 'Leads' },
-
-  // App Promotion
-  { value: 'OUTCOME_APP_PROMOTION', label: 'App promotion', category: 'App' },
-  { value: 'APP_INSTALLS', label: 'App installs', category: 'App' },
-  { value: 'APP_EVENTS', label: 'App events', category: 'App' },
-
-  // Sales
-  { value: 'OUTCOME_SALES', label: 'Sales', category: 'Sales' },
-  { value: 'CONVERSIONS', label: 'Conversions', category: 'Sales' },
-  { value: 'CATALOG_SALES', label: 'Catalog sales', category: 'Sales' },
-  { value: 'STORE_VISITS', label: 'Store traffic', category: 'Sales' }
+  { value: 'PHONE_CALL', label: 'Calls', category: 'Leads' }
 ];
 
 export const BUDGET_LEVEL_OPTIONS = [
