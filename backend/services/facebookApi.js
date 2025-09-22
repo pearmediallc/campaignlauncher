@@ -106,6 +106,9 @@ class FacebookAPI {
     console.log('💰 Budget Type:', adSetData.budgetType || 'daily');
     console.log('🎯 Conversion Location:', adSetData.conversionLocation || 'Not set');
 
+    // Declare params outside try block so it's accessible in catch
+    let params = null;
+
     try {
       const url = `${this.baseURL}/act_${this.adAccountId}/adsets`;
 
@@ -144,8 +147,8 @@ class FacebookAPI {
       console.log('  - Page ID:', this.pageId || 'NONE');
       console.log('  - Conversion Event:', adSetData.conversionEvent || 'Not set');
       console.log('  - Optimization Goal:', this.getOptimizationGoal ? 'Will be calculated' : 'Not set');
-      
-      const params = {
+
+      params = {
         name: `[REVIEW] ${adSetData.campaignName} - AdSet`,
         campaign_id: adSetData.campaignId,
         billing_event: 'IMPRESSIONS',
@@ -372,7 +375,7 @@ class FacebookAPI {
 
       console.log('\n📤 Sending AdSet Creation Request...');
       console.log('📦 Final params being sent:', JSON.stringify({
-        ...params,
+        ...(params || {}),
         access_token: '[HIDDEN]',
         targeting: params.targeting ? '[TARGETING_DATA]' : undefined
       }, null, 2));
@@ -386,7 +389,7 @@ class FacebookAPI {
       console.error('❌ AdSet Creation Failed!');
       console.error('🔴 Error at AdSet Level');
       console.error('📍 Failed with params:', JSON.stringify({
-        ...params,
+        ...(params || {}),
         access_token: '[HIDDEN]'
       }, null, 2));
       this.handleError(error);
