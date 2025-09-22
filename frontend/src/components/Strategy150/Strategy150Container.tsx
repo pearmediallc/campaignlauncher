@@ -95,7 +95,7 @@ const Strategy150Container: React.FC = () => {
       setActiveStep(1);
       setError('');
 
-      // Map Strategy150FormData to existing CampaignFormData format
+      // Map Strategy150FormData to Strategy 1-50-1 endpoint format
       const campaignData = {
         // Basic campaign data
         campaignName: data.campaignName,
@@ -103,6 +103,7 @@ const Strategy150Container: React.FC = () => {
         headline: data.headline,
         description: data.description,
         url: data.url,
+        urlType: data.urlType,
         callToAction: data.callToAction,
         displayLink: data.displayLink,
 
@@ -111,36 +112,69 @@ const Strategy150Container: React.FC = () => {
         image: data.image,
         video: data.video,
         images: data.images,
+        mediaSpecs: data.mediaSpecs,
 
         // Facebook resources
         facebookPage: data.facebookPage,
+        instagramAccount: data.instagramAccount,
         pixel: data.pixel,
 
         // Strategy 1-50-1 specific
         strategy: '1-50-1',
         publishDirectly: data.publishDirectly,
 
-        // Ad set budget (for the initial ad set)
+        // Budget configuration
         budgetType: data.budgetType,
-        dailyBudget: data.budgetType === 'daily' ? 1 : undefined, // $1 default for duplication
-        lifetimeBudget: data.budgetType === 'lifetime' ? 7 : undefined, // $7 default for duplication
+        budgetLevel: data.budgetLevel || 'adset',
+
+        // Campaign budget (for CBO)
+        campaignBudget: data.campaignBudget,
+        campaignBudgetOptimization: data.campaignBudgetOptimization,
+
+        // Ad set budget
+        adSetBudget: data.adSetBudget || {
+          dailyBudget: data.budgetType === 'daily' ? 1 : undefined,
+          lifetimeBudget: data.budgetType === 'lifetime' ? 7 : undefined
+        },
 
         // Meta API compliance fields
-        buyingType: data.buyingType,
+        buyingType: data.buyingType || 'AUCTION',
         objective: data.objective,
-        budgetLevel: data.budgetLevel,
-        specialAdCategories: data.specialAdCategories,
-        performanceGoal: data.performanceGoal,
+        specialAdCategories: data.specialAdCategories || [],
+        performanceGoal: data.performanceGoal || 'maximize_conversions',
         conversionEvent: data.conversionEvent,
+        conversionLocation: data.conversionLocation || 'website',
         attributionSetting: data.attributionSetting,
         attributionWindow: data.attributionWindow,
-        bidStrategy: data.bidStrategy,
+        bidStrategy: data.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
         costCap: data.costCap,
-        minRoas: data.minRoas
+        minRoas: data.minRoas,
+
+        // Targeting
+        targeting: data.targeting || {
+          locations: { countries: ['US'] },
+          demographics: {
+            ageMin: 18,
+            ageMax: 65,
+            genders: ['all']
+          }
+        },
+
+        // Placements
+        placementType: data.placementType || 'automatic',
+        placements: data.placements,
+
+        // Duplication settings for Strategy 1-50-1
+        duplicationSettings: data.duplicationSettings || {
+          defaultBudgetPerAdSet: 1,
+          budgetDistributionType: 'equal'
+        }
       };
 
-      // Call the existing campaign creation API
-      const response = await fetch('/api/campaigns/create', {
+      // Call the Strategy 1-50-1 dedicated API endpoint
+      console.log('📤 Sending Strategy 1-50-1 campaign data:', campaignData);
+
+      const response = await fetch('/api/campaigns/strategy-150/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -150,24 +184,25 @@ const Strategy150Container: React.FC = () => {
       });
 
       const result = await response.json();
+      console.log('📥 Response:', response.status, result);
 
       if (result.success) {
         // Transform response to Strategy150Response format
         const strategy150Result: Strategy150Response = {
           success: true,
-          message: 'Campaign created successfully',
+          message: result.message || 'Campaign created successfully',
           data: {
-            phase: 'waiting',
-            campaign: {
-              id: result.data.campaignId,
+            phase: result.data?.phase || 'waiting',
+            campaign: result.data?.campaign || {
+              id: result.data?.campaignId,
               name: data.campaignName
             },
-            adSet: {
-              id: result.data.adSetId,
+            adSet: result.data?.adSet || {
+              id: result.data?.adSetId,
               name: `${data.campaignName} - Ad Set 1`
             },
-            ads: [{
-              id: result.data.adId,
+            ads: result.data?.ads || [{
+              id: result.data?.adId,
               name: `${data.campaignName} - Ad 1`
             }]
           }
