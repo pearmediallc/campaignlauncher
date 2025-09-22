@@ -43,7 +43,7 @@ class FacebookAPI {
       const params = {
         name: `[REVIEW] ${campaignData.name}`,
         objective: campaignData.objective || 'OUTCOME_LEADS',
-        status: campaignData.status || 'PAUSED',
+        status: campaignData.status || 'ACTIVE',
         // Properly handle special ad categories
         special_ad_categories: JSON.stringify(
           Array.isArray(campaignData.specialAdCategories)
@@ -154,7 +154,7 @@ class FacebookAPI {
         billing_event: 'IMPRESSIONS',
         optimization_goal: this.getOptimizationGoal(adSetData),
         bid_strategy: adSetData.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
-        status: 'PAUSED',
+        status: 'ACTIVE',
         access_token: this.accessToken
       };
 
@@ -620,7 +620,7 @@ class FacebookAPI {
           'action.type': ['offsite_conversion'],
           'fb_pixel': [this.pixelId]
         }]),
-        status: 'PAUSED',
+        status: 'ACTIVE',
         access_token: this.accessToken
       };
 
@@ -984,7 +984,7 @@ class FacebookAPI {
         objective: mappedObjective,
         buyingType: campaignData.buyingType ? campaignData.buyingType.toUpperCase() : 'AUCTION',
         specialAdCategories: specialAdCategories, // Use filtered categories
-        status: campaignData.status || 'PAUSED'
+        status: campaignData.status || 'ACTIVE'
       };
 
       // Only add bid_strategy if using campaign-level budget
@@ -1077,14 +1077,33 @@ class FacebookAPI {
         console.warn('⚠️ Ad creation failed - continuing with campaign and adset only');
       } else {
         console.log('✅ Ad created successfully with ID:', ad.id);
+
+        // Try to automatically capture post ID
+        console.log('🔍 Attempting to capture post ID automatically...');
+        try {
+          // Wait a moment for Facebook to process the ad
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          const postId = await this.getPostIdFromAd(ad.id);
+          if (postId) {
+            console.log('✅ Post ID captured successfully:', postId);
+            ad.postId = postId; // Add to response
+          } else {
+            console.log('⚠️ Could not auto-capture post ID - may need manual entry');
+          }
+        } catch (postError) {
+          console.log('⚠️ Post ID capture failed:', postError.message);
+        }
       }
 
       console.log('\n🎯 ========== STRATEGY 1-50-1 PHASE 1 COMPLETE ==========');
       console.log('📊 Results:');
-      console.log('  - Campaign ID:', campaign.id);
-      console.log('  - AdSet ID:', adSet.id);
-      console.log('  - Ad ID:', ad ? ad.id : 'Not created');
+      console.log('  - Campaign ID:', campaign.id, '(STATUS: ACTIVE)');
+      console.log('  - AdSet ID:', adSet.id, '(STATUS: ACTIVE)');
+      console.log('  - Ad ID:', ad ? ad.id : 'Not created', ad ? '(STATUS: ACTIVE)' : '');
+      console.log('  - Post ID:', ad?.postId || 'Not captured automatically');
       console.log('  - Skipped Fields:', this.skippedFields ? Object.keys(this.skippedFields).join(', ') : 'None');
+      console.log('\n🚀 ALL COMPONENTS ARE LIVE AND ACTIVE IN FACEBOOK!');
       console.log('========================================\n');
 
       return {
@@ -1175,7 +1194,7 @@ class FacebookAPI {
             optimization_goal: originalAdSet.optimization_goal,
             bid_strategy: originalAdSet.bid_strategy,
             targeting: JSON.stringify(originalAdSet.targeting),
-            status: 'PAUSED',
+            status: 'ACTIVE',
             access_token: this.accessToken
           };
 
@@ -1203,7 +1222,7 @@ class FacebookAPI {
               object_story_id: postId,
               page_id: this.pageId
             }),
-            status: 'PAUSED',
+            status: 'ACTIVE',
             access_token: this.accessToken
           };
 
