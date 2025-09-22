@@ -21,7 +21,7 @@ export interface Strategy150FormData {
   // Ad Set Level Extensions
   performanceGoal: 'maximize_conversions' | 'cost_per_result' | 'lowest_cost';
   pixel?: string; // Renamed from dataset
-  conversionEvent: 'PageView' | 'ViewContent' | 'Search' | 'AddToCart' | 'AddToWishlist' | 'InitiateCheckout' | 'AddPaymentInfo' | 'Purchase' | 'Lead' | 'CompleteRegistration' | 'Contact' | 'SubmitApplication' | 'Schedule' | 'StartTrial' | 'Subscribe' | 'CustomizeProduct' | 'Donate' | 'FindLocation';
+  conversionEvent: 'Lead' | 'Contact' | 'Purchase';
   attributionSetting: 'standard' | '1_day_view' | '7_day_click' | '28_day_click';
   attributionWindow: '1_day' | '7_day' | '28_day';
 
@@ -225,25 +225,10 @@ export const PERFORMANCE_GOAL_OPTIONS = [
 ];
 
 export const CONVERSION_EVENT_OPTIONS = [
-  // Standard Events
-  { value: 'PageView', label: 'Page View' },
-  { value: 'ViewContent', label: 'View Content' },
-  { value: 'Search', label: 'Search' },
-  { value: 'AddToCart', label: 'Add to Cart' },
-  { value: 'AddToWishlist', label: 'Add to Wishlist' },
-  { value: 'InitiateCheckout', label: 'Initiate Checkout' },
-  { value: 'AddPaymentInfo', label: 'Add Payment Info' },
-  { value: 'Purchase', label: 'Purchase' },
+  // Only Lead, Contact, and Purchase
   { value: 'Lead', label: 'Lead' },
-  { value: 'CompleteRegistration', label: 'Complete Registration' },
   { value: 'Contact', label: 'Contact' },
-  { value: 'SubmitApplication', label: 'Submit Application' },
-  { value: 'Schedule', label: 'Schedule' },
-  { value: 'StartTrial', label: 'Start Trial' },
-  { value: 'Subscribe', label: 'Subscribe' },
-  { value: 'CustomizeProduct', label: 'Customize Product' },
-  { value: 'Donate', label: 'Donate' },
-  { value: 'FindLocation', label: 'Find Location' }
+  { value: 'Purchase', label: 'Purchase' }
 ];
 
 export const ATTRIBUTION_SETTING_OPTIONS = [
