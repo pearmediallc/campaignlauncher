@@ -823,12 +823,28 @@ class FacebookAPI {
   }
 
   mapObjective(objective) {
+    // If objective is already in correct format, return it
+    const validObjectives = [
+      'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_AWARENESS',
+      'OUTCOME_ENGAGEMENT', 'OUTCOME_APP_PROMOTION',
+      'CONVERSIONS', 'LINK_CLICKS', 'LEAD_GENERATION', 'BRAND_AWARENESS',
+      'REACH', 'POST_ENGAGEMENT', 'VIDEO_VIEWS', 'APP_INSTALLS'
+    ];
+
+    if (validObjectives.includes(objective)) {
+      return objective;
+    }
+
+    // Map common aliases
     const objectiveMap = {
       'leads': 'OUTCOME_LEADS',
-      'conversions': 'CONVERSIONS',
-      'traffic': 'LINK_CLICKS'
+      'conversions': 'OUTCOME_SALES',
+      'traffic': 'OUTCOME_TRAFFIC',
+      'awareness': 'OUTCOME_AWARENESS',
+      'engagement': 'OUTCOME_ENGAGEMENT'
     };
-    return objectiveMap[objective] || 'OUTCOME_LEADS';
+
+    return objectiveMap[objective?.toLowerCase()] || objective || 'OUTCOME_LEADS';
   }
 
   handleError(error) {
