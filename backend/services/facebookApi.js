@@ -952,13 +952,24 @@ class FacebookAPI {
 
     try {
       console.log('\n🔷 Step 1 of 3: Creating Campaign...');
+
+      // Map objective and ensure it's valid
+      const mappedObjective = this.mapObjective(campaignData.objective);
+      console.log('  🎯 Objective Mapping:', campaignData.objective, '->', mappedObjective);
+
+      // Ensure special ad categories is an array
+      const specialAdCategories = Array.isArray(campaignData.specialAdCategories)
+        ? campaignData.specialAdCategories
+        : [];
+      console.log('  🔐 Special Ad Categories:', specialAdCategories.length > 0 ? specialAdCategories : 'None');
+
       // Create campaign with Strategy 150 specific settings
       const campaign = await this.createCampaign({
         name: campaignData.campaignName,
-        objective: this.mapObjective(campaignData.objective),
+        objective: mappedObjective,
         buyingType: campaignData.buyingType ? campaignData.buyingType.toUpperCase() : 'AUCTION',
-        specialAdCategories: campaignData.specialAdCategories,
-        bidStrategy: campaignData.bidStrategy,
+        specialAdCategories: specialAdCategories,
+        bidStrategy: campaignData.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
         status: campaignData.status || 'PAUSED',
         daily_budget: campaignData.campaignBudgetOptimization && campaignData.campaignBudget?.dailyBudget ? campaignData.campaignBudget.dailyBudget : undefined,
         lifetime_budget: campaignData.campaignBudgetOptimization && campaignData.campaignBudget?.lifetimeBudget ? campaignData.campaignBudget.lifetimeBudget : undefined
@@ -1280,6 +1291,13 @@ class FacebookAPI {
   }
 
   mapObjective(objective) {
+    // PHONE_CALL is not a valid Facebook objective
+    // Map it to OUTCOME_LEADS which supports call conversions
+    if (objective === 'PHONE_CALL') {
+      console.log('📞 Mapping PHONE_CALL to OUTCOME_LEADS for calls objective');
+      return 'OUTCOME_LEADS';
+    }
+
     // If objective is already in correct format, return it
     const validObjectives = [
       'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_AWARENESS',
@@ -1298,10 +1316,12 @@ class FacebookAPI {
       'conversions': 'OUTCOME_SALES',
       'traffic': 'OUTCOME_TRAFFIC',
       'awareness': 'OUTCOME_AWARENESS',
-      'engagement': 'OUTCOME_ENGAGEMENT'
+      'engagement': 'OUTCOME_ENGAGEMENT',
+      'phone_call': 'OUTCOME_LEADS',
+      'calls': 'OUTCOME_LEADS'
     };
 
-    return objectiveMap[objective?.toLowerCase()] || objective || 'OUTCOME_LEADS';
+    return objectiveMap[objective?.toLowerCase()] || 'OUTCOME_LEADS';
   }
 
   handleError(error) {
