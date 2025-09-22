@@ -207,7 +207,7 @@ const Strategy150Container: React.FC = () => {
 
       // Check for undefined or null critical fields
       const criticalFields = ['campaignName', 'objective', 'primaryText', 'headline'];
-      const missingFields = criticalFields.filter(field => !campaignData[field]);
+      const missingFields = criticalFields.filter(field => !(campaignData as any)[field]);
       if (missingFields.length > 0) {
         console.warn('⚠️ Missing critical fields:', missingFields);
       }
@@ -227,7 +227,7 @@ const Strategy150Container: React.FC = () => {
       // Enhanced error logging
       if (result.errors && Array.isArray(result.errors)) {
         console.error('❌ Validation errors detected:', result.errors.length, 'error(s)');
-        result.errors.forEach((err, index) => {
+        result.errors.forEach((err: any, index: number) => {
           console.error(`  Error ${index + 1}:`, {
             field: err.path || err.param || 'unknown',
             message: err.msg || err.message || 'no message',
@@ -272,7 +272,7 @@ const Strategy150Container: React.FC = () => {
       } else {
         // Handle validation errors
         if (result.errors && Array.isArray(result.errors)) {
-          const errorMessages = result.errors.map(e => e.msg || e.message || e).join('; ');
+          const errorMessages = result.errors.map((e: any) => e.msg || e.message || e).join('; ');
           throw new Error(`Validation failed: ${errorMessages}`);
         } else {
           throw new Error(result.error || 'Failed to create campaign');
