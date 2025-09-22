@@ -178,7 +178,39 @@ const Strategy150Container: React.FC = () => {
       };
 
       // Call the Strategy 1-50-1 dedicated API endpoint
+      // Enhanced logging - log each field individually
       console.log('📤 Sending Strategy 1-50-1 campaign data:', campaignData);
+      console.log('📊 Field-by-field validation check:');
+      console.log('  ✓ campaignName:', campaignData.campaignName, typeof campaignData.campaignName);
+      console.log('  ✓ objective:', campaignData.objective, typeof campaignData.objective);
+      console.log('  ✓ primaryText:', campaignData.primaryText, typeof campaignData.primaryText);
+      console.log('  ✓ headline:', campaignData.headline, typeof campaignData.headline);
+      console.log('  ✓ description:', campaignData.description, typeof campaignData.description);
+      console.log('  ✓ url:', campaignData.url, typeof campaignData.url);
+      console.log('  ✓ urlType:', campaignData.urlType, typeof campaignData.urlType);
+      console.log('  ✓ budgetType:', campaignData.budgetType, typeof campaignData.budgetType);
+      console.log('  ✓ budgetLevel:', campaignData.budgetLevel, typeof campaignData.budgetLevel);
+      console.log('  ✓ dailyBudget:', campaignData.dailyBudget, typeof campaignData.dailyBudget);
+      console.log('  ✓ lifetimeBudget:', campaignData.lifetimeBudget, typeof campaignData.lifetimeBudget);
+      console.log('  ✓ buyingType:', campaignData.buyingType, typeof campaignData.buyingType);
+      console.log('  ✓ specialAdCategories:', campaignData.specialAdCategories, Array.isArray(campaignData.specialAdCategories));
+      console.log('  ✓ performanceGoal:', campaignData.performanceGoal, typeof campaignData.performanceGoal);
+      console.log('  ✓ conversionEvent:', campaignData.conversionEvent, typeof campaignData.conversionEvent);
+      console.log('  ✓ bidStrategy:', campaignData.bidStrategy, typeof campaignData.bidStrategy);
+      console.log('  ✓ targeting:', campaignData.targeting);
+      console.log('  ✓ placementType:', campaignData.placementType, typeof campaignData.placementType);
+      console.log('  ✓ facebookPage:', campaignData.facebookPage);
+      console.log('  ✓ instagramAccount:', campaignData.instagramAccount);
+      console.log('  ✓ pixel:', campaignData.pixel);
+      console.log('  ✓ mediaType:', campaignData.mediaType, typeof campaignData.mediaType);
+      console.log('  ✓ publishDirectly:', campaignData.publishDirectly, typeof campaignData.publishDirectly);
+
+      // Check for undefined or null critical fields
+      const criticalFields = ['campaignName', 'objective', 'primaryText', 'headline'];
+      const missingFields = criticalFields.filter(field => !campaignData[field]);
+      if (missingFields.length > 0) {
+        console.warn('⚠️ Missing critical fields:', missingFields);
+      }
 
       const response = await fetch('/api/campaigns/strategy-150/create', {
         method: 'POST',
@@ -192,9 +224,20 @@ const Strategy150Container: React.FC = () => {
       const result = await response.json();
       console.log('📥 Response:', response.status, result);
 
-      // Log validation errors if present
+      // Enhanced error logging
       if (result.errors && Array.isArray(result.errors)) {
-        console.error('❌ Validation errors:', result.errors.map(e => e.msg || e.message || e).join(', '));
+        console.error('❌ Validation errors detected:', result.errors.length, 'error(s)');
+        result.errors.forEach((err, index) => {
+          console.error(`  Error ${index + 1}:`, {
+            field: err.path || err.param || 'unknown',
+            message: err.msg || err.message || 'no message',
+            value: err.value !== undefined ? err.value : 'undefined',
+            location: err.location || 'body',
+            type: err.type || 'unknown'
+          });
+        });
+        // Also log the raw error for debugging
+        console.error('  Raw error object:', JSON.stringify(result.errors, null, 2));
       }
 
       if (result.success) {

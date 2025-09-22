@@ -230,9 +230,32 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       user: req.user?.id
     });
 
+    // Enhanced field-by-field logging
+    console.log('🔍 Validating fields:');
+    console.log('  campaignName:', req.body.campaignName, typeof req.body.campaignName);
+    console.log('  objective:', req.body.objective, typeof req.body.objective);
+    console.log('  primaryText:', req.body.primaryText, typeof req.body.primaryText);
+    console.log('  headline:', req.body.headline, typeof req.body.headline);
+    console.log('  budgetType:', req.body.budgetType, typeof req.body.budgetType);
+    console.log('  dailyBudget:', req.body.dailyBudget, typeof req.body.dailyBudget);
+    console.log('  lifetimeBudget:', req.body.lifetimeBudget, typeof req.body.lifetimeBudget);
+    console.log('  buyingType:', req.body.buyingType, typeof req.body.buyingType);
+    console.log('  mediaType:', req.body.mediaType, typeof req.body.mediaType);
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ Validation errors:', errors.array());
+      console.log('❌ Validation failed!');
+      console.log('Number of errors:', errors.array().length);
+      errors.array().forEach((err, index) => {
+        console.log(`Error ${index + 1}:`, {
+          field: err.path || err.param,
+          message: err.msg,
+          value: err.value,
+          location: err.location,
+          type: err.type
+        });
+      });
+      console.log('Full error details:', JSON.stringify(errors.array(), null, 2));
       return res.status(400).json({ errors: errors.array() });
     }
 
