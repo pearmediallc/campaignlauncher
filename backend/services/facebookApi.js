@@ -50,9 +50,13 @@ class FacebookAPI {
         access_token: this.accessToken
       };
 
-      // Add bid strategy at campaign level
-      if (campaignData.bidStrategy) {
+      // Only add bid strategy if there's a campaign-level budget
+      // Facebook requires a budget to use bid strategies
+      if (campaignData.bidStrategy && (campaignData.daily_budget || campaignData.lifetime_budget)) {
         params.bid_strategy = campaignData.bidStrategy;
+        console.log('  - Bid Strategy added (campaign has budget)');
+      } else if (campaignData.bidStrategy) {
+        console.log('  - Bid Strategy skipped (no campaign budget, using ad set budget)');
       }
 
       // Add optional parameters if provided
@@ -962,17 +966,29 @@ class FacebookAPI {
       const specialAdCategories = ['HOUSING'];
       console.log('  🔐 Special Ad Categories: HARDCODED TO HOUSING FOR TESTING');
 
+      // Check if using campaign or ad set level budgets
+      const useCampaignBudget = campaignData.budgetLevel === 'campaign' || campaignData.campaignBudgetOptimization;
+
       // Create campaign with Strategy 150 specific settings
-      const campaign = await this.createCampaign({
+      const campaignConfig = {
         name: campaignData.campaignName,
         objective: mappedObjective,
         buyingType: campaignData.buyingType ? campaignData.buyingType.toUpperCase() : 'AUCTION',
         specialAdCategories: ['HOUSING'], // HARDCODED
-        bidStrategy: campaignData.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
-        status: campaignData.status || 'PAUSED',
-        daily_budget: campaignData.campaignBudgetOptimization && campaignData.campaignBudget?.dailyBudget ? campaignData.campaignBudget.dailyBudget : undefined,
-        lifetime_budget: campaignData.campaignBudgetOptimization && campaignData.campaignBudget?.lifetimeBudget ? campaignData.campaignBudget.lifetimeBudget : undefined
-      });
+        status: campaignData.status || 'PAUSED'
+      };
+
+      // Only add bid_strategy if using campaign-level budget
+      if (useCampaignBudget) {
+        campaignConfig.bidStrategy = campaignData.bidStrategy || 'LOWEST_COST_WITHOUT_CAP';
+        campaignConfig.daily_budget = campaignData.campaignBudget?.dailyBudget;
+        campaignConfig.lifetime_budget = campaignData.campaignBudget?.lifetimeBudget;
+        console.log('  💰 Using Campaign Budget Optimization (CBO)');
+      } else {
+        console.log('  💰 Using Ad Set level budgets (no bid strategy at campaign)');
+      }
+
+      const campaign = await this.createCampaign(campaignConfig);
 
       if (!campaign || !campaign.id) {
         throw new Error('Campaign creation failed - no campaign ID received');
