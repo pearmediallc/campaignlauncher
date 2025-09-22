@@ -31,6 +31,11 @@ class FacebookAPI {
   }
 
   async createCampaign(campaignData) {
+    console.log('\n=== CAMPAIGN CREATION START ===');
+    console.log('📍 Step 1: Creating Campaign');
+    console.log('🔗 API URL:', `${this.baseURL}/act_${this.adAccountId}/campaigns`);
+    console.log('📊 Ad Account ID:', this.adAccountId);
+
     try {
       const url = `${this.baseURL}/act_${this.adAccountId}/campaigns`;
 
@@ -60,39 +65,76 @@ class FacebookAPI {
         params.lifetime_budget = Math.round(parseFloat(campaignData.lifetime_budget) * 100);
       }
 
-      console.log('🔵 Creating campaign with params:', {
-        ...params,
-        access_token: '[HIDDEN]'
-      });
-      console.log('🔵 Special Ad Categories being sent:', params.special_ad_categories);
-      console.log('🔵 Objective being sent:', params.objective);
-      console.log('🔵 Buying Type being sent:', params.buying_type);
+      console.log('📋 Campaign Parameters:');
+      console.log('  - Name:', params.name);
+      console.log('  - Objective:', params.objective);
+      console.log('  - Status:', params.status);
+      console.log('  - Buying Type:', params.buying_type);
+      console.log('  - Bid Strategy:', params.bid_strategy || 'Not set');
+      console.log('  - Special Ad Categories:', params.special_ad_categories);
+      console.log('  - Daily Budget:', params.daily_budget ? `$${params.daily_budget/100}` : 'Not set');
+      console.log('  - Lifetime Budget:', params.lifetime_budget ? `$${params.lifetime_budget/100}` : 'Not set');
+      console.log('  - Spend Cap:', params.spend_cap ? `$${params.spend_cap/100}` : 'Not set');
+      console.log('\n📤 Sending Campaign Creation Request...');
 
       const response = await axios.post(url, null, { params });
+      console.log('✅ Campaign Created Successfully!');
+      console.log('🆔 Campaign ID:', response.data.id);
+      console.log('=== CAMPAIGN CREATION END ===\n');
       return response.data;
     } catch (error) {
+      console.error('❌ Campaign Creation Failed!');
+      console.error('🔴 Error at Campaign Level');
       this.handleError(error);
     }
   }
 
   async createAdSet(adSetData) {
+    console.log('\n=== ADSET CREATION START ===');
+    console.log('📍 Step 2: Creating AdSet');
+    console.log('🔗 API URL:', `${this.baseURL}/act_${this.adAccountId}/adsets`);
+    console.log('🎯 Campaign ID:', adSetData.campaignId);
+    console.log('💰 Budget Type:', adSetData.budgetType || 'daily');
+    console.log('🎯 Conversion Location:', adSetData.conversionLocation || 'Not set');
+
     try {
       const url = `${this.baseURL}/act_${this.adAccountId}/adsets`;
-      
-      console.log('Creating AdSet with data:', {
-        budgetType: adSetData.budgetType,
-        schedule: adSetData.schedule,
-        lifetimeBudget: adSetData.lifetimeBudget,
-        dailyBudget: adSetData.dailyBudget,
-        conversionLocation: adSetData.conversionLocation,
-        pixelId: this.pixelId,
-        pageId: this.pageId
-      });
-      
-      // Validate required fields
+
+      // Auto-fetch pixel ID if needed for website conversions
       if (adSetData.conversionLocation === 'website' && !this.pixelId) {
-        throw new Error('Pixel ID is required for website conversion campaigns. No pixel found for the selected ad account.');
+        console.log('🔍 Pixel ID not provided, attempting to fetch from ad account...');
+        try {
+          const pixelsUrl = `${this.baseURL}/act_${this.adAccountId}/adspixels`;
+          const pixelsResponse = await axios.get(pixelsUrl, {
+            params: {
+              access_token: this.accessToken,
+              fields: 'id,name,code,is_created_by_business',
+              limit: 10
+            }
+          });
+
+          if (pixelsResponse.data.data && pixelsResponse.data.data.length > 0) {
+            // Use the first available pixel
+            this.pixelId = pixelsResponse.data.data[0].id;
+            console.log(`✅ Auto-fetched pixel: ${pixelsResponse.data.data[0].name} (${this.pixelId})`);
+          } else {
+            console.warn('⚠️ No pixels found for this ad account - proceeding without pixel');
+          }
+        } catch (pixelFetchError) {
+          console.error('❌ Failed to fetch pixels:', pixelFetchError.message);
+          console.log('🆗 Proceeding without pixel ID - may need manual configuration');
+        }
       }
+
+      console.log('📋 AdSet Configuration:');
+      console.log('  - Budget Type:', adSetData.budgetType || 'daily');
+      console.log('  - Daily Budget:', adSetData.dailyBudget ? `$${adSetData.dailyBudget}` : 'Not set');
+      console.log('  - Lifetime Budget:', adSetData.lifetimeBudget ? `$${adSetData.lifetimeBudget}` : 'Not set');
+      console.log('  - Conversion Location:', adSetData.conversionLocation || 'website');
+      console.log('  - Pixel ID:', this.pixelId || 'NONE');
+      console.log('  - Page ID:', this.pageId || 'NONE');
+      console.log('  - Conversion Event:', adSetData.conversionEvent || 'Not set');
+      console.log('  - Optimization Goal:', this.getOptimizationGoal ? 'Will be calculated' : 'Not set');
       
       const params = {
         name: `[REVIEW] ${adSetData.campaignName} - AdSet`,
@@ -100,10 +142,20 @@ class FacebookAPI {
         billing_event: 'IMPRESSIONS',
         optimization_goal: this.getOptimizationGoal(adSetData),
         bid_strategy: adSetData.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
-        promoted_object: this.getPromotedObject(adSetData),
         status: 'PAUSED',
         access_token: this.accessToken
       };
+
+      // Only add promoted_object if we have valid data
+      console.log('\n🎯 Creating promoted_object...');
+      const promotedObject = this.getPromotedObject(adSetData);
+      if (promotedObject && promotedObject !== 'null') {
+        params.promoted_object = promotedObject;
+        console.log('✅ promoted_object created:', promotedObject);
+      } else if (adSetData.conversionLocation === 'website') {
+        console.warn('⚠️ No promoted_object created - pixel ID missing');
+        console.log('🔄 Will proceed without promoted_object (safe mode)');
+      }
 
       // Add performance goal if provided
       if (adSetData.performanceGoal) {
@@ -130,24 +182,36 @@ class FacebookAPI {
         }
       }
       
-      // Handle budget based on type
+      // Handle budget based on type - use our improved parsing
       if (adSetData.budgetType === 'lifetime') {
-        const lifetimeBudgetCents = Math.round(adSetData.lifetimeBudget * 100);
-        params.lifetime_budget = lifetimeBudgetCents;
+        const lifetimeBudgetCents = this.parseBudgetValue(adSetData.lifetimeBudget);
+        if (lifetimeBudgetCents) {
+          params.lifetime_budget = lifetimeBudgetCents;
+        } else {
+          console.warn('⚠️ Invalid lifetime budget, using default $100');
+          params.lifetime_budget = 10000; // $100 default
+        }
       } else {
-        const dailyBudgetCents = Math.round(adSetData.dailyBudget * 100);
-        params.daily_budget = dailyBudgetCents;
+        const dailyBudgetCents = this.parseBudgetValue(adSetData.dailyBudget);
+        if (dailyBudgetCents) {
+          params.daily_budget = dailyBudgetCents;
+        } else {
+          console.warn('⚠️ Invalid daily budget, using default $50');
+          params.daily_budget = 5000; // $50 default
+        }
       }
 
-      // Add bid caps and constraints if provided
+      // Add bid caps and constraints if provided - use improved parsing
       if (adSetData.costCap) {
-        params.bid_cap = Math.round(parseFloat(adSetData.costCap) * 100);
+        const costCapCents = this.parseBudgetValue(adSetData.costCap);
+        if (costCapCents) params.bid_cap = costCapCents;
       }
       if (adSetData.minRoas) {
         params.min_roas = parseFloat(adSetData.minRoas);
       }
       if (adSetData.bidAmount) {
-        params.bid_amount = Math.round(parseFloat(adSetData.bidAmount) * 100);
+        const bidAmountCents = this.parseBudgetValue(adSetData.bidAmount);
+        if (bidAmountCents) params.bid_amount = bidAmountCents;
       }
       
       // Build targeting from provided data with correct field names
@@ -297,11 +361,157 @@ class FacebookAPI {
         }
       }
 
+      console.log('\n📤 Sending AdSet Creation Request...');
+      console.log('📦 Final params being sent:', JSON.stringify({
+        ...params,
+        access_token: '[HIDDEN]',
+        targeting: params.targeting ? '[TARGETING_DATA]' : undefined
+      }, null, 2));
+
       const response = await axios.post(url, null, { params });
+      console.log('✅ AdSet Created Successfully!');
+      console.log('🆔 AdSet ID:', response.data.id);
+      console.log('=== ADSET CREATION END ===\n');
       return response.data;
     } catch (error) {
+      console.error('❌ AdSet Creation Failed!');
+      console.error('🔴 Error at AdSet Level');
+      console.error('📍 Failed with params:', JSON.stringify({
+        ...params,
+        access_token: '[HIDDEN]'
+      }, null, 2));
       this.handleError(error);
     }
+  }
+
+  // New method: Create AdSet with automatic fallback to safe mode
+  async createAdSetWithFallback(adSetData, attempt = 1) {
+    try {
+      console.log(`🚀 Attempt ${attempt}: Creating AdSet with full configuration`);
+      return await this.createAdSet(adSetData);
+    } catch (error) {
+      const errorCode = error.fbError?.code || error.response?.data?.error?.code;
+      const errorMessage = error.message || '';
+
+      // Check if this is a field validation error (Code 100 or 400)
+      if (attempt === 1 && (errorCode === 100 || errorCode === 400 ||
+          errorMessage.includes('promoted_object') ||
+          errorMessage.includes('custom_event_type'))) {
+
+        console.log('⚠️ Primary attempt failed with validation error, trying safe mode...');
+        console.log('🔧 Stripping problematic fields and retrying...');
+
+        // Create a safe version of the data
+        const safeData = this.stripProblematicFields(adSetData);
+
+        // Log what we're removing
+        this.logSkippedFields(adSetData, safeData);
+
+        // Store skipped fields for user notification
+        this.skippedFields = this.identifySkippedFields(adSetData, safeData);
+
+        // Retry with safe data
+        return await this.createAdSet(safeData);
+      }
+
+      // If it's not a validation error or we've already tried safe mode, throw the error
+      throw error;
+    }
+  }
+
+  // Helper: Strip problematic fields that commonly cause validation errors
+  stripProblematicFields(adSetData) {
+    const safeData = { ...adSetData };
+
+    console.log('🧩 Removing problematic fields for safe mode:');
+
+    // Fields that commonly cause issues
+    const problematicFields = [
+      'promoted_object',
+      'attribution_spec',
+      'conversion_specs',
+      'optimization_sub_event',
+      'rf_prediction_id'
+    ];
+
+    problematicFields.forEach(field => {
+      if (safeData[field]) {
+        console.log(`  - Removing ${field}`);
+        delete safeData[field];
+      }
+    });
+
+    // Also ensure we don't have invalid conversion events
+    if (safeData.conversionEvent &&
+        !['LEAD', 'PURCHASE'].includes(safeData.conversionEvent.toUpperCase())) {
+      console.log(`  - Changing conversion event from ${safeData.conversionEvent} to LEAD`);
+      safeData.conversionEvent = 'LEAD';
+    }
+
+    return safeData;
+  }
+
+  // Helper: Log which fields were skipped
+  logSkippedFields(originalData, safeData) {
+    const skipped = [];
+
+    Object.keys(originalData).forEach(key => {
+      if (originalData[key] !== undefined && safeData[key] === undefined) {
+        skipped.push({
+          field: key,
+          value: originalData[key]
+        });
+      }
+    });
+
+    if (skipped.length > 0) {
+      console.log('📝 Skipped fields (will need manual configuration in Facebook):');
+      skipped.forEach(item => {
+        console.log(`  - ${item.field}: ${JSON.stringify(item.value)}`);
+      });
+    }
+
+    return skipped;
+  }
+
+  // Helper: Identify skipped fields for user notification
+  identifySkippedFields(originalData, safeData) {
+    const skipped = {};
+
+    ['promoted_object', 'attribution_spec', 'conversion_specs'].forEach(field => {
+      if (originalData[field] && !safeData[field]) {
+        skipped[field] = originalData[field];
+      }
+    });
+
+    return skipped;
+  }
+
+  // Helper: Parse and validate budget values
+  parseBudgetValue(value) {
+    if (value === undefined || value === null) return undefined;
+
+    // If it's already a number, use it
+    if (typeof value === 'number') {
+      return Math.round(value * 100); // Convert to cents
+    }
+
+    // If it's a string, clean it up
+    if (typeof value === 'string') {
+      // Remove currency symbols, commas, and spaces
+      const cleaned = value.replace(/[$,\s]/g, '');
+      const parsed = parseFloat(cleaned);
+
+      if (isNaN(parsed)) {
+        console.warn(`⚠️ Could not parse budget value: ${value}`);
+        return undefined;
+      }
+
+      return Math.round(parsed * 100); // Convert to cents
+    }
+
+    console.warn(`⚠️ Unexpected budget value type: ${typeof value}`);
+    return undefined;
   }
 
   async createAd(adData) {
@@ -706,7 +916,18 @@ class FacebookAPI {
 
   // Strategy 150 specific methods
   async createStrategy150Campaign(campaignData) {
+    console.log('\n🎯 ========== STRATEGY 1-50-1 START ==========');
+    console.log('📍 Phase 1: Creating 1-1-1 Structure');
+    console.log('📊 Campaign Data:');
+    console.log('  - Campaign Name:', campaignData.campaignName);
+    console.log('  - Objective:', campaignData.objective);
+    console.log('  - Budget Type:', campaignData.budgetType);
+    console.log('  - Daily Budget:', campaignData.dailyBudget);
+    console.log('  - Conversion Location:', campaignData.conversionLocation);
+    console.log('  - Conversion Event:', campaignData.conversionEvent);
+
     try {
+      console.log('\n🔷 Step 1 of 3: Creating Campaign...');
       // Create campaign with Strategy 150 specific settings
       const campaign = await this.createCampaign({
         name: campaignData.campaignName,
@@ -719,8 +940,14 @@ class FacebookAPI {
         lifetime_budget: campaignData.campaignBudgetOptimization && campaignData.campaignBudget?.lifetimeBudget ? campaignData.campaignBudget.lifetimeBudget : undefined
       });
 
-      // Create ad set with Strategy 150 specific settings
-      const adSet = await this.createAdSet({
+      if (!campaign || !campaign.id) {
+        throw new Error('Campaign creation failed - no campaign ID received');
+      }
+      console.log('✅ Campaign created successfully with ID:', campaign.id);
+
+      // Create ad set with fallback mechanism for Strategy 150
+      console.log('\n🔷 Step 2 of 3: Creating AdSet with fallback support...');
+      const adSet = await this.createAdSetWithFallback({
         campaignId: campaign.id,
         campaignName: campaignData.campaignName,
         budgetType: campaignData.budgetType,
@@ -742,7 +969,21 @@ class FacebookAPI {
         specialAdCategories: campaignData.specialAdCategories
       });
 
+      if (!adSet || !adSet.id) {
+        throw new Error('AdSet creation failed - no AdSet ID received');
+      }
+      console.log('✅ AdSet created successfully with ID:', adSet.id);
+
+      // Check if we had to use safe mode
+      if (this.skippedFields && Object.keys(this.skippedFields).length > 0) {
+        console.log('\n📢 IMPORTANT: Some fields were skipped to ensure campaign creation success');
+        console.log('🔧 Skipped fields:', this.skippedFields);
+        // Add skipped fields to response for frontend notification
+        adSet._skippedFields = this.skippedFields;
+      }
+
       // Create initial ad
+      console.log('\n🔷 Step 3 of 3: Creating Ad...');
       const mediaAssets = await this.prepareMediaAssets(campaignData);
       const ad = await this.createAd({
         campaignName: campaignData.campaignName,
@@ -757,12 +998,29 @@ class FacebookAPI {
         ...mediaAssets
       });
 
+      if (!ad || !ad.id) {
+        console.warn('⚠️ Ad creation failed - continuing with campaign and adset only');
+      } else {
+        console.log('✅ Ad created successfully with ID:', ad.id);
+      }
+
+      console.log('\n🎯 ========== STRATEGY 1-50-1 PHASE 1 COMPLETE ==========');
+      console.log('📊 Results:');
+      console.log('  - Campaign ID:', campaign.id);
+      console.log('  - AdSet ID:', adSet.id);
+      console.log('  - Ad ID:', ad ? ad.id : 'Not created');
+      console.log('  - Skipped Fields:', this.skippedFields ? Object.keys(this.skippedFields).join(', ') : 'None');
+      console.log('========================================\n');
+
       return {
         campaign,
         adSet,
         ads: [ad]
       };
     } catch (error) {
+      console.error('\n❌ STRATEGY 1-50-1 FAILED');
+      console.error('📍 Failed at step:', error.message);
+      console.error('========================================\n');
       this.handleError(error);
     }
   }
@@ -934,53 +1192,67 @@ class FacebookAPI {
   }
 
   getPromotedObject(adSetData) {
+    console.log('\n📊 Building promoted_object...');
+    console.log('  Input conversion location:', adSetData.conversionLocation);
+    console.log('  Input conversion event:', adSetData.conversionEvent);
+    console.log('  Available pixel ID:', this.pixelId || 'NONE');
+    console.log('  Available page ID:', this.pageId || 'NONE');
+
     const promotedObject = {};
 
     if (adSetData.conversionLocation === 'calls') {
       promotedObject.page_id = this.pageId;
-    } else if (adSetData.conversionLocation === 'website' && this.pixelId) {
-      promotedObject.pixel_id = this.pixelId;
+      console.log('  ✅ Using page_id for calls:', this.pageId);
+    } else if (adSetData.conversionLocation === 'website') {
+      // Always ensure we have a pixel ID for website conversions
+      if (this.pixelId) {
+        promotedObject.pixel_id = this.pixelId;
+        console.log('  ✅ Using pixel_id for website:', this.pixelId);
+      } else {
+        console.warn('  ⚠️ No pixel ID available for website conversion');
+        console.log('  🔄 Returning null to trigger pixel fetching in createAdSet');
+        return null; // Return null to trigger pixel fetching
+      }
 
-      // Map conversion events to proper Meta API case-sensitive format
-      const eventMap = {
-        'LEAD': 'Lead',
-        'lead': 'Lead',
-        'Lead': 'Lead',
-        'PURCHASE': 'Purchase',
-        'purchase': 'Purchase',
-        'Purchase': 'Purchase',
-        'ADD_TO_CART': 'AddToCart',
-        'add_to_cart': 'AddToCart',
-        'AddToCart': 'AddToCart',
-        'COMPLETE_REGISTRATION': 'CompleteRegistration',
-        'complete_registration': 'CompleteRegistration',
-        'CompleteRegistration': 'CompleteRegistration',
-        'PAGE_VIEW': 'PageView',
-        'page_view': 'PageView',
-        'PageView': 'PageView',
-        'VIEW_CONTENT': 'ViewContent',
-        'view_content': 'ViewContent',
-        'ViewContent': 'ViewContent',
-        'INITIATE_CHECKOUT': 'InitiateCheckout',
-        'initiate_checkout': 'InitiateCheckout',
-        'InitiateCheckout': 'InitiateCheckout',
-        'ADD_PAYMENT_INFO': 'AddPaymentInfo',
-        'add_payment_info': 'AddPaymentInfo',
-        'AddPaymentInfo': 'AddPaymentInfo'
+      // ONLY support LEAD and PURCHASE events as per Facebook's requirements
+      const supportedEvents = {
+        'LEAD': 'LEAD',
+        'lead': 'LEAD',
+        'Lead': 'LEAD',
+        'PURCHASE': 'PURCHASE',
+        'purchase': 'PURCHASE',
+        'Purchase': 'PURCHASE'
       };
 
-      const conversionEvent = adSetData.conversionEvent || 'Lead';
-      promotedObject.custom_event_type = eventMap[conversionEvent] || conversionEvent;
+      const conversionEvent = adSetData.conversionEvent || 'LEAD';
+      const mappedEvent = supportedEvents[conversionEvent];
+      console.log('  📝 Conversion event mapping:');
+      console.log('    - Input:', conversionEvent);
+      console.log('    - Mapped:', mappedEvent || 'Not found in supported events');
+
+      if (mappedEvent) {
+        promotedObject.custom_event_type = mappedEvent;
+        console.log('  ✅ Using custom_event_type:', mappedEvent);
+      } else {
+        console.warn(`  ⚠️ Unsupported conversion event: ${conversionEvent}`);
+        console.log('  🔄 Defaulting to LEAD');
+        promotedObject.custom_event_type = 'LEAD';
+      }
 
     } else if (adSetData.conversionLocation === 'app') {
       promotedObject.application_id = adSetData.applicationId || process.env.FB_APP_ID;
       promotedObject.object_store_url = adSetData.appStoreUrl;
+      // For app conversions, only use LEAD or PURCHASE
       if (adSetData.conversionEvent) {
-        promotedObject.custom_event_type = adSetData.conversionEvent;
+        const appEvent = adSetData.conversionEvent.toUpperCase();
+        promotedObject.custom_event_type = (appEvent === 'PURCHASE' ? 'PURCHASE' : 'LEAD');
       }
     }
 
-    return JSON.stringify(promotedObject);
+    const result = JSON.stringify(promotedObject);
+    console.log('  📦 Final promoted_object:', result);
+    console.log('  ✅ promoted_object built successfully\n');
+    return result;
   }
 
   mapObjective(objective) {
@@ -1009,39 +1281,87 @@ class FacebookAPI {
   }
 
   handleError(error) {
+    console.error('\n===============================================');
+    console.error('🚨 FACEBOOK API ERROR OCCURRED 🚨');
+    console.error('===============================================');
+
     if (error.response) {
       const fbError = error.response.data.error;
       const errorMessage = fbError ? fbError.message : 'Facebook API Error';
       const errorCode = fbError ? fbError.code : 'UNKNOWN';
 
-      // Enhanced error logging for debugging
-      console.error('🔴 Facebook API Error Details:');
+      console.error('\n📍 ERROR LOCATION:');
+      console.error('  Request URL:', error.config?.url);
+      console.error('  Request Method:', error.config?.method);
+      console.error('  HTTP Status:', error.response.status);
+
+      console.error('\n🔴 FACEBOOK ERROR DETAILS:');
       console.error('  Error Code:', errorCode);
       console.error('  Error Message:', errorMessage);
+
       if (fbError) {
         console.error('  Error Type:', fbError.type);
         console.error('  Error Subcode:', fbError.error_subcode);
         console.error('  Error User Title:', fbError.error_user_title);
         console.error('  Error User Message:', fbError.error_user_msg);
         console.error('  Fbtrace ID:', fbError.fbtrace_id);
-        if (fbError.error_data) {
-          console.error('  Error Data:', JSON.stringify(fbError.error_data, null, 2));
+
+        // Specific error code explanations
+        if (errorCode === 100) {
+          console.error('\n⚠️ ERROR 100: Invalid Parameter');
+          console.error('  This usually means one of the fields sent to Facebook is invalid.');
+          console.error('  Check: promoted_object, custom_event_type, targeting, budget values');
+        } else if (errorCode === 190) {
+          console.error('\n⚠️ ERROR 190: Invalid Access Token');
+          console.error('  The Facebook access token has expired or is invalid.');
+          console.error('  User needs to re-authenticate with Facebook.');
+        } else if (errorCode === 400) {
+          console.error('\n⚠️ ERROR 400: Bad Request');
+          console.error('  The request structure is invalid.');
         }
-        console.error('  Full Error Object:', JSON.stringify(fbError, null, 2));
+
+        if (fbError.error_data) {
+          console.error('\n📊 Additional Error Data:', JSON.stringify(fbError.error_data, null, 2));
+        }
+
+        // Check for specific field errors
+        if (errorMessage.includes('promoted_object')) {
+          console.error('\n🎯 PROMOTED_OBJECT ERROR DETECTED');
+          console.error('  Issue with conversion tracking configuration');
+          console.error('  Will retry with safe mode (no promoted_object)');
+        }
+
+        if (errorMessage.includes('custom_event_type')) {
+          console.error('\n🎯 CUSTOM_EVENT_TYPE ERROR DETECTED');
+          console.error('  Invalid conversion event specified');
+          console.error('  Only LEAD and PURCHASE are supported');
+        }
       }
-      console.error('  Request URL:', error.config?.url);
-      console.error('  Request Method:', error.config?.method);
-      console.error('  Request Data:', error.config?.data);
-      console.error('  Request Params:', error.config?.params);
+
+      console.error('\n📤 REQUEST DATA THAT FAILED:');
+      if (error.config?.params) {
+        const safeParams = { ...error.config.params };
+        if (safeParams.access_token) safeParams.access_token = '[HIDDEN]';
+        console.error(JSON.stringify(safeParams, null, 2));
+      }
+
+      console.error('\n===============================================\n');
 
       const customError = new Error(`Facebook API Error: ${errorMessage} (Code: ${errorCode})`);
       customError.status = error.response.status;
       customError.fbError = fbError;
-
       throw customError;
     } else if (error.request) {
+      console.error('\n🌐 NO RESPONSE FROM FACEBOOK API');
+      console.error('  The request was made but no response was received');
+      console.error('  This could be a network issue or Facebook servers are down');
+      console.error('===============================================\n');
       throw new Error('No response from Facebook API');
     } else {
+      console.error('\n⚠️ REQUEST SETUP ERROR');
+      console.error('  Error occurred while setting up the request');
+      console.error('  Error:', error.message);
+      console.error('===============================================\n');
       throw error;
     }
   }

@@ -36,6 +36,8 @@ const Strategy150Container: React.FC = () => {
   const [campaignResult, setCampaignResult] = useState<Strategy150Response | null>(null);
   const [postId, setPostId] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [skippedFields, setSkippedFields] = useState<any>(null);
+  const [fallbackUsed, setFallbackUsed] = useState(false);
 
 
   const getPhaseComponent = () => {
@@ -89,6 +91,15 @@ const Strategy150Container: React.FC = () => {
   };
 
   const handlePhase1Submit = async (data: Strategy150FormData) => {
+    console.log('\n🎯 ========== STRATEGY 1-50-1 CLIENT START ==========');
+    console.log('📄 Form Data Received:', data);
+    console.log('📊 Key Parameters:');
+    console.log('  - Campaign Name:', data.campaignName);
+    console.log('  - Objective:', data.objective);
+    console.log('  - Budget Type:', data.budgetType);
+    console.log('  - Daily Budget:', data.dailyBudget);
+    console.log('  - Conversion Event:', data.conversionEvent);
+
     try {
       setFormData(data);
       setPhase('creating');
@@ -178,7 +189,12 @@ const Strategy150Container: React.FC = () => {
       };
 
       // Use the working campaignApi.createCampaign instead of custom endpoint
+      console.log('\n🔄 Processing Form Data...');
       console.log('📤 Using working campaign creation flow');
+      console.log('📝 Budget configuration:');
+      console.log('  - Budget Type:', data.budgetType);
+      console.log('  - Daily Budget:', data.dailyBudget);
+      console.log('  - Lifetime Budget:', data.lifetimeBudget);
 
       // Transform to match working CampaignForm structure
       // IMPORTANT: Only send fields that backend validates and expects
@@ -243,7 +259,10 @@ const Strategy150Container: React.FC = () => {
         }
       });
 
-      console.log('📤 Sending to working endpoint:', workingCampaignData);
+      console.log('\n📤 Sending Request to Backend...');
+      console.log('🔗 Endpoint: /api/campaigns/create');
+      console.log('📦 Payload size:', JSON.stringify(workingCampaignData).length, 'bytes');
+      console.log('📊 Request data:', workingCampaignData);
 
       // Use the working API method
       const { campaignApi } = await import('../../services/api');
@@ -280,6 +299,14 @@ const Strategy150Container: React.FC = () => {
 
         console.log('📝 Transformed response:', strategy150Result);
         setCampaignResult(strategy150Result);
+
+        // Check if fallback was used (fields were skipped)
+        if (result.data?.adSet?._skippedFields) {
+          setSkippedFields(result.data.adSet._skippedFields);
+          setFallbackUsed(true);
+          console.log('📢 Some fields were skipped for successful creation:', result.data.adSet._skippedFields);
+        }
+
         setPhase('waiting');
 
         // Extract ad ID from the first ad for Post ID capture
@@ -301,21 +328,37 @@ const Strategy150Container: React.FC = () => {
         throw new Error(result.error || 'Failed to create campaign');
       }
     } catch (error: any) {
-      console.error('Phase 1 error:', error);
+      console.error('\n❌ ========== STRATEGY 1-50-1 FAILED ==========');
+      console.error('🔴 Phase 1 error:', error);
+      console.error('📍 Error Type:', error.name);
+      console.error('📍 Error Status:', error.response?.status);
+      console.error('📍 Error URL:', error.config?.url);
 
       // Extract detailed error message
       let errorMessage = 'Unknown error occurred';
+
       if (error.response?.data?.errors) {
         // Validation errors from backend
         const validationErrors = error.response.data.errors;
         errorMessage = validationErrors.map((e: any) => e.msg || e.message).join(', ');
-        console.error('Validation errors:', validationErrors);
+        console.error('📋 Validation errors:', validationErrors);
       } else if (error.response?.data?.error) {
-        // General error message
+        // General error message from backend
         errorMessage = error.response.data.error;
+        console.error('📋 Backend error message:', errorMessage);
+
+        // Check for specific Facebook errors
+        if (errorMessage.includes('promoted_object') || errorMessage.includes('custom_event_type')) {
+          console.error('🎯 Facebook API field validation error detected');
+          console.error('💡 Suggestion: Backend should retry with safe mode automatically');
+        }
       } else if (error.message) {
         errorMessage = error.message;
+        console.error('📋 Client error message:', errorMessage);
       }
+
+      console.error('📊 Full error object:', error);
+      console.error('==========================================\n');
 
       setError(errorMessage);
       setPhase('error');
@@ -383,6 +426,8 @@ const Strategy150Container: React.FC = () => {
     setCampaignResult(null);
     setPostId('');
     setError('');
+    setSkippedFields(null);
+    setFallbackUsed(false);
   };
 
   return (
@@ -425,6 +470,45 @@ const Strategy150Container: React.FC = () => {
                 ))}
               </Stepper>
             </Box>
+
+            {/* Fallback Warning */}
+            {fallbackUsed && skippedFields && (
+              <Alert
+                severity="warning"
+                sx={{ mb: 3 }}
+                action={
+                  <Typography variant="caption" sx={{ textDecoration: 'underline', cursor: 'pointer' }}>
+                    <a
+                      href={`https://business.facebook.com/adsmanager/manage/campaigns?act=${localStorage.getItem('fb_ad_account_id')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: 'inherit' }}
+                    >
+                      Configure in Facebook
+                    </a>
+                  </Typography>
+                }
+              >
+                <Typography variant="subtitle2" fontWeight="bold">
+                  Campaign created successfully with some optimizations disabled
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  The following fields were skipped to ensure successful campaign creation:
+                </Typography>
+                <Box component="ul" sx={{ mt: 1, mb: 0, pl: 3 }}>
+                  {Object.keys(skippedFields).map(field => (
+                    <li key={field}>
+                      <Typography variant="caption">
+                        <strong>{field}</strong>: You may need to set conversion tracking manually
+                      </Typography>
+                    </li>
+                  ))}
+                </Box>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Your campaign was created successfully, but you may want to configure these settings in Facebook Ads Manager for optimal performance.
+                </Typography>
+              </Alert>
+            )}
 
             {getPhaseComponent()}
           </>
