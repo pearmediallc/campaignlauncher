@@ -694,16 +694,24 @@ const AdSetSection: React.FC = () => {
 
         {/* Age Range */}
         <Box sx={{ width: "100%" }}>
-          <Typography gutterBottom>Age Range</Typography>
+          <Typography gutterBottom>
+            Age Range: {(watch('targeting.ageMin') || 18)} - {(watch('targeting.ageMax') || 65)}
+          </Typography>
           <Box sx={{ px: 2 }}>
             <Controller
-              name="targeting.ageMin"
+              name="targeting.ageRange"
               control={control}
-              defaultValue={18}
+              defaultValue={[18, 65]}
               render={({ field }) => (
                 <Box>
                   <Slider
-                    {...field}
+                    value={field.value || [18, 65]}
+                    onChange={(_, value) => {
+                      field.onChange(value);
+                      // Also update the individual ageMin/ageMax fields for backward compatibility
+                      setValue('targeting.ageMin', (value as number[])[0]);
+                      setValue('targeting.ageMax', (value as number[])[1]);
+                    }}
                     valueLabelDisplay="auto"
                     min={13}
                     max={65}

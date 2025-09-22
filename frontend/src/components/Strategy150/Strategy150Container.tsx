@@ -177,52 +177,54 @@ const Strategy150Container: React.FC = () => {
         }
       };
 
-      // Call the Strategy 1-50-1 dedicated API endpoint
-      // Enhanced logging - log each field individually
-      console.log('📤 Sending Strategy 1-50-1 campaign data:', campaignData);
-      console.log('📊 Field-by-field validation check:');
-      console.log('  ✓ campaignName:', campaignData.campaignName, typeof campaignData.campaignName);
-      console.log('  ✓ objective:', campaignData.objective, typeof campaignData.objective);
-      console.log('  ✓ primaryText:', campaignData.primaryText, typeof campaignData.primaryText);
-      console.log('  ✓ headline:', campaignData.headline, typeof campaignData.headline);
-      console.log('  ✓ description:', campaignData.description, typeof campaignData.description);
-      console.log('  ✓ url:', campaignData.url, typeof campaignData.url);
-      console.log('  ✓ urlType:', campaignData.urlType, typeof campaignData.urlType);
-      console.log('  ✓ budgetType:', campaignData.budgetType, typeof campaignData.budgetType);
-      console.log('  ✓ budgetLevel:', campaignData.budgetLevel, typeof campaignData.budgetLevel);
-      console.log('  ✓ dailyBudget:', campaignData.dailyBudget, typeof campaignData.dailyBudget);
-      console.log('  ✓ lifetimeBudget:', campaignData.lifetimeBudget, typeof campaignData.lifetimeBudget);
-      console.log('  ✓ buyingType:', campaignData.buyingType, typeof campaignData.buyingType);
-      console.log('  ✓ specialAdCategories:', campaignData.specialAdCategories, Array.isArray(campaignData.specialAdCategories));
-      console.log('  ✓ performanceGoal:', campaignData.performanceGoal, typeof campaignData.performanceGoal);
-      console.log('  ✓ conversionEvent:', campaignData.conversionEvent, typeof campaignData.conversionEvent);
-      console.log('  ✓ bidStrategy:', campaignData.bidStrategy, typeof campaignData.bidStrategy);
-      console.log('  ✓ targeting:', campaignData.targeting);
-      console.log('  ✓ placementType:', campaignData.placementType, typeof campaignData.placementType);
-      console.log('  ✓ facebookPage:', campaignData.facebookPage);
-      console.log('  ✓ instagramAccount:', campaignData.instagramAccount);
-      console.log('  ✓ pixel:', campaignData.pixel);
-      console.log('  ✓ mediaType:', campaignData.mediaType, typeof campaignData.mediaType);
-      console.log('  ✓ publishDirectly:', campaignData.publishDirectly, typeof campaignData.publishDirectly);
+      // Use the working campaignApi.createCampaign instead of custom endpoint
+      console.log('📤 Using working campaign creation flow');
 
-      // Check for undefined or null critical fields
-      const criticalFields = ['campaignName', 'objective', 'primaryText', 'headline'];
-      const missingFields = criticalFields.filter(field => !(campaignData as any)[field]);
-      if (missingFields.length > 0) {
-        console.warn('⚠️ Missing critical fields:', missingFields);
-      }
+      // Transform to match working CampaignForm structure
+      const workingCampaignData = {
+        campaignName: campaignData.campaignName,
+        primaryText: campaignData.primaryText,
+        headline: campaignData.headline,
+        description: campaignData.description,
+        url: campaignData.url,
+        urlType: campaignData.urlType,
+        callToAction: campaignData.callToAction,
+        displayLink: campaignData.displayLink,
 
-      const response = await fetch('/api/campaigns/strategy-150/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        // Budget
+        budgetType: campaignData.budgetType,
+        dailyBudget: campaignData.dailyBudget,
+        lifetimeBudget: campaignData.lifetimeBudget,
+
+        // Meta API fields
+        objective: campaignData.objective,
+        specialAdCategories: campaignData.specialAdCategories,
+        performanceGoal: campaignData.performanceGoal,
+        conversionEvent: campaignData.conversionEvent,
+        bidStrategy: campaignData.bidStrategy,
+
+        // Targeting in working format
+        targeting: {
+          locations: campaignData.targeting?.locations || { countries: ['US'] },
+          ageMin: campaignData.targeting?.ageMin || 18,
+          ageMax: campaignData.targeting?.ageMax || 65,
         },
-        body: JSON.stringify(campaignData)
-      });
 
-      const result = await response.json();
-      console.log('📥 Response:', response.status, result);
+        // Media
+        mediaType: campaignData.mediaType,
+        image: campaignData.image,
+
+        // Placements
+        placements: campaignData.placementType === 'automatic' ? {} : campaignData.placements
+      };
+
+      console.log('📤 Sending to working endpoint:', workingCampaignData);
+
+      // Use the working API method
+      const { campaignApi } = await import('../../services/api');
+      const result = await campaignApi.createCampaign(workingCampaignData);
+
+      console.log('📥 Response from working endpoint:', result);
 
       // Enhanced error logging
       if (result.errors && Array.isArray(result.errors)) {
