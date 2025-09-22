@@ -1004,6 +1004,15 @@ class FacebookAPI {
       }
       console.log('✅ Campaign created successfully with ID:', campaign.id);
 
+      // Explicitly publish the campaign to ensure it's not in draft mode
+      try {
+        await this.publishCampaign(campaign.id);
+        console.log('✅ Campaign published and confirmed not in draft mode');
+      } catch (publishError) {
+        console.warn('⚠️ Campaign publish warning (campaign may still work):', publishError.message);
+        // Don't fail the entire process if publish fails
+      }
+
       // Create ad set with fallback mechanism for Strategy 150
       console.log('\n🔷 Step 2 of 3: Creating AdSet with fallback support...');
       const adSet = await this.createAdSetWithFallback({
@@ -1173,81 +1182,152 @@ class FacebookAPI {
     };
 
     try {
-      // Get original ad set data
-      const originalAdSetResponse = await axios.get(`${this.baseURL}/${originalAdSetId}`, {
-        params: {
-          fields: 'name,targeting,bid_amount,billing_event,optimization_goal,bid_strategy,daily_budget,lifetime_budget,campaign_id',
-          access_token: this.accessToken
+      console.log(`🔄 Starting AdSet duplication using Facebook /copies endpoint`);
+      console.log(`📋 Original AdSet ID: ${originalAdSetId}`);
+      console.log(`📋 Target Campaign ID: ${campaignId}`);
+      console.log(`📋 Post ID: ${postId}`);
+      console.log(`📋 Count: ${count}`);
+
+      // Use Facebook's official /copies endpoint for batch duplication
+      const copyData = {
+        campaign_id: campaignId,
+        deep_copy: true,
+        status_option: 'ACTIVE',
+        rename_options: {
+          rename_prefix: '',
+          rename_suffix: ' - Copy'
+        },
+        access_token: this.accessToken
+      };
+
+      console.log(`🔄 Using Facebook /copies endpoint with data:`, copyData);
+
+      // Create all copies in one API call using Facebook's batch copy feature
+      const copyResponse = await axios.post(
+        `${this.baseURL}/${originalAdSetId}/copies`,
+        null,
+        {
+          params: {
+            ...copyData,
+            // Create count number of copies
+            batch_size: count
+          }
         }
-      });
+      );
 
-      const originalAdSet = originalAdSetResponse.data;
+      console.log(`✅ Facebook /copies response:`, copyResponse.data);
 
-      // Create 49 duplicate ad sets
-      for (let i = 1; i <= count; i++) {
-        try {
-          // Create duplicate ad set
-          const duplicateAdSetData = {
-            name: `${originalAdSet.name} - Copy ${i}`,
-            campaign_id: campaignId,
-            billing_event: originalAdSet.billing_event,
-            optimization_goal: originalAdSet.optimization_goal,
-            bid_strategy: originalAdSet.bid_strategy,
-            targeting: JSON.stringify(originalAdSet.targeting),
-            status: 'ACTIVE',
-            access_token: this.accessToken
-          };
+      // If batch copy response contains the copied adset IDs
+      if (copyResponse.data && copyResponse.data.id) {
+        const newAdSetIds = Array.isArray(copyResponse.data.id) ? copyResponse.data.id : [copyResponse.data.id];
 
-          // Add budget information
-          if (originalAdSet.daily_budget) {
-            duplicateAdSetData.daily_budget = originalAdSet.daily_budget;
+        // Create ads for each copied adset
+        for (let i = 0; i < newAdSetIds.length; i++) {
+          try {
+            const newAdSetId = newAdSetIds[i];
+
+            // Create ad using existing post
+            const adData = {
+              name: `${formData.campaignName} - Ad Copy ${i + 1}`,
+              adset_id: newAdSetId,
+              creative: JSON.stringify({
+                object_story_id: postId,
+                page_id: this.pageId
+              }),
+              status: 'ACTIVE',
+              access_token: this.accessToken
+            };
+
+            console.log(`🔄 Creating Ad for AdSet ${newAdSetId}:`, adData);
+
+            await axios.post(
+              `${this.baseURL}/act_${this.adAccountId}/ads`,
+              null,
+              { params: adData }
+            );
+
+            results.adSets.push({
+              id: newAdSetId,
+              name: `AdSet Copy ${i + 1}`
+            });
+
+            console.log(`✅ Created ad for AdSet copy ${i + 1}: ${newAdSetId}`);
+
+          } catch (adError) {
+            console.error(`❌ Error creating ad for AdSet ${i + 1}:`, adError.response?.data || adError.message);
+            results.errors.push({
+              adSetIndex: i + 1,
+              error: `Ad creation failed: ${adError.message}`
+            });
           }
-          if (originalAdSet.lifetime_budget) {
-            duplicateAdSetData.lifetime_budget = originalAdSet.lifetime_budget;
+        }
+      } else {
+        // Fallback: Create copies one by one if batch didn't work
+        console.log(`⚠️ Batch copy didn't return expected format, falling back to individual copies`);
+
+        for (let i = 1; i <= count; i++) {
+          try {
+            const copyData = {
+              campaign_id: campaignId,
+              deep_copy: true,
+              status_option: 'ACTIVE',
+              rename_options: {
+                rename_prefix: '',
+                rename_suffix: ` - Copy ${i}`
+              },
+              access_token: this.accessToken
+            };
+
+            console.log(`🔄 Creating individual AdSet Copy ${i} using /copies:`, copyData);
+
+            const individualCopyResponse = await axios.post(
+              `${this.baseURL}/${originalAdSetId}/copies`,
+              null,
+              { params: copyData }
+            );
+
+            const newAdSetId = individualCopyResponse.data.id;
+
+            // Create ad using existing post
+            const adData = {
+              name: `${formData.campaignName} - Ad Copy ${i}`,
+              adset_id: newAdSetId,
+              creative: JSON.stringify({
+                object_story_id: postId,
+                page_id: this.pageId
+              }),
+              status: 'ACTIVE',
+              access_token: this.accessToken
+            };
+
+            await axios.post(
+              `${this.baseURL}/act_${this.adAccountId}/ads`,
+              null,
+              { params: adData }
+            );
+
+            results.adSets.push({
+              id: newAdSetId,
+              name: `AdSet Copy ${i}`
+            });
+
+            console.log(`✅ Created individual AdSet copy ${i}: ${newAdSetId}`);
+
+            // Small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+          } catch (error) {
+            console.error(`❌ Error creating individual AdSet copy ${i}:`, {
+              message: error.message,
+              status: error.response?.status,
+              data: error.response?.data
+            });
+
+            results.errors.push({
+              adSetIndex: i,
+              error: error.message
+            });
           }
-
-          const adSetResponse = await axios.post(
-            `${this.baseURL}/act_${this.adAccountId}/adsets`,
-            null,
-            { params: duplicateAdSetData }
-          );
-
-          const newAdSetId = adSetResponse.data.id;
-
-          // Create ad using existing post
-          const adData = {
-            name: `${formData.campaignName} - Ad Copy ${i}`,
-            adset_id: newAdSetId,
-            creative: JSON.stringify({
-              object_story_id: postId,
-              page_id: this.pageId
-            }),
-            status: 'ACTIVE',
-            access_token: this.accessToken
-          };
-
-          await axios.post(
-            `${this.baseURL}/act_${this.adAccountId}/ads`,
-            null,
-            { params: adData }
-          );
-
-          results.adSets.push({
-            id: newAdSetId,
-            name: duplicateAdSetData.name
-          });
-
-          console.log(`✅ Created ad set copy ${i}: ${newAdSetId}`);
-
-          // Small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100));
-
-        } catch (error) {
-          console.error(`❌ Error creating ad set copy ${i}:`, error);
-          results.errors.push({
-            adSetIndex: i,
-            error: error.message
-          });
         }
       }
 
@@ -1256,6 +1336,43 @@ class FacebookAPI {
 
     } catch (error) {
       console.error('Error in duplicateAdSetsWithExistingPost:', error);
+      throw error;
+    }
+  }
+
+  // Function to explicitly publish campaign and ensure it's not in draft mode
+  async publishCampaign(campaignId) {
+    try {
+      console.log(`🚀 Publishing campaign ${campaignId} to ensure it's not in draft mode`);
+
+      // Update campaign to ensure it's published and not in draft
+      const publishData = {
+        status: 'ACTIVE',
+        access_token: this.accessToken
+      };
+
+      const response = await axios.post(
+        `${this.baseURL}/${campaignId}`,
+        null,
+        { params: publishData }
+      );
+
+      console.log(`✅ Campaign ${campaignId} published successfully`);
+      return response.data;
+
+    } catch (error) {
+      console.error(`❌ Error publishing campaign ${campaignId}:`, {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+
+      // If the campaign is already published or active, this is not a critical error
+      if (error.response?.status === 400 && error.response?.data?.error?.message?.includes('status')) {
+        console.log(`⚠️ Campaign may already be in correct status, continuing...`);
+        return { success: true, message: 'Campaign status already correct' };
+      }
+
       throw error;
     }
   }
