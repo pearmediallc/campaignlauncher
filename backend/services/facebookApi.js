@@ -44,7 +44,8 @@ class FacebookAPI {
         name: `[REVIEW] ${campaignData.name}`,
         objective: campaignData.objective || 'OUTCOME_LEADS',
         status: campaignData.status || 'PAUSED',
-        special_ad_categories: JSON.stringify(campaignData.specialAdCategories || []),
+        // HARDCODED FOR TESTING - Always use HOUSING
+        special_ad_categories: JSON.stringify(['HOUSING']),
         buying_type: campaignData.buyingType || 'AUCTION',
         access_token: this.accessToken
       };
@@ -957,18 +958,16 @@ class FacebookAPI {
       const mappedObjective = this.mapObjective(campaignData.objective);
       console.log('  🎯 Objective Mapping:', campaignData.objective, '->', mappedObjective);
 
-      // Ensure special ad categories is an array
-      const specialAdCategories = Array.isArray(campaignData.specialAdCategories)
-        ? campaignData.specialAdCategories
-        : [];
-      console.log('  🔐 Special Ad Categories:', specialAdCategories.length > 0 ? specialAdCategories : 'None');
+      // HARDCODE HOUSING for testing
+      const specialAdCategories = ['HOUSING'];
+      console.log('  🔐 Special Ad Categories: HARDCODED TO HOUSING FOR TESTING');
 
       // Create campaign with Strategy 150 specific settings
       const campaign = await this.createCampaign({
         name: campaignData.campaignName,
         objective: mappedObjective,
         buyingType: campaignData.buyingType ? campaignData.buyingType.toUpperCase() : 'AUCTION',
-        specialAdCategories: specialAdCategories,
+        specialAdCategories: ['HOUSING'], // HARDCODED
         bidStrategy: campaignData.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
         status: campaignData.status || 'PAUSED',
         daily_budget: campaignData.campaignBudgetOptimization && campaignData.campaignBudget?.dailyBudget ? campaignData.campaignBudget.dailyBudget : undefined,
