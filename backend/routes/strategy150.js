@@ -368,12 +368,13 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       console.log('Media upload detected but skipped for JSON endpoint');
     }
 
-    // Parse and validate budget values (convert from cents back to dollars for FacebookAPI)
+    // Parse and validate budget values (keep in dollars, FacebookAPI will convert to cents)
     const parseBudget = (value) => {
       if (value === undefined || value === null) return undefined;
       if (typeof value === 'number') {
-        // If value is > 1000, assume it's in cents and convert to dollars
-        return value > 1000 ? value / 100 : value;
+        // Frontend sends in cents, convert back to dollars for FacebookAPI
+        // FacebookAPI.parseBudgetValue will convert back to cents
+        return value / 100;
       }
       // Remove $ and commas, then parse to float
       const cleanValue = String(value).replace(/[$,]/g, '');
