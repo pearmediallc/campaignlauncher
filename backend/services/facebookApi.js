@@ -151,24 +151,38 @@ class FacebookAPI {
       }
       
       // Build targeting from provided data with correct field names
+      // For special ad categories, age_max should be 65+ (which is represented as no age_max or 65)
+      const hasSpecialAdCategories = adSetData.specialAdCategories && adSetData.specialAdCategories.length > 0;
+
       const targeting = {
         age_min: adSetData.targeting?.ageMin || adSetData.targeting?.age_min || 18,
-        age_max: adSetData.targeting?.ageMax || adSetData.targeting?.age_max || 65,
       };
 
+      // Only set age_max if it's not a special ad category campaign
+      if (!hasSpecialAdCategories) {
+        targeting.age_max = adSetData.targeting?.ageMax || adSetData.targeting?.age_max || 65;
+      }
+      // For special ad categories, omit age_max to allow 65+ (Facebook default)
+
       // Handle gender targeting - check both locations for gender data
-      const genderSource = adSetData.targeting?.demographics?.genders || adSetData.targeting?.genders;
-      if (genderSource) {
-        const genders = Array.isArray(genderSource) ? genderSource : [genderSource];
-        if (!genders.includes('all')) {
-          // Map gender strings to Meta API numbers
-          const genderMap = { 'male': 1, 'female': 2 };
-          const mappedGenders = genders.map(g => genderMap[g] || g).filter(g => typeof g === 'number');
-          if (mappedGenders.length > 0) {
-            targeting.genders = mappedGenders;
+      // BUT: If special ad categories include HOUSING, EMPLOYMENT, or CREDIT, skip gender targeting
+      const hasRestrictedCategories = adSetData.specialAdCategories &&
+        adSetData.specialAdCategories.some(cat => ['HOUSING', 'EMPLOYMENT', 'CREDIT'].includes(cat));
+
+      if (!hasRestrictedCategories) {
+        const genderSource = adSetData.targeting?.demographics?.genders || adSetData.targeting?.genders;
+        if (genderSource) {
+          const genders = Array.isArray(genderSource) ? genderSource : [genderSource];
+          if (!genders.includes('all')) {
+            // Map gender strings to Meta API numbers
+            const genderMap = { 'male': 1, 'female': 2 };
+            const mappedGenders = genders.map(g => genderMap[g] || g).filter(g => typeof g === 'number');
+            if (mappedGenders.length > 0) {
+              targeting.genders = mappedGenders;
+            }
           }
+          // If 'all' is selected, don't set genders field - Meta defaults to all
         }
-        // If 'all' is selected, don't set genders field - Meta defaults to all
       }
 
       // Handle age targeting - check for demographics object
@@ -738,7 +752,8 @@ class FacebookAPI {
         bidStrategy: campaignData.bidStrategy,
         costCap: campaignData.costCap,
         minRoas: campaignData.minRoas,
-        objective: campaignData.objective
+        objective: campaignData.objective,
+        specialAdCategories: campaignData.specialAdCategories
       });
 
       // Create initial ad
