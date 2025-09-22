@@ -181,35 +181,31 @@ const Strategy150Container: React.FC = () => {
       console.log('📤 Using working campaign creation flow');
 
       // Transform to match working CampaignForm structure
-      const workingCampaignData = {
+      // IMPORTANT: Only send fields that backend validates and expects
+      const workingCampaignData: any = {
+        // Required fields
         campaignName: campaignData.campaignName,
         primaryText: campaignData.primaryText,
         headline: campaignData.headline,
         description: campaignData.description || '',
+
+        // URL fields
         url: campaignData.url || '',
         urlType: (campaignData.urlType === 'lead_gen' || campaignData.urlType === 'call') ? campaignData.urlType : 'lead_gen',
-        callToAction: campaignData.callToAction || 'LEARN_MORE',
-        displayLink: campaignData.displayLink,
 
-        // Budget
-        budgetType: campaignData.budgetType,
-        dailyBudget: campaignData.dailyBudget,
-        lifetimeBudget: campaignData.lifetimeBudget,
+        // Budget - send the appropriate one based on budgetType
+        budgetType: campaignData.budgetType || 'daily',
+
+        // Call to action
+        callToAction: campaignData.callToAction || 'LEARN_MORE',
 
         // Required field for CampaignFormData
         conversionLocation: campaignData.conversionLocation || 'website',
 
-        // Meta API fields
-        objective: campaignData.objective,
-        specialAdCategories: campaignData.specialAdCategories,
-        performanceGoal: campaignData.performanceGoal,
-        conversionEvent: campaignData.conversionEvent,
-        bidStrategy: campaignData.bidStrategy,
-
-        // Targeting in working format (simplified for CampaignForm compatibility)
+        // Targeting in working format
         targeting: {
           locations: campaignData.targeting?.locations || { countries: ['US'] },
-          ageMin: 18, // Use default values since CampaignForm expects simple structure
+          ageMin: 18,
           ageMax: 65,
         },
 
@@ -217,7 +213,7 @@ const Strategy150Container: React.FC = () => {
         mediaType: campaignData.mediaType || 'single_image',
         image: campaignData.image,
 
-        // Placements (provide defaults to match CampaignFormData structure)
+        // Placements
         placements: {
           facebook: campaignData.placements?.facebook || ['feed'],
           instagram: campaignData.placements?.instagram || ['stream'],
@@ -225,6 +221,27 @@ const Strategy150Container: React.FC = () => {
           messenger: campaignData.placements?.messenger || []
         }
       };
+
+      // Add budget based on type (make sure to get the actual values)
+      if (campaignData.budgetType === 'lifetime') {
+        workingCampaignData.lifetimeBudget = campaignData.lifetimeBudget || campaignData.adSetBudget?.lifetimeBudget || 350;
+      } else {
+        workingCampaignData.dailyBudget = campaignData.dailyBudget || campaignData.adSetBudget?.dailyBudget || 50;
+      }
+
+      // Log to verify budget is being set
+      console.log('💰 Budget configuration:', {
+        budgetType: workingCampaignData.budgetType,
+        dailyBudget: workingCampaignData.dailyBudget,
+        lifetimeBudget: workingCampaignData.lifetimeBudget
+      });
+
+      // Remove any undefined fields before sending
+      Object.keys(workingCampaignData).forEach(key => {
+        if (workingCampaignData[key] === undefined) {
+          delete workingCampaignData[key];
+        }
+      });
 
       console.log('📤 Sending to working endpoint:', workingCampaignData);
 
@@ -283,9 +300,24 @@ const Strategy150Container: React.FC = () => {
         // Handle errors (CampaignResponse only has 'error' field)
         throw new Error(result.error || 'Failed to create campaign');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Phase 1 error:', error);
-      setError(error instanceof Error ? error.message : 'Unknown error occurred');
+
+      // Extract detailed error message
+      let errorMessage = 'Unknown error occurred';
+      if (error.response?.data?.errors) {
+        // Validation errors from backend
+        const validationErrors = error.response.data.errors;
+        errorMessage = validationErrors.map((e: any) => e.msg || e.message).join(', ');
+        console.error('Validation errors:', validationErrors);
+      } else if (error.response?.data?.error) {
+        // General error message
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      setError(errorMessage);
       setPhase('error');
     }
   };
