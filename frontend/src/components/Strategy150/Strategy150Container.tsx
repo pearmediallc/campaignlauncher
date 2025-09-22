@@ -127,11 +127,11 @@ const Strategy150Container: React.FC = () => {
         budgetType: data.budgetType || 'daily',
         budgetLevel: data.budgetLevel || 'adset',
 
-        // Send budgets at root level for backend compatibility
-        dailyBudget: data.adSetBudget?.dailyBudget ||
-                    (data.budgetType === 'daily' || !data.budgetType ? 50 : undefined),
-        lifetimeBudget: data.adSetBudget?.lifetimeBudget ||
-                       (data.budgetType === 'lifetime' ? 350 : undefined),
+        // Send budgets at root level for backend compatibility (ensure they're numbers)
+        dailyBudget: data.budgetType === 'daily' || !data.budgetType ?
+                    (data.adSetBudget?.dailyBudget ? parseFloat(String(data.adSetBudget.dailyBudget).replace(/[$,]/g, '')) : 50) : undefined,
+        lifetimeBudget: data.budgetType === 'lifetime' ?
+                       (data.adSetBudget?.lifetimeBudget ? parseFloat(String(data.adSetBudget.lifetimeBudget).replace(/[$,]/g, '')) : 350) : undefined,
 
         // Campaign budget (for CBO)
         campaignBudget: data.campaignBudget,

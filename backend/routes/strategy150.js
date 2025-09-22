@@ -351,6 +351,16 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       imagePaths = req.files.map(f => f.path);
     }
 
+    // Parse and validate budget values
+    const parseBudget = (value) => {
+      if (value === undefined || value === null) return undefined;
+      if (typeof value === 'number') return value;
+      // Remove $ and commas, then parse to float
+      const cleanValue = String(value).replace(/[$,]/g, '');
+      const parsed = parseFloat(cleanValue);
+      return isNaN(parsed) ? undefined : parsed;
+    };
+
     // Prepare campaign data with all Meta-compliant Strategy 150 fields
     const campaignData = {
       // Campaign level fields
@@ -374,12 +384,18 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       attributionSetting: req.body.attributionSetting || 'standard',
       attributionWindow: req.body.attributionWindow || '7_day',
 
-      // Ad set budget & schedule
-      adSetBudget: req.body.adSetBudget || {
-        dailyBudget: 50,
-        scheduleType: 'run_continuously'
+      // Ad set budget & schedule (ensure proper number parsing)
+      adSetBudget: {
+        ...req.body.adSetBudget,
+        dailyBudget: parseBudget(req.body.adSetBudget?.dailyBudget) || parseBudget(req.body.dailyBudget) || 50,
+        lifetimeBudget: parseBudget(req.body.adSetBudget?.lifetimeBudget) || parseBudget(req.body.lifetimeBudget),
+        scheduleType: req.body.adSetBudget?.scheduleType || 'run_continuously'
       },
       budgetType: req.body.budgetType || 'daily',
+
+      // Also send budgets at root level for FacebookAPI compatibility
+      dailyBudget: parseBudget(req.body.dailyBudget) || parseBudget(req.body.adSetBudget?.dailyBudget) || 50,
+      lifetimeBudget: parseBudget(req.body.lifetimeBudget) || parseBudget(req.body.adSetBudget?.lifetimeBudget),
 
       // Enhanced targeting (Meta-compliant)
       targeting: req.body.targeting || {
