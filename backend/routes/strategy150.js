@@ -389,8 +389,10 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       buyingType: req.body.buyingType || 'AUCTION',
       objective: req.body.objective,
       budgetLevel: req.body.budgetLevel || 'adset',
-      // HARDCODED FOR TESTING - Always use HOUSING
-      specialAdCategories: ['HOUSING'], // HARDCODED - ignoring req.body.specialAdCategories,
+      // Properly handle special ad categories - filter out NONE and empty strings
+      specialAdCategories: Array.isArray(req.body.specialAdCategories)
+        ? req.body.specialAdCategories.filter(cat => cat !== 'NONE' && cat !== '')
+        : [],
       campaignBudgetOptimization: req.body.campaignBudgetOptimization || false,
       bidStrategy: req.body.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
 

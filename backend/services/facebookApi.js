@@ -44,8 +44,12 @@ class FacebookAPI {
         name: `[REVIEW] ${campaignData.name}`,
         objective: campaignData.objective || 'OUTCOME_LEADS',
         status: campaignData.status || 'PAUSED',
-        // HARDCODED FOR TESTING - Always use HOUSING
-        special_ad_categories: JSON.stringify(['HOUSING']),
+        // Properly handle special ad categories
+        special_ad_categories: JSON.stringify(
+          Array.isArray(campaignData.specialAdCategories)
+            ? campaignData.specialAdCategories.filter(cat => cat !== 'NONE' && cat !== '')
+            : []
+        ),
         buying_type: campaignData.buyingType || 'AUCTION',
         access_token: this.accessToken
       };
@@ -962,9 +966,11 @@ class FacebookAPI {
       const mappedObjective = this.mapObjective(campaignData.objective);
       console.log('  🎯 Objective Mapping:', campaignData.objective, '->', mappedObjective);
 
-      // HARDCODE HOUSING for testing
-      const specialAdCategories = ['HOUSING'];
-      console.log('  🔐 Special Ad Categories: HARDCODED TO HOUSING FOR TESTING');
+      // Properly handle special ad categories - filter out NONE
+      const specialAdCategories = Array.isArray(campaignData.specialAdCategories)
+        ? campaignData.specialAdCategories.filter(cat => cat !== 'NONE' && cat !== '')
+        : [];
+      console.log('  🔐 Special Ad Categories:', specialAdCategories.length > 0 ? specialAdCategories : 'None (empty array)');
 
       // Check if using campaign or ad set level budgets
       const useCampaignBudget = campaignData.budgetLevel === 'campaign' || campaignData.campaignBudgetOptimization;
@@ -974,7 +980,7 @@ class FacebookAPI {
         name: campaignData.campaignName,
         objective: mappedObjective,
         buyingType: campaignData.buyingType ? campaignData.buyingType.toUpperCase() : 'AUCTION',
-        specialAdCategories: ['HOUSING'], // HARDCODED
+        specialAdCategories: specialAdCategories, // Use filtered categories
         status: campaignData.status || 'PAUSED'
       };
 
@@ -1034,7 +1040,23 @@ class FacebookAPI {
 
       // Create initial ad
       console.log('\n🔷 Step 3 of 3: Creating Ad...');
-      const mediaAssets = await this.prepareMediaAssets(campaignData);
+
+      // Handle media if present
+      let mediaAssets = {};
+      if (campaignData.imagePath) {
+        try {
+          const imageHash = await this.uploadImage(campaignData.imagePath);
+          if (imageHash) {
+            mediaAssets.imageHash = imageHash;
+            console.log('✅ Image uploaded successfully');
+          }
+        } catch (error) {
+          console.log('⚠️ Image upload skipped:', error.message);
+        }
+      } else {
+        console.log('📷 No image provided, creating ad without media');
+      }
+
       const ad = await this.createAd({
         campaignName: campaignData.campaignName,
         adsetId: adSet.id,
