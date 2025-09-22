@@ -192,6 +192,11 @@ const Strategy150Container: React.FC = () => {
       const result = await response.json();
       console.log('📥 Response:', response.status, result);
 
+      // Log validation errors if present
+      if (result.errors && Array.isArray(result.errors)) {
+        console.error('❌ Validation errors:', result.errors.map(e => e.msg || e.message || e).join(', '));
+      }
+
       if (result.success) {
         // Transform response to Strategy150Response format
         const strategy150Result: Strategy150Response = {
@@ -222,7 +227,13 @@ const Strategy150Container: React.FC = () => {
           handleAutoPostCapture(result.data.adId);
         }, 30000); // Wait 30 seconds before trying to fetch post ID
       } else {
-        throw new Error(result.error || 'Failed to create campaign');
+        // Handle validation errors
+        if (result.errors && Array.isArray(result.errors)) {
+          const errorMessages = result.errors.map(e => e.msg || e.message || e).join('; ');
+          throw new Error(`Validation failed: ${errorMessages}`);
+        } else {
+          throw new Error(result.error || 'Failed to create campaign');
+        }
       }
     } catch (error) {
       console.error('Phase 1 error:', error);
