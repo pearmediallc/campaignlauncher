@@ -122,7 +122,7 @@ const CompletionSummary: React.FC<CompletionSummaryProps> = ({
                 {totalAdSets}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                1 original + 49 duplicates
+                1 original + 48 duplicates
               </Typography>
             </CardContent>
           </Card>
@@ -193,7 +193,7 @@ const CompletionSummary: React.FC<CompletionSummaryProps> = ({
             </ListItemIcon>
             <ListItemText
               primary="Ad Sets Duplicated"
-              secondary={`49 additional ad sets created with "Use Existing Post" setting`}
+              secondary={`48 additional ad sets created with "Use Existing Post" setting`}
             />
           </ListItem>
 

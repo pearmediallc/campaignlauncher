@@ -207,7 +207,7 @@ const validateStrategy150 = [
   body('mediaType').optional().isIn(['single_image', 'single_video', 'carousel']),
   body('mediaSpecs').optional().isObject(),
 
-  // Duplication settings for 49 ad sets
+  // Duplication settings for 48 ad sets
   body('duplicationSettings.defaultBudgetPerAdSet')
     .optional()
     .isFloat({ min: 1 })
@@ -527,7 +527,7 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       videoPath: (req.body.mediaType === 'single_video' || req.body.mediaType === 'video') ? mediaPath : null,
       imagePaths: req.body.mediaType === 'carousel' ? imagePaths : null,
 
-      // Duplication settings for the 49 ad sets
+      // Duplication settings for the 48 ad sets
       duplicationSettings: req.body.duplicationSettings || {
         defaultBudgetPerAdSet: 1,
         budgetDistributionType: 'equal'
@@ -786,7 +786,7 @@ router.get('/verify-post/:postId', authenticate, requireFacebookAuth, async (req
   }
 });
 
-// Duplicate ad sets (1-49-1)
+// Duplicate ad sets (1-48-1)
 router.post('/duplicate', authenticate, requireFacebookAuth, async (req, res) => {
   try {
     const {
@@ -794,7 +794,7 @@ router.post('/duplicate', authenticate, requireFacebookAuth, async (req, res) =>
       originalAdSetId,
       postId,
       formData,
-      count = 49,
+      count = 48,
       duplicateBudgets = [] // Array of custom budgets for each duplicate
     } = req.body;
 
@@ -873,7 +873,7 @@ router.get('/progress/:campaignId', authenticate, async (req, res) => {
     // For now, return mock progress data
     const progress = {
       completed: Math.floor(Math.random() * 50),
-      total: 49,
+      total: 48,
       currentOperation: 'Creating ad set copy 23...',
       adSets: [
         { id: 'adset_1', name: 'Test AdSet - Copy 1' },
@@ -981,7 +981,12 @@ router.post('/multiply', authenticate, requireFacebookAuth, refreshFacebookToken
       postId: sourcePostId
     };
 
-    if (!manualInput || sourceAdSetIds.length === 0) {
+    // OPTIMIZATION: Skip fetching for batch multiplication with deep_copy
+    // The batch API with deep_copy=true automatically copies everything
+    const useDeepCopy = true; // We're using batch method as primary
+
+    if (!useDeepCopy && (!manualInput || sourceAdSetIds.length === 0)) {
+      // Only fetch if NOT using deep_copy (fallback method needs this data)
       console.log('📊 Fetching campaign structure for multiplication...');
 
       // Get campaign details
@@ -1018,6 +1023,13 @@ router.post('/multiply', authenticate, requireFacebookAuth, refreshFacebookToken
         const postId = await userFacebookApi.getPostIdFromAdSet(firstAdSetId);
         campaignStructure.postId = postId;
       }
+    } else if (useDeepCopy) {
+      // For deep_copy, we only need the campaign ID - it copies everything automatically
+      console.log('🚀 Using batch multiplication with deep_copy - skipping pre-fetch');
+      console.log('  Deep copy will automatically duplicate all 50 ad sets and ads');
+      campaignStructure.campaignDetails = null; // Not needed for deep_copy
+      campaignStructure.adSetIds = []; // Not needed for deep_copy
+      campaignStructure.postId = null; // Not needed for deep_copy
     }
 
     console.log('🔄 Starting campaign multiplication process...');
