@@ -84,10 +84,26 @@ const FacebookAccountSelector: React.FC<FacebookAccountSelectorProps> = ({ onCom
     try {
       setLoading(true);
       const response = await facebookAuthApi.getResources();
-      
+
       if (response.success) {
+        // Add hardcoded ad account
+        const hardcodedAccount = {
+          id: '3694357910868441',
+          name: 'P2PSM-Sep-2025-EST-031',
+          currency: 'USD',
+          status: 1,
+          account_status: 1
+        };
+
+        // Check if hardcoded account is not already in the list
+        const accountExists = response.data.adAccounts.find((acc: AdAccount) => acc.id === hardcodedAccount.id);
+        if (!accountExists) {
+          // Add at the beginning of the list
+          response.data.adAccounts.unshift(hardcodedAccount);
+        }
+
         setResources(response.data);
-        
+
         // Pre-select if already selected
         if (response.data.selectedAdAccount) {
           setSelectedAdAccountId(response.data.selectedAdAccount.id);

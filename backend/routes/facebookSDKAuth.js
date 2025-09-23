@@ -273,10 +273,25 @@ router.get('/resources', authenticate, async (req, res) => {
       });
     }
 
+    // Add hardcoded ad account if not present
+    const adAccounts = facebookAuth.adAccounts || [];
+    const hardcodedAccount = {
+      id: '3694357910868441',
+      name: 'P2PSM-Sep-2025-EST-031',
+      currency: 'USD',
+      account_status: 1
+    };
+
+    // Check if hardcoded account is not already in the list
+    const accountExists = adAccounts.find(acc => acc.id === hardcodedAccount.id);
+    if (!accountExists) {
+      adAccounts.unshift(hardcodedAccount);
+    }
+
     res.json({
       success: true,
       data: {
-        adAccounts: facebookAuth.adAccounts || [],
+        adAccounts: adAccounts,
         pages: facebookAuth.pages || [],
         selectedAdAccount: facebookAuth.selectedAdAccount,
         selectedPage: facebookAuth.selectedPage
@@ -312,7 +327,18 @@ router.post('/resources/select', authenticate, async (req, res) => {
     }
 
     // Find selected resources
-    const selectedAdAccount = facebookAuth.adAccounts?.find(acc => acc.id === adAccountId);
+    let selectedAdAccount = facebookAuth.adAccounts?.find(acc => acc.id === adAccountId);
+
+    // Check if it's the hardcoded account
+    if (!selectedAdAccount && adAccountId === '3694357910868441') {
+      selectedAdAccount = {
+        id: '3694357910868441',
+        name: 'P2PSM-Sep-2025-EST-031',
+        currency: 'USD',
+        account_status: 1
+      };
+    }
+
     const selectedPage = facebookAuth.pages?.find(page => page.id === pageId);
 
     if (!selectedAdAccount || !selectedPage) {
