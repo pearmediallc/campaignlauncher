@@ -1189,23 +1189,8 @@ class FacebookAPI {
       console.log(`📋 Post ID: ${postId}`);
       console.log(`📋 Count: ${count}`);
 
-      // Use Facebook's official /copies endpoint for batch duplication
-      const copyData = {
-        campaign_id: campaignId,
-        deep_copy: true,
-        status_option: 'ACTIVE',
-        rename_options: {
-          rename_prefix: '',
-          rename_suffix: ' - Copy'
-        },
-        access_token: this.accessToken
-      };
-
-      console.log(`🔄 Using Facebook /copies endpoint with data:`, copyData);
-
-      // Facebook's /copies endpoint creates ONE copy at a time
-      // We need to call it multiple times to create 49 copies
-      console.log(`📋 Creating ${count} copies of ad set ${originalAdSetId}...`);
+      // Facebook's /copies endpoint for AD SETS - different from campaign copies
+      console.log(`📋 Creating ${count} copies of ad set ${originalAdSetId} in campaign ${campaignId}...`);
 
       const newAdSetIds = [];
 
@@ -1213,18 +1198,39 @@ class FacebookAPI {
         try {
           console.log(`  Creating copy ${i + 1} of ${count}...`);
 
-          const copyResponse = await axios.post(
-            `${this.baseURL}/${originalAdSetId}/copies`,
-            null,
+          // For AD SET copies, we don't use campaign_id or deep_copy
+          // We create a new ad set with the same settings
+          const originalAdSetResponse = await axios.get(
+            `${this.baseURL}/${originalAdSetId}`,
             {
               params: {
-                ...copyData,
-                rename_options: {
-                  rename_prefix: '',
-                  rename_suffix: ` - Copy ${i + 1}`
-                }
+                fields: 'name,targeting,daily_budget,lifetime_budget,optimization_goal,billing_event,bid_strategy,promoted_object',
+                access_token: this.accessToken
               }
             }
+          );
+
+          const originalAdSet = originalAdSetResponse.data;
+
+          // Create new ad set with same settings
+          const newAdSetData = {
+            name: `${originalAdSet.name} - Copy ${i + 1}`,
+            campaign_id: campaignId,
+            targeting: originalAdSet.targeting,
+            daily_budget: originalAdSet.daily_budget,
+            lifetime_budget: originalAdSet.lifetime_budget,
+            optimization_goal: originalAdSet.optimization_goal,
+            billing_event: originalAdSet.billing_event,
+            bid_strategy: originalAdSet.bid_strategy,
+            promoted_object: originalAdSet.promoted_object,
+            status: 'ACTIVE',
+            access_token: this.accessToken
+          };
+
+          const copyResponse = await axios.post(
+            `${this.baseURL}/act_${this.adAccountId}/adsets`,
+            null,
+            { params: newAdSetData }
           );
 
           if (copyResponse.data && copyResponse.data.id) {
@@ -1287,74 +1293,6 @@ class FacebookAPI {
             results.errors.push({
               adSetIndex: i + 1,
               error: `Ad creation failed: ${adError.message}`
-            });
-          }
-        }
-      } else {
-        // Fallback: Create copies one by one if batch didn't work
-        console.log(`⚠️ Batch copy didn't return expected format, falling back to individual copies`);
-
-        for (let i = 1; i <= count; i++) {
-          try {
-            const copyData = {
-              campaign_id: campaignId,
-              deep_copy: true,
-              status_option: 'ACTIVE',
-              rename_options: {
-                rename_prefix: '',
-                rename_suffix: ` - Copy ${i}`
-              },
-              access_token: this.accessToken
-            };
-
-            console.log(`🔄 Creating individual AdSet Copy ${i} using /copies:`, copyData);
-
-            const individualCopyResponse = await axios.post(
-              `${this.baseURL}/${originalAdSetId}/copies`,
-              null,
-              { params: copyData }
-            );
-
-            const newAdSetId = individualCopyResponse.data.id;
-
-            // Create ad using existing post
-            const adData = {
-              name: `${formData.campaignName} - Ad Copy ${i}`,
-              adset_id: newAdSetId,
-              creative: JSON.stringify({
-                object_story_id: postId,
-                page_id: this.pageId
-              }),
-              status: 'ACTIVE',
-              access_token: this.accessToken
-            };
-
-            await axios.post(
-              `${this.baseURL}/act_${this.adAccountId}/ads`,
-              null,
-              { params: adData }
-            );
-
-            results.adSets.push({
-              id: newAdSetId,
-              name: `AdSet Copy ${i}`
-            });
-
-            console.log(`✅ Created individual AdSet copy ${i}: ${newAdSetId}`);
-
-            // Small delay to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 200));
-
-          } catch (error) {
-            console.error(`❌ Error creating individual AdSet copy ${i}:`, {
-              message: error.message,
-              status: error.response?.status,
-              data: error.response?.data
-            });
-
-            results.errors.push({
-              adSetIndex: i,
-              error: error.message
             });
           }
         }
@@ -1716,126 +1654,213 @@ class FacebookAPI {
     }
   }
 
-  // NEW OPTIMIZED: Batch multiplication using deep_copy - Much faster, no rate limits!
+  // NEW OPTIMIZED: Batch multiplication using direct campaign duplication
   async batchMultiplyCampaigns(sourceCampaignId, multiplyCount, updateProgress) {
-    console.log('\n🚀 BATCH MULTIPLICATION: Using Facebook Batch API with deep_copy');
+    console.log('\n🚀 CAMPAIGN MULTIPLICATION: Creating multiple complete campaigns');
     console.log(`  Source Campaign: ${sourceCampaignId}`);
     console.log(`  Copies to create: ${multiplyCount}`);
-    console.log('  Method: Single batch request with deep_copy=true');
+    console.log('  Method: Direct campaign duplication with all ad sets and ads');
 
     try {
-      // Prepare batch requests for all copies
-      const batchRequests = [];
+      const results = [];
+      const errors = [];
       const timestamp = Date.now();
 
+      // For each multiplication, we'll duplicate the entire campaign
       for (let i = 0; i < multiplyCount; i++) {
         const copyNumber = i + 1;
 
-        // Each batch request to copy entire campaign structure
-        batchRequests.push({
-          method: 'POST',
-          relative_url: `v18.0/${sourceCampaignId}/copies`,
-          body: `deep_copy=true&status_option=PAUSED&rename_options=${encodeURIComponent(JSON.stringify({
-            rename_suffix: `_Copy${copyNumber}_${timestamp}`
-          }))}`
-        });
-
-        console.log(`  Prepared batch request ${copyNumber} for deep copy`);
-      }
-
-      if (updateProgress) {
-        updateProgress('Sending batch request to Facebook...');
-      }
-
-      // Send all copy requests in a SINGLE API call
-      console.log('\n📤 Sending single batch request for all campaign copies...');
-
-      // Create form-urlencoded data
-      const params = new URLSearchParams();
-      params.append('batch', JSON.stringify(batchRequests));
-      params.append('access_token', this.accessToken);
-
-      const batchResponse = await axios.post(
-        this.baseURL,
-        params.toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
+        console.log(`\n📋 Creating campaign copy ${copyNumber} of ${multiplyCount}...`);
+        if (updateProgress) {
+          updateProgress(`Creating campaign copy ${copyNumber} of ${multiplyCount}...`);
         }
-      );
 
-      console.log('✅ Batch request completed!');
-
-      // Parse batch response
-      const results = [];
-      const errors = [];
-
-      if (batchResponse.data && Array.isArray(batchResponse.data)) {
-        batchResponse.data.forEach((response, index) => {
-          const copyNumber = index + 1;
-
-          if (response.code === 200) {
-            // Success - parse the response body
-            let responseData;
-            try {
-              responseData = typeof response.body === 'string'
-                ? JSON.parse(response.body)
-                : response.body;
-            } catch (e) {
-              responseData = { id: 'unknown', success: true };
+        try {
+          // Get original campaign details
+          const campaignResponse = await axios.get(
+            `${this.baseURL}/${sourceCampaignId}`,
+            {
+              params: {
+                fields: 'name,objective,daily_budget,lifetime_budget,special_ad_categories,buying_type,status',
+                access_token: this.accessToken
+              }
             }
+          );
 
-            results.push({
-              copyNumber,
-              campaignId: responseData.copied_campaign_id || responseData.id || responseData.campaign_id,
-              status: 'success',
-              message: `Campaign copy ${copyNumber} created successfully`
-            });
+          const originalCampaign = campaignResponse.data;
 
-            console.log(`  ✅ Copy ${copyNumber}: Success - Campaign ID: ${responseData.copied_campaign_id || responseData.id}`);
-          } else {
-            // Error
-            let errorMessage = 'Unknown error';
-            try {
-              const errorData = typeof response.body === 'string'
-                ? JSON.parse(response.body)
-                : response.body;
-              errorMessage = errorData.error?.message || errorMessage;
-            } catch (e) {
-              errorMessage = response.body || errorMessage;
-            }
+          // Create new campaign with same settings
+          const newCampaignData = {
+            name: `${originalCampaign.name}_Copy${copyNumber}_${timestamp}`,
+            objective: originalCampaign.objective,
+            special_ad_categories: originalCampaign.special_ad_categories || [],
+            buying_type: originalCampaign.buying_type || 'AUCTION',
+            status: 'PAUSED',
+            access_token: this.accessToken
+          };
 
-            errors.push({
-              copyNumber,
-              error: errorMessage,
-              status: 'failed'
-            });
-
-            console.error(`  ❌ Copy ${copyNumber}: Failed - ${errorMessage}`);
+          // Add budget if exists
+          if (originalCampaign.daily_budget) {
+            newCampaignData.daily_budget = originalCampaign.daily_budget;
           }
-        });
+          if (originalCampaign.lifetime_budget) {
+            newCampaignData.lifetime_budget = originalCampaign.lifetime_budget;
+          }
+
+          const newCampaignResponse = await axios.post(
+            `${this.baseURL}/act_${this.adAccountId}/campaigns`,
+            null,
+            { params: newCampaignData }
+          );
+
+          const newCampaignId = newCampaignResponse.data.id;
+          console.log(`  ✅ Created new campaign: ${newCampaignId}`);
+
+          // Now get all ad sets from original campaign and duplicate them
+          const adSetsResponse = await axios.get(
+            `${this.baseURL}/${sourceCampaignId}/adsets`,
+            {
+              params: {
+                fields: 'id,name,targeting,daily_budget,lifetime_budget,optimization_goal,billing_event,promoted_object,bid_strategy',
+                limit: 100,
+                access_token: this.accessToken
+              }
+            }
+          );
+
+          const originalAdSets = adSetsResponse.data.data || [];
+          console.log(`  📊 Found ${originalAdSets.length} ad sets to duplicate`);
+
+          let adSetsCreated = 0;
+          let adsCreated = 0;
+
+          // Duplicate each ad set
+          for (const originalAdSet of originalAdSets) {
+            try {
+              // Create new ad set
+              const newAdSetData = {
+                name: originalAdSet.name,
+                campaign_id: newCampaignId,
+                targeting: originalAdSet.targeting,
+                optimization_goal: originalAdSet.optimization_goal,
+                billing_event: originalAdSet.billing_event,
+                promoted_object: originalAdSet.promoted_object,
+                status: 'PAUSED',
+                access_token: this.accessToken
+              };
+
+              // Add budget
+              if (originalAdSet.daily_budget) {
+                newAdSetData.daily_budget = originalAdSet.daily_budget;
+              }
+              if (originalAdSet.lifetime_budget) {
+                newAdSetData.lifetime_budget = originalAdSet.lifetime_budget;
+              }
+              if (originalAdSet.bid_strategy) {
+                newAdSetData.bid_strategy = originalAdSet.bid_strategy;
+              }
+
+              const newAdSetResponse = await axios.post(
+                `${this.baseURL}/act_${this.adAccountId}/adsets`,
+                null,
+                { params: newAdSetData }
+              );
+
+              const newAdSetId = newAdSetResponse.data.id;
+              adSetsCreated++;
+
+              // Get ads from original ad set
+              const adsResponse = await axios.get(
+                `${this.baseURL}/${originalAdSet.id}/ads`,
+                {
+                  params: {
+                    fields: 'id,name,creative,status',
+                    limit: 10,
+                    access_token: this.accessToken
+                  }
+                }
+              );
+
+              const originalAds = adsResponse.data.data || [];
+
+              // Duplicate each ad
+              for (const originalAd of originalAds) {
+                try {
+                  const newAdData = {
+                    name: originalAd.name,
+                    adset_id: newAdSetId,
+                    creative: originalAd.creative,
+                    status: 'PAUSED',
+                    access_token: this.accessToken
+                  };
+
+                  await axios.post(
+                    `${this.baseURL}/act_${this.adAccountId}/ads`,
+                    null,
+                    { params: newAdData }
+                  );
+
+                  adsCreated++;
+                } catch (adError) {
+                  console.error(`    ⚠️ Failed to duplicate ad: ${adError.message}`);
+                }
+              }
+
+              // Small delay to avoid rate limits
+              if (adSetsCreated % 10 === 0) {
+                await this.delay(1000);
+              }
+
+            } catch (adSetError) {
+              console.error(`  ⚠️ Failed to duplicate ad set: ${adSetError.message}`);
+            }
+          }
+
+          results.push({
+            copyNumber,
+            campaignId: newCampaignId,
+            campaignName: newCampaignData.name,
+            adSetsCreated,
+            adsCreated,
+            status: 'success'
+          });
+
+          console.log(`  ✅ Campaign copy ${copyNumber} complete: ${adSetsCreated} ad sets, ${adsCreated} ads`);
+
+        } catch (error) {
+          console.error(`  ❌ Failed to create campaign copy ${copyNumber}:`, error.message);
+          errors.push({
+            copyNumber,
+            error: error.message,
+            status: 'failed'
+          });
+        }
+
+        // Delay between campaign copies
+        if (i < multiplyCount - 1) {
+          await this.delay(2000);
+        }
       }
 
       if (updateProgress) {
         updateProgress(`Completed: ${results.length} successful, ${errors.length} failed`);
       }
 
-      console.log(`\n📊 Batch Multiplication Results:`);
+      console.log(`\n📊 Campaign Multiplication Results:`);
       console.log(`  ✅ Successful: ${results.length}`);
       console.log(`  ❌ Failed: ${errors.length}`);
-      console.log(`  ⏱️ Total API calls used: 1 (batch request)`);
+      console.log(`  📈 Total campaigns created: ${results.length}`);
 
       return {
-        success: true,
-        method: 'batch_deep_copy',
+        success: results.length > 0,
+        method: 'direct_duplication',
         results,
         errors,
         summary: {
           requested: multiplyCount,
           successful: results.length,
           failed: errors.length,
-          apiCallsUsed: 1  // Just 1 API call for everything!
+          apiCallsUsed: results.length * 50 // Approximate API calls
         }
       };
 
