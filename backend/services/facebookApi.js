@@ -1589,6 +1589,23 @@ class FacebookAPI {
 
   // ========== CAMPAIGN MULTIPLICATION HELPER FUNCTIONS ==========
 
+  // Delay helper for rate limiting (ONLY used in multiplication)
+  async delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Rate limit configuration for multiplication ONLY
+  getMultiplicationRateLimits() {
+    return {
+      betweenCampaigns: 40000,    // 40 seconds between campaigns
+      betweenAdSets: 1000,         // 1 second between adsets
+      betweenAds: 500,             // 0.5 second between ads
+      afterBatch: 10000,           // 10 seconds after every 10 operations
+      initialDelay: 5000,          // 5 seconds before starting
+      retryDelay: 60000,           // 60 seconds if rate limited
+    };
+  }
+
   // Get full campaign details including all settings
   async getCampaignFullDetails(campaignId) {
     try {
@@ -1679,10 +1696,23 @@ class FacebookAPI {
       postId,
       campaignDetails,
       copyNumber,
-      timestamp
+      timestamp,
+      updateProgress // Callback for progress updates
     } = multiplyData;
 
-    console.log(`\n🔄 Starting multiplication ${copyNumber}...`);
+    const rateLimits = this.getMultiplicationRateLimits();
+    console.log(`\n🔄 Starting multiplication ${copyNumber} with smart delays...`);
+
+    // Initial delay for first campaign or delay between campaigns
+    if (copyNumber === 1) {
+      console.log('⏸️ Initial safety delay: 5 seconds...');
+      if (updateProgress) updateProgress(`Initial safety delay...`);
+      await this.delay(rateLimits.initialDelay);
+    } else {
+      console.log(`⏸️ Waiting 40 seconds before creating campaign ${copyNumber}...`);
+      if (updateProgress) updateProgress(`Waiting 40 seconds before campaign ${copyNumber}...`);
+      await this.delay(rateLimits.betweenCampaigns);
+    }
 
     try {
       // Step 1: Create new campaign with same settings
@@ -1718,7 +1748,7 @@ class FacebookAPI {
       const newCampaignId = newCampaignResponse.data.id;
       console.log(`  ✅ Created campaign: ${newCampaignId}`);
 
-      // Step 2: Clone all ad sets to new campaign
+      // Step 2: Clone all ad sets to new campaign with smart delays
       const clonedAdSets = [];
       const clonedAds = [];
       let successfulAdSets = 0;
@@ -1726,7 +1756,21 @@ class FacebookAPI {
 
       for (let i = 0; i < sourceAdSetIds.length; i++) {
         const sourceAdSetId = sourceAdSetIds[i];
+
+        // Add delay between adsets (except for first one)
+        if (i > 0) {
+          await this.delay(rateLimits.betweenAdSets);
+        }
+
+        // Take a break every 10 adsets
+        if (i > 0 && i % 10 === 0) {
+          console.log(`  ☕ Taking a 10-second break after ${i} adsets...`);
+          if (updateProgress) updateProgress(`Taking a break after ${i} adsets...`);
+          await this.delay(rateLimits.afterBatch);
+        }
+
         console.log(`  Cloning ad set ${i + 1}/${sourceAdSetIds.length}...`);
+        if (updateProgress) updateProgress(`Cloning ad set ${i + 1}/${sourceAdSetIds.length}...`);
 
         try {
           // Use Facebook's copy endpoint for ad sets
@@ -1747,6 +1791,9 @@ class FacebookAPI {
 
           // Step 3: Create ad with same post ID for each cloned ad set
           if (postId) {
+            // Small delay before creating ad
+            await this.delay(rateLimits.betweenAds);
+
             console.log(`    Creating ad with post ${postId}...`);
             const adParams = {
               name: `Ad_${newAdSetId}_${timestamp}`,
@@ -1789,6 +1836,15 @@ class FacebookAPI {
 
     } catch (error) {
       console.error(`❌ Failed to multiply campaign ${copyNumber}:`, error.message);
+
+      // Check if it's a rate limit error
+      if (error.message?.includes('limit reached') || error.response?.data?.error?.code === 17) {
+        console.log('⚠️ Rate limit detected! Waiting 60 seconds before retry...');
+        if (updateProgress) updateProgress('Rate limited - waiting 60 seconds...');
+        await this.delay(rateLimits.retryDelay);
+        throw new Error('Rate limited - please retry after delay');
+      }
+
       throw error;
     }
   }

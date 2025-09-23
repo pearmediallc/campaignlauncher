@@ -16,45 +16,59 @@ import {
   CheckCircle as CheckIcon,
   RadioButtonUnchecked as PendingIcon,
   Error as ErrorIcon,
-  Campaign as CampaignIcon
+  Campaign as CampaignIcon,
+  Timer as TimerIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
 
 interface MultiplyProgressProps {
   totalCampaigns: number;
   currentProgress?: {
-    current: number;
+    progress: number;
     total: number;
-    percentage: number;
+    percentComplete: number;
     currentOperation: string;
-    completedCampaigns: Array<{
-      id: string;
-      name: string;
-      status: 'success' | 'failed';
-    }>;
+    elapsedSeconds: number;
+    remainingSeconds: number;
+    campaigns: Array<any>;
     errors: Array<{
-      campaign: number;
-      message: string;
+      copyNumber: number;
+      error: string;
     }>;
+    status: string;
   };
+  jobId?: string | null;
+  estimatedSeconds?: number;
 }
 
 const MultiplyProgress: React.FC<MultiplyProgressProps> = ({
   totalCampaigns,
-  currentProgress
+  currentProgress,
+  jobId,
+  estimatedSeconds
 }) => {
   const progress = currentProgress || {
-    current: 0,
+    progress: 0,
     total: totalCampaigns,
-    percentage: 0,
+    percentComplete: 0,
     currentOperation: 'Initializing multiplication process...',
-    completedCampaigns: [],
-    errors: []
+    elapsedSeconds: 0,
+    remainingSeconds: estimatedSeconds || 0,
+    campaigns: [],
+    errors: [],
+    status: 'started'
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
   };
 
   const getStatusIcon = (index: number) => {
-    if (index < progress.current) {
+    if (index < progress.progress) {
       return <CheckIcon color="success" />;
-    } else if (index === progress.current) {
+    } else if (index === progress.progress) {
       return <CircularProgress size={20} />;
     } else {
       return <PendingIcon color="disabled" />;
@@ -62,9 +76,9 @@ const MultiplyProgress: React.FC<MultiplyProgressProps> = ({
   };
 
   const getStatusText = (index: number) => {
-    if (index < progress.current) {
+    if (index < progress.progress) {
       return 'Completed';
-    } else if (index === progress.current) {
+    } else if (index === progress.progress) {
       return 'In Progress';
     } else {
       return 'Pending';
@@ -86,16 +100,16 @@ const MultiplyProgress: React.FC<MultiplyProgressProps> = ({
             <Box sx={{ flexGrow: 1, mr: 2 }}>
               <LinearProgress
                 variant="determinate"
-                value={progress.percentage}
+                value={progress.percentComplete}
                 sx={{ height: 8, borderRadius: 4 }}
               />
             </Box>
             <Typography variant="body2" color="textSecondary">
-              {progress.percentage}%
+              {progress.percentComplete}%
             </Typography>
           </Box>
           <Typography variant="body2" color="textSecondary">
-            {progress.current} of {progress.total} campaigns completed
+            {progress.progress} of {progress.total} campaigns completed
           </Typography>
         </Box>
 
@@ -112,8 +126,8 @@ const MultiplyProgress: React.FC<MultiplyProgressProps> = ({
         <List>
           {Array.from({ length: totalCampaigns }, (_, index) => {
             const campaignNumber = index + 1;
-            const completedCampaign = progress.completedCampaigns[index];
-            const hasError = progress.errors.find(e => e.campaign === campaignNumber);
+            const completedCampaign = progress.campaigns[index];
+            const hasError = progress.errors.find(e => e.copyNumber === campaignNumber);
 
             return (
               <ListItem key={index}>
@@ -142,16 +156,16 @@ const MultiplyProgress: React.FC<MultiplyProgressProps> = ({
                   secondary={
                     completedCampaign ? (
                       <>
-                        {completedCampaign.name}
-                        {completedCampaign.id && (
+                        {completedCampaign.campaign?.name}
+                        {completedCampaign.campaign?.id && (
                           <Typography variant="caption" display="block">
-                            ID: {completedCampaign.id}
+                            ID: {completedCampaign.campaign?.id}
                           </Typography>
                         )}
                       </>
                     ) : hasError ? (
                       <Typography variant="caption" color="error">
-                        Error: {hasError.message}
+                        Error: {hasError.error}
                       </Typography>
                     ) : (
                       getStatusText(index)
@@ -171,6 +185,21 @@ const MultiplyProgress: React.FC<MultiplyProgressProps> = ({
           </Alert>
         )}
       </Paper>
+
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <TimerIcon color="action" />
+          <Typography variant="body2" color="textSecondary">
+            Elapsed: {formatTime(progress.elapsedSeconds)}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <TimerIcon color="action" />
+          <Typography variant="body2" color="textSecondary">
+            Remaining: {formatTime(progress.remainingSeconds)}
+          </Typography>
+        </Box>
+      </Box>
 
       <Alert severity="info">
         <Typography variant="body2">

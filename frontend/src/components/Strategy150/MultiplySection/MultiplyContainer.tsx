@@ -59,6 +59,8 @@ const MultiplyContainer: React.FC<MultiplyContainerProps> = ({
   // Results
   const [multiplicationResults, setMultiplicationResults] = useState<any>(null);
   const [progressData, setProgressData] = useState<any>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [estimatedTime, setEstimatedTime] = useState<number>(0);
 
   // Auto-populate from session storage if available
   useEffect(() => {
@@ -105,17 +107,13 @@ const MultiplyContainer: React.FC<MultiplyContainerProps> = ({
         manualInput
       });
 
-      if (response.data.success) {
-        setMultiplicationResults(response.data.data);
-        setActiveStep(3);
-        setSuccess(true);
+      if (response.data.success && response.data.jobId) {
+        // Store job ID and estimated time
+        setJobId(response.data.jobId);
+        setEstimatedTime(response.data.estimatedSeconds);
 
-        // Clear session storage after successful multiplication
-        sessionStorage.removeItem('lastCreatedCampaign');
-
-        if (onComplete) {
-          onComplete();
-        }
+        // Start polling for progress
+        pollJobStatus(response.data.jobId);
       } else {
         throw new Error(response.data.error || 'Multiplication failed');
       }
@@ -128,6 +126,56 @@ const MultiplyContainer: React.FC<MultiplyContainerProps> = ({
     }
   };
 
+  const pollJobStatus = (jobId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await api.get(`/campaigns/strategy-150/multiply/status/${jobId}`);
+        const status = response.data;
+
+        setProgressData(status);
+
+        if (status.status === 'completed') {
+          clearInterval(interval);
+          setMultiplicationResults({
+            source: {
+              campaignId: campaignId,
+              adSetCount: 50, // Strategy 150 has 50 adsets
+              postId: postId
+            },
+            results: status.campaigns.map((c: any, i: number) => ({
+              copyNumber: i + 1,
+              campaign: c.campaign,
+              adSetsCreated: c.adSetsCreated,
+              adsCreated: c.adsCreated,
+              status: 'success'
+            })),
+            errors: status.errors || [],
+            summary: {
+              requested: multiplyCount,
+              successful: status.campaigns.length,
+              failed: status.errors?.length || 0
+            }
+          });
+          setActiveStep(3);
+          setSuccess(true);
+
+          // Clear session storage after successful multiplication
+          sessionStorage.removeItem('lastCreatedCampaign');
+
+          if (onComplete) {
+            onComplete();
+          }
+        } else if (status.status === 'failed') {
+          clearInterval(interval);
+          setError(status.error || 'Multiplication failed');
+          setActiveStep(1);
+        }
+      } catch (error) {
+        console.error('Failed to fetch job status:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+  };
+
   const handleReset = () => {
     setActiveStep(0);
     setCampaignId('');
@@ -137,6 +185,9 @@ const MultiplyContainer: React.FC<MultiplyContainerProps> = ({
     setError(null);
     setSuccess(false);
     setManualInput(true);
+    setJobId(null);
+    setEstimatedTime(0);
+    setProgressData(null);
   };
 
   const renderStepContent = () => {
@@ -256,6 +307,8 @@ const MultiplyContainer: React.FC<MultiplyContainerProps> = ({
           <MultiplyProgress
             totalCampaigns={multiplyCount}
             currentProgress={progressData}
+            jobId={jobId}
+            estimatedSeconds={estimatedTime}
           />
         );
 

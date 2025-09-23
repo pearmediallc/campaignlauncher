@@ -893,6 +893,23 @@ router.get('/progress/:campaignId', authenticate, async (req, res) => {
   }
 });
 
+// In-memory job storage (use Redis in production)
+const multiplicationJobs = new Map();
+
+// Helper to generate unique job ID
+function generateJobId() {
+  return `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Helper to update job status
+function updateJobStatus(jobId, updates) {
+  const job = multiplicationJobs.get(jobId);
+  if (job) {
+    Object.assign(job, updates);
+    job.lastUpdated = Date.now();
+  }
+}
+
 // Multiply Campaign endpoint - Clone entire 1-50-1 structure multiple times
 router.post('/multiply', authenticate, requireFacebookAuth, refreshFacebookToken, async (req, res) => {
   try {
@@ -1009,73 +1026,33 @@ router.post('/multiply', authenticate, requireFacebookAuth, refreshFacebookToken
     console.log(`  Post ID: ${campaignStructure.postId}`);
     console.log(`  Multiply count: ${multiplyCount}`);
 
-    // Initialize results array
-    const results = [];
-    const errors = [];
+    // Create job and return immediately
+    const jobId = generateJobId();
+    const estimatedSeconds = multiplyCount * 132; // ~2.2 minutes per campaign
 
-    // Perform multiplication
-    for (let i = 0; i < multiplyCount; i++) {
-      try {
-        console.log(`\n📋 Creating copy ${i + 1} of ${multiplyCount}...`);
+    // Initialize job
+    multiplicationJobs.set(jobId, {
+      id: jobId,
+      status: 'started',
+      progress: 0,
+      total: multiplyCount,
+      currentOperation: 'Initializing...',
+      campaigns: [],
+      errors: [],
+      startTime: Date.now(),
+      estimatedSeconds,
+      userId: req.user.id
+    });
 
-        // Clone the campaign with all its structure
-        const multipliedCampaign = await userFacebookApi.multiplyStrategy150Campaign({
-          sourceCampaignId: campaignStructure.campaignId,
-          sourceAdSetIds: campaignStructure.adSetIds,
-          postId: campaignStructure.postId,
-          campaignDetails: campaignStructure.campaignDetails,
-          copyNumber: i + 1,
-          timestamp: Date.now()
-        });
+    // Start async processing
+    processMultiplicationAsync(jobId, campaignStructure, multiplyCount, userFacebookApi, req.user.id);
 
-        results.push({
-          copyNumber: i + 1,
-          campaign: multipliedCampaign.campaign,
-          adSetsCreated: multipliedCampaign.adSetsCreated,
-          adsCreated: multipliedCampaign.adsCreated,
-          status: 'success'
-        });
-
-        console.log(`✅ Successfully created copy ${i + 1}`);
-
-      } catch (error) {
-        console.error(`❌ Failed to create copy ${i + 1}:`, error.message);
-        errors.push({
-          copyNumber: i + 1,
-          error: error.message,
-          status: 'failed'
-        });
-      }
-    }
-
-    // Log audit
-    await AuditService.logRequest(
-      req,
-      'strategy150.multiply',
-      'campaign',
-      sourceCampaignId,
-      results.length > 0 ? 'success' : 'failure',
-      `Multiplied ${results.length} campaigns successfully, ${errors.length} failed`
-    );
-
-    // Return results
+    // Return immediately with job ID
     res.json({
       success: true,
-      message: `Campaign multiplication completed: ${results.length} successful, ${errors.length} failed`,
-      data: {
-        source: {
-          campaignId: sourceCampaignId,
-          adSetCount: campaignStructure.adSetIds.length,
-          postId: campaignStructure.postId
-        },
-        results: results,
-        errors: errors,
-        summary: {
-          requested: multiplyCount,
-          successful: results.length,
-          failed: errors.length
-        }
-      }
+      jobId,
+      estimatedSeconds,
+      message: `Multiplication started. Estimated time: ${Math.ceil(estimatedSeconds / 60)} minutes`
     });
 
   } catch (error) {
@@ -1096,31 +1073,138 @@ router.post('/multiply', authenticate, requireFacebookAuth, refreshFacebookToken
   }
 });
 
+// Async function to process multiplication in background
+async function processMultiplicationAsync(jobId, campaignStructure, multiplyCount, userFacebookApi, userId) {
+  const job = multiplicationJobs.get(jobId);
+  if (!job) return;
+
+  console.log(`🚀 Starting async multiplication job ${jobId}`);
+
+  try {
+    const results = [];
+    const errors = [];
+
+    // Process each campaign copy
+    for (let i = 0; i < multiplyCount; i++) {
+      try {
+        // Update job status
+        updateJobStatus(jobId, {
+          status: 'processing',
+          progress: i,
+          currentOperation: `Creating campaign ${i + 1} of ${multiplyCount}...`
+        });
+
+        console.log(`\n📋 Job ${jobId}: Creating copy ${i + 1} of ${multiplyCount}...`);
+
+        // Create progress callback
+        const updateProgress = (message) => {
+          updateJobStatus(jobId, {
+            currentOperation: `Campaign ${i + 1}: ${message}`
+          });
+        };
+
+        // Clone the campaign with progress updates
+        const multipliedCampaign = await userFacebookApi.multiplyStrategy150Campaign({
+          sourceCampaignId: campaignStructure.campaignId,
+          sourceAdSetIds: campaignStructure.adSetIds,
+          postId: campaignStructure.postId,
+          campaignDetails: campaignStructure.campaignDetails,
+          copyNumber: i + 1,
+          timestamp: Date.now(),
+          updateProgress
+        });
+
+        results.push({
+          copyNumber: i + 1,
+          campaign: multipliedCampaign.campaign,
+          adSetsCreated: multipliedCampaign.adSetsCreated,
+          adsCreated: multipliedCampaign.adsCreated,
+          status: 'success'
+        });
+
+        // Update job with successful result
+        job.campaigns.push(multipliedCampaign);
+        console.log(`✅ Job ${jobId}: Successfully created copy ${i + 1}`);
+
+      } catch (error) {
+        console.error(`❌ Job ${jobId}: Failed to create copy ${i + 1}:`, error.message);
+
+        // Check if it's a rate limit error
+        if (error.message?.includes('Rate limited')) {
+          // The delay has already been applied in multiplyStrategy150Campaign
+          // Retry this campaign
+          i--; // Decrement to retry this campaign
+          updateJobStatus(jobId, {
+            currentOperation: `Rate limited - will retry campaign ${i + 2} after delay...`
+          });
+        } else {
+          // Non-rate limit error, record and continue
+          errors.push({
+            copyNumber: i + 1,
+            error: error.message,
+            status: 'failed'
+          });
+          job.errors.push({
+            copyNumber: i + 1,
+            error: error.message
+          });
+        }
+      }
+    }
+
+    // Mark job as completed
+    updateJobStatus(jobId, {
+      status: 'completed',
+      progress: multiplyCount,
+      currentOperation: 'Multiplication completed',
+      completedAt: Date.now()
+    });
+
+    console.log(`✅ Job ${jobId} completed: ${results.length} successful, ${errors.length} failed`);
+
+  } catch (error) {
+    console.error(`❌ Job ${jobId} failed:`, error);
+    updateJobStatus(jobId, {
+      status: 'failed',
+      error: error.message,
+      completedAt: Date.now()
+    });
+  }
+}
+
 // Get multiplication progress (for async operations)
-router.get('/multiply/progress/:jobId', authenticate, async (req, res) => {
+router.get('/multiply/status/:jobId', authenticate, async (req, res) => {
   try {
     const { jobId } = req.params;
 
-    // This would fetch from a job queue or database
-    // For now, return a mock progress
-    const progress = {
-      jobId: jobId,
-      status: 'in_progress',
-      progress: {
-        current: 3,
-        total: 5,
-        percentage: 60
-      },
-      completedCampaigns: [
-        { id: 'campaign_copy_1', name: 'Campaign Copy 1' },
-        { id: 'campaign_copy_2', name: 'Campaign Copy 2' },
-        { id: 'campaign_copy_3', name: 'Campaign Copy 3' }
-      ],
-      currentOperation: 'Creating ad sets for campaign copy 4...',
-      errors: []
-    };
+    // Get job from memory
+    const job = multiplicationJobs.get(jobId);
 
-    res.json(progress);
+    if (!job) {
+      return res.status(404).json({
+        error: 'Job not found'
+      });
+    }
+
+    // Calculate elapsed and remaining time
+    const elapsed = Date.now() - job.startTime;
+    const estimatedRemaining = Math.max(0, (job.estimatedSeconds * 1000) - elapsed);
+    const percentComplete = job.total > 0 ? Math.floor((job.progress / job.total) * 100) : 0;
+
+    res.json({
+      id: job.id,
+      status: job.status,
+      progress: job.progress,
+      total: job.total,
+      currentOperation: job.currentOperation,
+      campaigns: job.campaigns,
+      errors: job.errors,
+      elapsedSeconds: Math.floor(elapsed / 1000),
+      remainingSeconds: Math.floor(estimatedRemaining / 1000),
+      percentComplete,
+      startTime: job.startTime,
+      completedAt: job.completedAt
+    });
   } catch (error) {
     console.error('Progress fetch error:', error);
     res.status(500).json({
