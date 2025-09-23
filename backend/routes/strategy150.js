@@ -221,8 +221,49 @@ const validateStrategy150 = [
   body('publishDirectly').optional().isBoolean()
 ];
 
+// Middleware to parse JSON fields from FormData
+const parseFormDataJson = (req, res, next) => {
+  // Parse JSON fields that come as strings from FormData
+  const parseJsonField = (field) => {
+    if (!field) return undefined;
+    if (typeof field === 'string') {
+      try {
+        return JSON.parse(field);
+      } catch (e) {
+        return field; // Return as-is if not valid JSON
+      }
+    }
+    return field;
+  };
+
+  // Parse JSON fields that were stringified in FormData
+  if (req.body.specialAdCategories && typeof req.body.specialAdCategories === 'string') {
+    req.body.specialAdCategories = parseJsonField(req.body.specialAdCategories);
+  }
+  if (req.body.adSetBudget && typeof req.body.adSetBudget === 'string') {
+    req.body.adSetBudget = parseJsonField(req.body.adSetBudget);
+  }
+  if (req.body.targeting && typeof req.body.targeting === 'string') {
+    req.body.targeting = parseJsonField(req.body.targeting);
+  }
+  if (req.body.placements && typeof req.body.placements === 'string') {
+    req.body.placements = parseJsonField(req.body.placements);
+  }
+  if (req.body.duplicationSettings && typeof req.body.duplicationSettings === 'string') {
+    req.body.duplicationSettings = parseJsonField(req.body.duplicationSettings);
+  }
+  if (req.body.campaignBudget && typeof req.body.campaignBudget === 'string') {
+    req.body.campaignBudget = parseJsonField(req.body.campaignBudget);
+  }
+  if (req.body.customBudgets && typeof req.body.customBudgets === 'string') {
+    req.body.customBudgets = parseJsonField(req.body.customBudgets);
+  }
+
+  next();
+};
+
 // Create initial campaign (1-1-1) - supports file uploads
-router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, requirePermission('campaign', 'create'), uploadSingle, validateStrategy150, async (req, res) => {
+router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, requirePermission('campaign', 'create'), uploadSingle, parseFormDataJson, validateStrategy150, async (req, res) => {
   try {
     console.log('📝 Strategy 1-50-1 creation request received:', {
       body: req.body,
@@ -358,34 +399,8 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       selectedPageId = req.body.selectedPageId;
     }
 
-    // Parse JSON fields from FormData (they come as strings)
-    const parseJsonField = (field) => {
-      if (!field) return undefined;
-      if (typeof field === 'string') {
-        try {
-          return JSON.parse(field);
-        } catch (e) {
-          return field; // Return as-is if not valid JSON
-        }
-      }
-      return field;
-    };
-
-    // Parse JSON fields that were stringified in FormData
-    if (req.body.specialAdCategories && typeof req.body.specialAdCategories === 'string') {
-      req.body.specialAdCategories = parseJsonField(req.body.specialAdCategories);
-    }
-    if (req.body.adSetBudget && typeof req.body.adSetBudget === 'string') {
-      req.body.adSetBudget = parseJsonField(req.body.adSetBudget);
-    }
-    if (req.body.targeting && typeof req.body.targeting === 'string') {
-      req.body.targeting = parseJsonField(req.body.targeting);
-    }
-    if (req.body.placements && typeof req.body.placements === 'string') {
-      req.body.placements = parseJsonField(req.body.placements);
-    }
-
-    // Handle media files using multer (same as campaigns.js)
+    // Handle media files - uploadSingle uses .any() so files are in req.files array
+    // Note: JSON field parsing is now done in parseFormDataJson middleware before validation
     let mediaPath = null;
     let imagePaths = [];
 
