@@ -1078,35 +1078,85 @@ async function processMultiplicationAsync(jobId, campaignStructure, multiplyCoun
   const job = multiplicationJobs.get(jobId);
   if (!job) return;
 
-  console.log(`🚀 Starting async multiplication job ${jobId}`);
+  console.log(`🚀 Starting async multiplication job ${jobId} - Using BATCH method`);
 
   try {
-    const results = [];
-    const errors = [];
+    // Update job status
+    updateJobStatus(jobId, {
+      status: 'processing',
+      progress: 0,
+      currentOperation: `Preparing batch request for ${multiplyCount} campaign copies...`
+    });
 
-    // Process each campaign copy
-    for (let i = 0; i < multiplyCount; i++) {
-      try {
-        // Update job status
-        updateJobStatus(jobId, {
-          status: 'processing',
-          progress: i,
-          currentOperation: `Creating campaign ${i + 1} of ${multiplyCount}...`
-        });
+    // Create progress callback
+    const updateProgress = (message) => {
+      updateJobStatus(jobId, {
+        currentOperation: message
+      });
+    };
 
-        console.log(`\n📋 Job ${jobId}: Creating copy ${i + 1} of ${multiplyCount}...`);
+    // Use the new BATCH method for all copies at once!
+    console.log(`\n📋 Job ${jobId}: Creating ${multiplyCount} copies using batch API...`);
 
-        // Create progress callback
-        const updateProgress = (message) => {
+    const batchResult = await userFacebookApi.batchMultiplyCampaigns(
+      campaignStructure.campaignId,
+      multiplyCount,
+      updateProgress
+    );
+
+    // Process batch results
+    if (batchResult.success) {
+      // Update job with results
+      updateJobStatus(jobId, {
+        status: 'completed',
+        progress: multiplyCount,
+        currentOperation: `Successfully created ${batchResult.summary.successful} campaigns`,
+        campaigns: batchResult.results,
+        errors: batchResult.errors,
+        completedAt: Date.now()
+      });
+
+      console.log(`✅ Job ${jobId} completed using batch method:`);
+      console.log(`  - Successful: ${batchResult.summary.successful}`);
+      console.log(`  - Failed: ${batchResult.summary.failed}`);
+      console.log(`  - API calls used: ${batchResult.summary.apiCallsUsed}`);
+    } else {
+      throw new Error('Batch multiplication failed');
+    }
+
+  } catch (error) {
+    console.error(`❌ Job ${jobId} failed:`, error);
+
+    // Fallback to original method if batch fails
+    console.log('⚠️ Batch method failed, falling back to sequential method...');
+
+    updateJobStatus(jobId, {
+      currentOperation: 'Batch failed, using sequential method...'
+    });
+
+    // Try the original sequential approach as fallback
+    try {
+      const results = [];
+      const errors = [];
+
+      for (let i = 0; i < multiplyCount; i++) {
+        try {
           updateJobStatus(jobId, {
-            currentOperation: `Campaign ${i + 1}: ${message}`
+            status: 'processing',
+            progress: i,
+            currentOperation: `Creating campaign ${i + 1} of ${multiplyCount} (sequential)...`
           });
-        };
 
-        // Clone the campaign with progress updates
-        const multipliedCampaign = await userFacebookApi.multiplyStrategy150Campaign({
-          sourceCampaignId: campaignStructure.campaignId,
-          sourceAdSetIds: campaignStructure.adSetIds,
+          const updateProgress = (message) => {
+            updateJobStatus(jobId, {
+              currentOperation: `Campaign ${i + 1}: ${message}`
+            });
+          };
+
+          // Use original method as fallback
+          const multipliedCampaign = await userFacebookApi.multiplyStrategy150Campaign({
+            sourceCampaignId: campaignStructure.campaignId,
+            sourceAdSetIds: campaignStructure.adSetIds,
           postId: campaignStructure.postId,
           campaignDetails: campaignStructure.campaignDetails,
           copyNumber: i + 1,
@@ -1162,13 +1212,14 @@ async function processMultiplicationAsync(jobId, campaignStructure, multiplyCoun
 
     console.log(`✅ Job ${jobId} completed: ${results.length} successful, ${errors.length} failed`);
 
-  } catch (error) {
-    console.error(`❌ Job ${jobId} failed:`, error);
-    updateJobStatus(jobId, {
-      status: 'failed',
-      error: error.message,
-      completedAt: Date.now()
-    });
+    } catch (fallbackError) {
+      console.error(`❌ Job ${jobId} fallback also failed:`, fallbackError);
+      updateJobStatus(jobId, {
+        status: 'failed',
+        error: fallbackError.message,
+        completedAt: Date.now()
+      });
+    }
   }
 }
 

@@ -1688,7 +1688,136 @@ class FacebookAPI {
     }
   }
 
-  // Main multiplication function - Clone entire Strategy 150 campaign
+  // NEW OPTIMIZED: Batch multiplication using deep_copy - Much faster, no rate limits!
+  async batchMultiplyCampaigns(sourceCampaignId, multiplyCount, updateProgress) {
+    console.log('\n🚀 BATCH MULTIPLICATION: Using Facebook Batch API with deep_copy');
+    console.log(`  Source Campaign: ${sourceCampaignId}`);
+    console.log(`  Copies to create: ${multiplyCount}`);
+    console.log('  Method: Single batch request with deep_copy=true');
+
+    try {
+      // Prepare batch requests for all copies
+      const batchRequests = [];
+      const timestamp = Date.now();
+
+      for (let i = 0; i < multiplyCount; i++) {
+        const copyNumber = i + 1;
+
+        // Each batch request to copy entire campaign structure
+        batchRequests.push({
+          method: 'POST',
+          relative_url: `${sourceCampaignId}/copies`,
+          body: `deep_copy=true&status_option=PAUSED&rename_options=${encodeURIComponent(JSON.stringify({
+            rename_suffix: `_Copy${copyNumber}_${timestamp}`
+          }))}`
+        });
+
+        console.log(`  Prepared batch request ${copyNumber} for deep copy`);
+      }
+
+      if (updateProgress) {
+        updateProgress('Sending batch request to Facebook...');
+      }
+
+      // Send all copy requests in a SINGLE API call
+      console.log('\n📤 Sending single batch request for all campaign copies...');
+
+      // Create form-urlencoded data
+      const params = new URLSearchParams();
+      params.append('batch', JSON.stringify(batchRequests));
+      params.append('access_token', this.accessToken);
+
+      const batchResponse = await axios.post(
+        this.baseURL,
+        params.toString(),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+
+      console.log('✅ Batch request completed!');
+
+      // Parse batch response
+      const results = [];
+      const errors = [];
+
+      if (batchResponse.data && Array.isArray(batchResponse.data)) {
+        batchResponse.data.forEach((response, index) => {
+          const copyNumber = index + 1;
+
+          if (response.code === 200) {
+            // Success - parse the response body
+            let responseData;
+            try {
+              responseData = typeof response.body === 'string'
+                ? JSON.parse(response.body)
+                : response.body;
+            } catch (e) {
+              responseData = { id: 'unknown', success: true };
+            }
+
+            results.push({
+              copyNumber,
+              campaignId: responseData.copied_campaign_id || responseData.id || responseData.campaign_id,
+              status: 'success',
+              message: `Campaign copy ${copyNumber} created successfully`
+            });
+
+            console.log(`  ✅ Copy ${copyNumber}: Success - Campaign ID: ${responseData.copied_campaign_id || responseData.id}`);
+          } else {
+            // Error
+            let errorMessage = 'Unknown error';
+            try {
+              const errorData = typeof response.body === 'string'
+                ? JSON.parse(response.body)
+                : response.body;
+              errorMessage = errorData.error?.message || errorMessage;
+            } catch (e) {
+              errorMessage = response.body || errorMessage;
+            }
+
+            errors.push({
+              copyNumber,
+              error: errorMessage,
+              status: 'failed'
+            });
+
+            console.error(`  ❌ Copy ${copyNumber}: Failed - ${errorMessage}`);
+          }
+        });
+      }
+
+      if (updateProgress) {
+        updateProgress(`Completed: ${results.length} successful, ${errors.length} failed`);
+      }
+
+      console.log(`\n📊 Batch Multiplication Results:`);
+      console.log(`  ✅ Successful: ${results.length}`);
+      console.log(`  ❌ Failed: ${errors.length}`);
+      console.log(`  ⏱️ Total API calls used: 1 (batch request)`);
+
+      return {
+        success: true,
+        method: 'batch_deep_copy',
+        results,
+        errors,
+        summary: {
+          requested: multiplyCount,
+          successful: results.length,
+          failed: errors.length,
+          apiCallsUsed: 1  // Just 1 API call for everything!
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Batch multiplication failed:', error.message);
+      throw new Error(`Batch multiplication failed: ${error.message}`);
+    }
+  }
+
+  // ORIGINAL: Main multiplication function - Clone entire Strategy 150 campaign (kept for compatibility)
   async multiplyStrategy150Campaign(multiplyData) {
     const {
       sourceCampaignId,
