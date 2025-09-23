@@ -1203,24 +1203,52 @@ class FacebookAPI {
 
       console.log(`🔄 Using Facebook /copies endpoint with data:`, copyData);
 
-      // Create all copies in one API call using Facebook's batch copy feature
-      const copyResponse = await axios.post(
-        `${this.baseURL}/${originalAdSetId}/copies`,
-        null,
-        {
-          params: {
-            ...copyData,
-            // Create count number of copies
-            batch_size: count
+      // Facebook's /copies endpoint creates ONE copy at a time
+      // We need to call it multiple times to create 49 copies
+      console.log(`📋 Creating ${count} copies of ad set ${originalAdSetId}...`);
+
+      const newAdSetIds = [];
+
+      for (let i = 0; i < count; i++) {
+        try {
+          console.log(`  Creating copy ${i + 1} of ${count}...`);
+
+          const copyResponse = await axios.post(
+            `${this.baseURL}/${originalAdSetId}/copies`,
+            null,
+            {
+              params: {
+                ...copyData,
+                rename_options: {
+                  rename_prefix: '',
+                  rename_suffix: ` - Copy ${i + 1}`
+                }
+              }
+            }
+          );
+
+          if (copyResponse.data && copyResponse.data.id) {
+            newAdSetIds.push(copyResponse.data.id);
+            console.log(`  ✅ Created ad set copy: ${copyResponse.data.id}`);
           }
+
+          // Add small delay between copies to avoid rate limits
+          if (i < count - 1) {
+            await this.delay(500); // 0.5 second delay
+          }
+        } catch (error) {
+          console.error(`  ❌ Failed to create copy ${i + 1}:`, error.message);
+          results.errors.push({
+            copyNumber: i + 1,
+            error: error.message
+          });
         }
-      );
+      }
 
-      console.log(`✅ Facebook /copies response:`, copyResponse.data);
+      console.log(`✅ Created ${newAdSetIds.length} ad set copies`);
 
-      // If batch copy response contains the copied adset IDs
-      if (copyResponse.data && copyResponse.data.id) {
-        const newAdSetIds = Array.isArray(copyResponse.data.id) ? copyResponse.data.id : [copyResponse.data.id];
+      // Now create ads for each copied adset
+      if (newAdSetIds.length > 0) {
 
         // Create ads for each copied adset
         for (let i = 0; i < newAdSetIds.length; i++) {
@@ -1706,7 +1734,7 @@ class FacebookAPI {
         // Each batch request to copy entire campaign structure
         batchRequests.push({
           method: 'POST',
-          relative_url: `${sourceCampaignId}/copies`,
+          relative_url: `v18.0/${sourceCampaignId}/copies`,
           body: `deep_copy=true&status_option=PAUSED&rename_options=${encodeURIComponent(JSON.stringify({
             rename_suffix: `_Copy${copyNumber}_${timestamp}`
           }))}`

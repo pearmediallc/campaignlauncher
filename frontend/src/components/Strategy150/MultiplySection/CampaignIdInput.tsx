@@ -83,7 +83,8 @@ const CampaignIdInput: React.FC<CampaignIdInputProps> = ({
 
     try {
       // This endpoint would verify the campaign exists and is a Strategy 150 campaign
-      const response = await api.get(`/campaigns/strategy-150/verify/${idToValidate}`);
+      // Add skipDetails=true to avoid fetching all ad sets (prevents rate limit)
+      const response = await api.get(`/campaigns/strategy-150/verify/${idToValidate}?skipDetails=true`);
 
       if (response.data.success) {
         setCampaignValid(true);

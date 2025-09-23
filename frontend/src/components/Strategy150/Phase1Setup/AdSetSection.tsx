@@ -1058,7 +1058,7 @@ const AdSetSection: React.FC = () => {
         <Box sx={{ width: "100%" }}>
           <Divider sx={{ my: 2 }} />
           <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
-            Duplication Settings for 48 Ad Sets
+            Duplication Settings for 49 Ad Sets
           </Typography>
         </Box>
 
@@ -1077,7 +1077,7 @@ const AdSetSection: React.FC = () => {
                 InputProps={{
                   startAdornment: <InputAdornment position="start">$</InputAdornment>
                 }}
-                helperText="Each of the 48 duplicated ad sets will have this budget (default: $1)"
+                helperText="Each of the 49 duplicated ad sets will have this budget (default: $1)"
               />
             )}
           />
@@ -1098,7 +1098,7 @@ const AdSetSection: React.FC = () => {
                   <MenuItem value="weighted">Weighted Distribution</MenuItem>
                 </Select>
                 <FormHelperText>
-                  How to distribute budget across the 48 duplicated ad sets
+                  How to distribute budget across the 49 duplicated ad sets
                 </FormHelperText>
               </FormControl>
             )}
@@ -1107,7 +1107,7 @@ const AdSetSection: React.FC = () => {
 
         <Box sx={{ width: "100%" }}>
           <Alert severity="info">
-            The initial ad set (1-1-1) will use the budget specified above. The 48 duplicated ad sets will each have $1 budget by default, which can be customized after creation.
+            The initial ad set (1-1-1) will use the budget specified above. The 49 duplicated ad sets will each have $1 budget by default, which can be customized after creation.
           </Alert>
         </Box>
       </Box>

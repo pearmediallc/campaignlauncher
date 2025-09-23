@@ -207,7 +207,7 @@ const validateStrategy150 = [
   body('mediaType').optional().isIn(['single_image', 'single_video', 'carousel']),
   body('mediaSpecs').optional().isObject(),
 
-  // Duplication settings for 48 ad sets
+  // Duplication settings for 49 ad sets
   body('duplicationSettings.defaultBudgetPerAdSet')
     .optional()
     .isFloat({ min: 1 })
@@ -527,7 +527,7 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       videoPath: (req.body.mediaType === 'single_video' || req.body.mediaType === 'video') ? mediaPath : null,
       imagePaths: req.body.mediaType === 'carousel' ? imagePaths : null,
 
-      // Duplication settings for the 48 ad sets
+      // Duplication settings for the 49 ad sets
       duplicationSettings: req.body.duplicationSettings || {
         defaultBudgetPerAdSet: 1,
         budgetDistributionType: 'equal'
@@ -669,6 +669,7 @@ router.get('/post-id/:adId', authenticate, requireFacebookAuth, async (req, res)
 router.get('/verify/:campaignId', authenticate, requireFacebookAuth, async (req, res) => {
   try {
     const { campaignId } = req.params;
+    const { skipDetails } = req.query; // Add query param to skip fetching details
 
     const facebookAuth = await db.FacebookAuth.findOne({
       where: { userId: req.user.id, isActive: true }
@@ -689,6 +690,21 @@ router.get('/verify/:campaignId', authenticate, requireFacebookAuth, async (req,
       return res.status(401).json({
         success: false,
         error: 'Invalid access token format'
+      });
+    }
+
+    // If skipDetails is true, return minimal info for multiplication
+    if (skipDetails === 'true') {
+      console.log('🚀 Skipping detailed verification for multiplication - using deep_copy');
+      return res.json({
+        success: true,
+        campaign: {
+          id: campaignId,
+          name: 'Strategy 1-50-1 Campaign'
+        },
+        isStrategy150: true, // Assume it's Strategy 150 if called from multiplication
+        adSetCount: 50, // Expected count
+        postId: null // Not needed for deep_copy
       });
     }
 
@@ -786,7 +802,7 @@ router.get('/verify-post/:postId', authenticate, requireFacebookAuth, async (req
   }
 });
 
-// Duplicate ad sets (1-48-1)
+// Duplicate ad sets (1-49-1)
 router.post('/duplicate', authenticate, requireFacebookAuth, async (req, res) => {
   try {
     const {
@@ -794,7 +810,7 @@ router.post('/duplicate', authenticate, requireFacebookAuth, async (req, res) =>
       originalAdSetId,
       postId,
       formData,
-      count = 48,
+      count = 49,
       duplicateBudgets = [] // Array of custom budgets for each duplicate
     } = req.body;
 
@@ -873,7 +889,7 @@ router.get('/progress/:campaignId', authenticate, async (req, res) => {
     // For now, return mock progress data
     const progress = {
       completed: Math.floor(Math.random() * 50),
-      total: 48,
+      total: 49,
       currentOperation: 'Creating ad set copy 23...',
       adSets: [
         { id: 'adset_1', name: 'Test AdSet - Copy 1' },
