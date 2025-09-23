@@ -1147,7 +1147,8 @@ class FacebookAPI {
         });
 
         if (creativeResponse.data.effective_object_story_id) {
-          return creativeResponse.data.effective_object_story_id.replace(/_/g, '');
+          // Keep the original format with underscore as Facebook provides it
+          return creativeResponse.data.effective_object_story_id;
         }
       }
 
@@ -1164,8 +1165,8 @@ class FacebookAPI {
       });
 
       if (postsResponse.data.data && postsResponse.data.data.length > 0) {
-        // Return the most recent post (likely to be our ad)
-        return postsResponse.data.data[0].id.replace(/_/g, '');
+        // Return the most recent post ID in original Facebook format with underscore
+        return postsResponse.data.data[0].id;
       }
 
       return null;

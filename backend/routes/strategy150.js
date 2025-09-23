@@ -358,6 +358,33 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       selectedPageId = req.body.selectedPageId;
     }
 
+    // Parse JSON fields from FormData (they come as strings)
+    const parseJsonField = (field) => {
+      if (!field) return undefined;
+      if (typeof field === 'string') {
+        try {
+          return JSON.parse(field);
+        } catch (e) {
+          return field; // Return as-is if not valid JSON
+        }
+      }
+      return field;
+    };
+
+    // Parse JSON fields that were stringified in FormData
+    if (req.body.specialAdCategories && typeof req.body.specialAdCategories === 'string') {
+      req.body.specialAdCategories = parseJsonField(req.body.specialAdCategories);
+    }
+    if (req.body.adSetBudget && typeof req.body.adSetBudget === 'string') {
+      req.body.adSetBudget = parseJsonField(req.body.adSetBudget);
+    }
+    if (req.body.targeting && typeof req.body.targeting === 'string') {
+      req.body.targeting = parseJsonField(req.body.targeting);
+    }
+    if (req.body.placements && typeof req.body.placements === 'string') {
+      req.body.placements = parseJsonField(req.body.placements);
+    }
+
     // Handle media files using multer (same as campaigns.js)
     let mediaPath = null;
     let imagePaths = [];
@@ -373,23 +400,26 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       } : null
     });
 
-    // Handle both req.file and req.files for single image (multer inconsistency)
-    if (req.body.mediaType === 'single_image') {
-      if (req.file) {
-        mediaPath = req.file.path;
-        console.log('✅ Single image detected (file):', mediaPath);
-      } else if (req.files && req.files.length > 0) {
+    // Handle media files - uploadSingle uses .any() so files are in req.files array
+    if (req.files && req.files.length > 0) {
+      console.log(`📸 Files detected: ${req.files.length} file(s)`);
+
+      if (req.body.mediaType === 'single_image') {
         mediaPath = req.files[0].path;
-        console.log('✅ Single image detected (files[0]):', mediaPath);
+        console.log('✅ Single image detected:', mediaPath);
+      } else if (req.body.mediaType === 'carousel') {
+        imagePaths = req.files.map(file => file.path);
+        console.log('✅ Carousel images detected:', imagePaths.length, 'images');
+      } else if (req.body.mediaType === 'video' || req.body.mediaType === 'single_video') {
+        mediaPath = req.files[0].path;
+        console.log('✅ Video detected:', mediaPath);
       } else {
-        console.log('⚠️ No image file detected');
+        // Default to single image if mediaType not specified but file exists
+        mediaPath = req.files[0].path;
+        console.log('✅ Media file detected (defaulting to image):', mediaPath);
       }
-    } else if (req.body.mediaType === 'carousel' && req.files) {
-      imagePaths = req.files.map(file => file.path);
-      console.log('✅ Carousel images detected:', imagePaths.length, 'images');
-    } else if (req.body.mediaType === 'video' && req.file) {
-      mediaPath = req.file.path;
-      console.log('✅ Video detected:', mediaPath);
+    } else {
+      console.log('⚠️ No media files detected in request');
     }
 
     // Parse and validate budget values (keep in dollars, FacebookAPI will convert to cents)
@@ -479,7 +509,7 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       mediaType: req.body.mediaType || 'single_image',
       mediaSpecs: req.body.mediaSpecs,
       imagePath: req.body.mediaType === 'single_image' ? mediaPath : null,
-      videoPath: req.body.mediaType === 'single_video' ? mediaPath : null,
+      videoPath: (req.body.mediaType === 'single_video' || req.body.mediaType === 'video') ? mediaPath : null,
       imagePaths: req.body.mediaType === 'carousel' ? imagePaths : null,
 
       // Duplication settings for the 49 ad sets
@@ -563,6 +593,9 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
 
 // Get post ID from created ad
 router.get('/post-id/:adId', authenticate, requireFacebookAuth, async (req, res) => {
+  // Set response type to JSON immediately
+  res.setHeader('Content-Type', 'application/json');
+
   try {
     const { adId } = req.params;
 
@@ -638,10 +671,9 @@ router.get('/verify-post/:postId', authenticate, requireFacebookAuth, async (req
 
     // Verify post exists by trying to fetch it
     const axios = require('axios');
-    // Normalize post ID for Facebook API (remove underscores)
-    const normalizedPostId = postId.replace(/_/g, '');
+    // Use the post ID as-is with the underscore format
     try {
-      await axios.get(`https://graph.facebook.com/v18.0/${normalizedPostId}`, {
+      await axios.get(`https://graph.facebook.com/v18.0/${postId}`, {
         params: {
           access_token: decryptedToken,
           fields: 'id,message,created_time'
@@ -704,13 +736,11 @@ router.post('/duplicate', authenticate, requireFacebookAuth, async (req, res) =>
     });
 
     // Start the duplication process with custom budgets
-    // Ensure post ID has no underscores (Facebook format change)
-    const normalizedPostId = postId.replace(/_/g, '');
-
+    // Keep the post ID in original Facebook format with underscore
     const duplicateData = {
       campaignId,
       originalAdSetId,
-      postId: normalizedPostId,
+      postId: postId,
       count,
       formData,
       userId: req.user.id

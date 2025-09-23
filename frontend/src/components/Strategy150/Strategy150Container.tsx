@@ -120,6 +120,7 @@ const Strategy150Container: React.FC = () => {
 
         // Media data
         mediaType: data.mediaType,
+        mediaFiles: data.mediaFiles,
         image: data.image,
         video: data.video,
         images: data.images,
@@ -235,7 +236,7 @@ const Strategy150Container: React.FC = () => {
 
         // Media
         mediaType: campaignData.mediaType || 'single_image',
-        image: campaignData.image,
+        mediaFiles: campaignData.mediaFiles,
 
         // Placements
         placements: {
@@ -272,54 +273,71 @@ const Strategy150Container: React.FC = () => {
       console.log('📦 Payload size:', JSON.stringify(workingCampaignData).length, 'bytes');
       console.log('📊 Request data:', workingCampaignData);
 
-      // Use Strategy 1-50-1 specific endpoint with JSON payload
-      // Media files need to be handled separately or converted to base64
-      let mediaData = null;
-      if (workingCampaignData.media instanceof File) {
-        // Convert media to base64 for JSON transport
-        const reader = new FileReader();
-        mediaData = await new Promise((resolve) => {
-          reader.onload = () => resolve({
-            data: reader.result,
-            name: workingCampaignData.media.name,
-            type: workingCampaignData.media.type
-          });
-          reader.readAsDataURL(workingCampaignData.media);
+      // Create FormData to handle file uploads properly
+      const formData = new FormData();
+
+      // Add all non-file fields to FormData
+      Object.keys(workingCampaignData).forEach(key => {
+        const value = workingCampaignData[key as keyof typeof workingCampaignData];
+
+        if (key === 'media' || key === 'mediaFiles' || key === 'image') {
+          // Skip file fields, we'll handle them separately
+          return;
+        }
+
+        if (value === undefined || value === null) {
+          return;
+        }
+
+        // Handle arrays and objects
+        if (Array.isArray(value)) {
+          formData.append(key, JSON.stringify(value));
+        } else if (typeof value === 'object' && !(value instanceof File)) {
+          formData.append(key, JSON.stringify(value));
+        } else if (key === 'dailyBudget' || key === 'lifetimeBudget') {
+          // Convert budgets to cents for Meta API
+          formData.append(key, String(Number(value) * 100));
+        } else {
+          formData.append(key, String(value));
+        }
+      });
+
+      // Handle media files
+      if (workingCampaignData.image instanceof File) {
+        formData.append('media', workingCampaignData.image);
+      } else if (workingCampaignData.media instanceof File) {
+        formData.append('media', workingCampaignData.media);
+      } else if (workingCampaignData.mediaFiles && Array.isArray(workingCampaignData.mediaFiles)) {
+        workingCampaignData.mediaFiles.forEach((file: File) => {
+          formData.append('media', file);
         });
       }
 
-      // Prepare JSON payload with proper field conversions
-      const jsonPayload = {
-        ...workingCampaignData,
-        // Convert budgets to cents for Meta API
-        dailyBudget: workingCampaignData.dailyBudget ? workingCampaignData.dailyBudget * 100 : undefined,
-        lifetimeBudget: workingCampaignData.lifetimeBudget ? workingCampaignData.lifetimeBudget * 100 : undefined,
-        // Ensure arrays are properly formatted
-        specialAdCategories: Array.isArray(workingCampaignData.specialAdCategories)
+      // Ensure special ad categories is properly formatted
+      if (workingCampaignData.specialAdCategories) {
+        const categories = Array.isArray(workingCampaignData.specialAdCategories)
           ? workingCampaignData.specialAdCategories
-          : workingCampaignData.specialAdCategories ? [workingCampaignData.specialAdCategories] : [],
-        // Include media if present
-        mediaBase64: mediaData,
-        // Remove the File object
-        media: undefined
-      };
+          : [workingCampaignData.specialAdCategories];
+        formData.set('specialAdCategories', JSON.stringify(categories));
+      }
 
       // Handle nested budget object
-      if (jsonPayload.adSetBudget) {
-        jsonPayload.adSetBudget = {
-          ...jsonPayload.adSetBudget,
-          dailyBudget: jsonPayload.adSetBudget.dailyBudget ? jsonPayload.adSetBudget.dailyBudget * 100 : undefined,
-          lifetimeBudget: jsonPayload.adSetBudget.lifetimeBudget ? jsonPayload.adSetBudget.lifetimeBudget * 100 : undefined
+      if (workingCampaignData.adSetBudget) {
+        const adSetBudget = {
+          ...workingCampaignData.adSetBudget,
+          dailyBudget: workingCampaignData.adSetBudget.dailyBudget ? workingCampaignData.adSetBudget.dailyBudget * 100 : undefined,
+          lifetimeBudget: workingCampaignData.adSetBudget.lifetimeBudget ? workingCampaignData.adSetBudget.lifetimeBudget * 100 : undefined
         };
+        formData.set('adSetBudget', JSON.stringify(adSetBudget));
       }
 
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5002/api'}/campaigns/strategy-150/create`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
+          // Don't set Content-Type, let the browser set it with boundary for multipart
         },
-        body: JSON.stringify(jsonPayload)
+        body: formData
       });
 
       const result = await response.json();
@@ -421,19 +439,39 @@ const Strategy150Container: React.FC = () => {
     }
   };
 
-  const handleAutoPostCapture = async (adId?: string) => {
+  const handleAutoPostCapture = async (adId?: string, retryCount = 0): Promise<void> => {
     if (!adId) {
       setPhase('manual');
       return;
     }
 
+    console.log('Attempting auto post capture for ad:', adId, 'Retry:', retryCount);
+
     try {
-      // Use existing post ID capture endpoint
+      // Use AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+
       const response = await fetch(`/api/campaigns/post-id/${adId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        },
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+
+      // Check if response is HTML (error page)
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('Received non-JSON response, likely HTML error page');
+        throw new Error('Invalid response format');
+      }
+
+      // Check if response is ok before parsing
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const result = await response.json();
 
@@ -441,28 +479,46 @@ const Strategy150Container: React.FC = () => {
         setPostId(result.postId);
         setPhase('duplicating');
         setActiveStep(2);
+      } else if (retryCount < 2) {
+        // Retry with exponential backoff
+        console.log('Post ID not ready yet, retrying in 5 seconds...');
+        setTimeout(() => {
+          handleAutoPostCapture(adId, retryCount + 1);
+        }, 5000 * (retryCount + 1));
       } else {
-        // Auto-capture failed, switch to manual input
+        // Auto-capture failed after retries, switch to manual input
+        console.log('Auto-capture failed after retries');
         setPhase('manual');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Auto post capture error:', error);
-      setPhase('manual');
+
+      if (error.name === 'AbortError') {
+        console.error('Request timed out after 45 seconds');
+      }
+
+      // Retry on network errors if we haven't exceeded retry count
+      if (retryCount < 2 && (error.name === 'AbortError' || error.message === 'Invalid response format')) {
+        console.log('Retrying due to network error...');
+        setTimeout(() => {
+          handleAutoPostCapture(adId, retryCount + 1);
+        }, 3000);
+      } else {
+        setPhase('manual');
+      }
     }
   };
 
   const handlePostIdCaptured = (capturedPostId: string) => {
-    // Normalize post ID by removing underscores
-    const normalizedPostId = capturedPostId.replace(/_/g, '');
-    setPostId(normalizedPostId);
+    // Keep the original Facebook format with underscore
+    setPostId(capturedPostId);
     setPhase('duplicating');
     setActiveStep(2);
   };
 
   const handleManualPostId = (manualPostId: string) => {
-    // Normalize post ID by removing underscores
-    const normalizedPostId = manualPostId.replace(/_/g, '');
-    setPostId(normalizedPostId);
+    // Keep the original Facebook format with underscore
+    setPostId(manualPostId);
     setPhase('duplicating');
     setActiveStep(2);
   };
