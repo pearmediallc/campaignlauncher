@@ -109,15 +109,55 @@ router.post('/sdk-callback', authenticate, async (req, res) => {
       .filter(p => p.status === 'granted')
       .map(p => p.permission);
 
-    // Get ad accounts
-    const adAccountsUrl = `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,account_status,currency&access_token=${accessToken}`;
-    const adAccountsResponse = await axios.get(adAccountsUrl);
-    const adAccounts = adAccountsResponse.data.data || [];
+    // Get ad accounts with pagination to fetch ALL accounts
+    let allAdAccounts = [];
+    let adAccountsUrl = `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,account_status,currency&limit=100&access_token=${accessToken}`;
 
-    // Get pages
-    const pagesUrl = `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token,category&access_token=${accessToken}`;
-    const pagesResponse = await axios.get(pagesUrl);
-    const pages = pagesResponse.data.data || [];
+    console.log('Fetching ad accounts with pagination...');
+
+    // Keep fetching until we have all pages
+    while (adAccountsUrl) {
+      const adAccountsResponse = await axios.get(adAccountsUrl);
+      const pageAdAccounts = adAccountsResponse.data.data || [];
+      allAdAccounts = allAdAccounts.concat(pageAdAccounts);
+
+      console.log(`Fetched ${pageAdAccounts.length} ad accounts, total so far: ${allAdAccounts.length}`);
+
+      // Check if there's a next page
+      if (adAccountsResponse.data.paging && adAccountsResponse.data.paging.next) {
+        adAccountsUrl = adAccountsResponse.data.paging.next;
+      } else {
+        adAccountsUrl = null; // No more pages
+      }
+    }
+
+    const adAccounts = allAdAccounts;
+    console.log(`Total ad accounts fetched: ${adAccounts.length}`);
+
+    // Get pages with pagination to fetch ALL pages
+    let allPages = [];
+    let pagesUrl = `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token,category&limit=100&access_token=${accessToken}`;
+
+    console.log('Fetching pages with pagination...');
+
+    // Keep fetching until we have all pages
+    while (pagesUrl) {
+      const pagesResponse = await axios.get(pagesUrl);
+      const pagePages = pagesResponse.data.data || [];
+      allPages = allPages.concat(pagePages);
+
+      console.log(`Fetched ${pagePages.length} pages, total so far: ${allPages.length}`);
+
+      // Check if there's a next page
+      if (pagesResponse.data.paging && pagesResponse.data.paging.next) {
+        pagesUrl = pagesResponse.data.paging.next;
+      } else {
+        pagesUrl = null; // No more pages
+      }
+    }
+
+    const pages = allPages;
+    console.log(`Total pages fetched: ${pages.length}`);
 
     // Try to exchange for long-lived token
     let finalAccessToken = accessToken;
