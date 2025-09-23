@@ -452,7 +452,7 @@ const Strategy150Container: React.FC = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
 
-      const response = await fetch(`/api/campaigns/post-id/${adId}`, {
+      const response = await fetch(`/api/campaigns/strategy-150/post-id/${adId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
