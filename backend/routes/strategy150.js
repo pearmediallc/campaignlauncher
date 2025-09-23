@@ -665,6 +665,81 @@ router.get('/post-id/:adId', authenticate, requireFacebookAuth, async (req, res)
   }
 });
 
+// Verify campaign for multiplication
+router.get('/verify/:campaignId', authenticate, requireFacebookAuth, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+
+    const facebookAuth = await db.FacebookAuth.findOne({
+      where: { userId: req.user.id, isActive: true }
+    });
+
+    if (!facebookAuth) {
+      return res.status(401).json({
+        success: false,
+        error: 'Facebook authentication required',
+        requiresReauth: true
+      });
+    }
+
+    let decryptedToken;
+    if (facebookAuth.accessToken.startsWith('{')) {
+      decryptedToken = decryptToken(facebookAuth.accessToken);
+    } else {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid access token format'
+      });
+    }
+
+    const userFacebookApi = new FacebookAPI({
+      accessToken: decryptedToken,
+      adAccountId: facebookAuth.selectedAdAccount.id.replace('act_', ''),
+      pageId: facebookAuth.selectedPage?.id
+    });
+
+    // Fetch campaign details
+    const campaignDetails = await userFacebookApi.getCampaignFullDetails(campaignId);
+
+    if (!campaignDetails) {
+      return res.json({
+        success: false,
+        error: 'Campaign not found'
+      });
+    }
+
+    // Get ad sets count
+    const adSets = await userFacebookApi.getAdSetsForCampaign(campaignId);
+
+    // Check if it's a Strategy 150 campaign (should have ~50 adsets)
+    const isStrategy150 = adSets && adSets.length >= 45 && adSets.length <= 55;
+
+    // Try to get post ID from first ad set
+    let postId = null;
+    if (adSets && adSets.length > 0) {
+      postId = await userFacebookApi.getPostIdFromAdSet(adSets[0].id);
+    }
+
+    res.json({
+      success: true,
+      campaign: {
+        id: campaignId,
+        name: campaignDetails.name,
+        status: campaignDetails.status,
+        adSetCount: adSets ? adSets.length : 0,
+        isStrategy150: isStrategy150
+      },
+      postId: postId
+    });
+  } catch (error) {
+    console.error('Campaign verification error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to verify campaign'
+    });
+  }
+});
+
 // Verify post ID
 router.get('/verify-post/:postId', authenticate, requireFacebookAuth, async (req, res) => {
   try {
@@ -805,6 +880,243 @@ router.get('/progress/:campaignId', authenticate, async (req, res) => {
         { id: 'adset_2', name: 'Test AdSet - Copy 2' },
         // ... more ad sets
       ],
+      errors: []
+    };
+
+    res.json(progress);
+  } catch (error) {
+    console.error('Progress fetch error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Multiply Campaign endpoint - Clone entire 1-50-1 structure multiple times
+router.post('/multiply', authenticate, requireFacebookAuth, refreshFacebookToken, async (req, res) => {
+  try {
+    const {
+      sourceCampaignId,
+      multiplyCount = 1,
+      sourceAdSetIds = [],
+      sourcePostId,
+      manualInput = false
+    } = req.body;
+
+    // Validation
+    if (!sourceCampaignId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Source campaign ID is required'
+      });
+    }
+
+    if (multiplyCount < 1 || multiplyCount > 9) {
+      return res.status(400).json({
+        success: false,
+        error: 'Multiply count must be between 1 and 9'
+      });
+    }
+
+    // Get user's Facebook credentials
+    const facebookAuth = await db.FacebookAuth.findOne({
+      where: { userId: req.user.id, isActive: true }
+    });
+
+    if (!facebookAuth || !facebookAuth.selectedAdAccount) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please select an ad account before multiplying campaigns'
+      });
+    }
+
+    // Decrypt access token
+    let decryptedToken;
+    if (facebookAuth.accessToken.startsWith('{')) {
+      decryptedToken = decryptToken(facebookAuth.accessToken);
+      if (!decryptedToken) {
+        return res.status(401).json({
+          success: false,
+          error: 'Failed to decrypt access token',
+          requiresReauth: true
+        });
+      }
+    } else {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid access token format',
+        requiresReauth: true
+      });
+    }
+
+    // Create FacebookAPI instance
+    const userFacebookApi = new FacebookAPI({
+      accessToken: decryptedToken,
+      adAccountId: facebookAuth.selectedAdAccount.id.replace('act_', ''),
+      pageId: facebookAuth.selectedPage?.id
+    });
+
+    // If not manual input, fetch campaign structure automatically
+    let campaignStructure = {
+      campaignId: sourceCampaignId,
+      adSetIds: sourceAdSetIds,
+      postId: sourcePostId
+    };
+
+    if (!manualInput || sourceAdSetIds.length === 0) {
+      console.log('📊 Fetching campaign structure for multiplication...');
+
+      // Get campaign details
+      const campaignDetails = await userFacebookApi.getCampaignFullDetails(sourceCampaignId);
+
+      if (!campaignDetails) {
+        return res.status(404).json({
+          success: false,
+          error: 'Source campaign not found'
+        });
+      }
+
+      // Get all adsets for the campaign
+      const adSets = await userFacebookApi.getAdSetsForCampaign(sourceCampaignId);
+
+      if (!adSets || adSets.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'No ad sets found in source campaign'
+        });
+      }
+
+      // Verify it's a Strategy 150 campaign (should have ~50 adsets)
+      if (adSets.length < 45 || adSets.length > 55) {
+        console.warn(`⚠️ Campaign has ${adSets.length} ad sets, expected ~50 for Strategy 150`);
+      }
+
+      campaignStructure.adSetIds = adSets.map(adSet => adSet.id);
+      campaignStructure.campaignDetails = campaignDetails;
+
+      // Get post ID from the first ad if not provided
+      if (!sourcePostId && adSets.length > 0) {
+        const firstAdSetId = adSets[0].id;
+        const postId = await userFacebookApi.getPostIdFromAdSet(firstAdSetId);
+        campaignStructure.postId = postId;
+      }
+    }
+
+    console.log('🔄 Starting campaign multiplication process...');
+    console.log(`  Source Campaign: ${sourceCampaignId}`);
+    console.log(`  Ad Sets to clone: ${campaignStructure.adSetIds.length}`);
+    console.log(`  Post ID: ${campaignStructure.postId}`);
+    console.log(`  Multiply count: ${multiplyCount}`);
+
+    // Initialize results array
+    const results = [];
+    const errors = [];
+
+    // Perform multiplication
+    for (let i = 0; i < multiplyCount; i++) {
+      try {
+        console.log(`\n📋 Creating copy ${i + 1} of ${multiplyCount}...`);
+
+        // Clone the campaign with all its structure
+        const multipliedCampaign = await userFacebookApi.multiplyStrategy150Campaign({
+          sourceCampaignId: campaignStructure.campaignId,
+          sourceAdSetIds: campaignStructure.adSetIds,
+          postId: campaignStructure.postId,
+          campaignDetails: campaignStructure.campaignDetails,
+          copyNumber: i + 1,
+          timestamp: Date.now()
+        });
+
+        results.push({
+          copyNumber: i + 1,
+          campaign: multipliedCampaign.campaign,
+          adSetsCreated: multipliedCampaign.adSetsCreated,
+          adsCreated: multipliedCampaign.adsCreated,
+          status: 'success'
+        });
+
+        console.log(`✅ Successfully created copy ${i + 1}`);
+
+      } catch (error) {
+        console.error(`❌ Failed to create copy ${i + 1}:`, error.message);
+        errors.push({
+          copyNumber: i + 1,
+          error: error.message,
+          status: 'failed'
+        });
+      }
+    }
+
+    // Log audit
+    await AuditService.logRequest(
+      req,
+      'strategy150.multiply',
+      'campaign',
+      sourceCampaignId,
+      results.length > 0 ? 'success' : 'failure',
+      `Multiplied ${results.length} campaigns successfully, ${errors.length} failed`
+    );
+
+    // Return results
+    res.json({
+      success: true,
+      message: `Campaign multiplication completed: ${results.length} successful, ${errors.length} failed`,
+      data: {
+        source: {
+          campaignId: sourceCampaignId,
+          adSetCount: campaignStructure.adSetIds.length,
+          postId: campaignStructure.postId
+        },
+        results: results,
+        errors: errors,
+        summary: {
+          requested: multiplyCount,
+          successful: results.length,
+          failed: errors.length
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Campaign multiplication error:', error);
+    await AuditService.logRequest(
+      req,
+      'strategy150.multiply',
+      'campaign',
+      req.body.sourceCampaignId,
+      'failure',
+      error.message
+    );
+
+    res.status(error.status || 500).json({
+      success: false,
+      error: error.message || 'Failed to multiply campaign'
+    });
+  }
+});
+
+// Get multiplication progress (for async operations)
+router.get('/multiply/progress/:jobId', authenticate, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+
+    // This would fetch from a job queue or database
+    // For now, return a mock progress
+    const progress = {
+      jobId: jobId,
+      status: 'in_progress',
+      progress: {
+        current: 3,
+        total: 5,
+        percentage: 60
+      },
+      completedCampaigns: [
+        { id: 'campaign_copy_1', name: 'Campaign Copy 1' },
+        { id: 'campaign_copy_2', name: 'Campaign Copy 2' },
+        { id: 'campaign_copy_3', name: 'Campaign Copy 3' }
+      ],
+      currentOperation: 'Creating ad sets for campaign copy 4...',
       errors: []
     };
 

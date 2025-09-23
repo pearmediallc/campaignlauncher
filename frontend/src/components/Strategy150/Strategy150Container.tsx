@@ -17,6 +17,7 @@ import Phase2PostCapture from './Phase2PostCapture/Phase2PostCapture';
 import Phase3Duplication from './Phase3Duplication/Phase3Duplication';
 import CompletionSummary from './CompletionSummary/CompletionSummary';
 import CampaignManagementContainer from './CampaignManagement/CampaignManagementContainer';
+import MultiplyContainer from './MultiplySection/MultiplyContainer';
 
 const steps = [
   'Campaign Setup (1-1-1)',
@@ -566,6 +567,7 @@ const Strategy150Container: React.FC = () => {
           >
             <Tab label="Create Campaign" value="create" />
             <Tab label="Manage Campaigns" value="manage" />
+            <Tab label="Multiply Campaign" value="multiply" />
           </Tabs>
         </Box>
 
@@ -628,10 +630,13 @@ const Strategy150Container: React.FC = () => {
 
             {getPhaseComponent()}
           </>
-        ) : (
+        ) : activeTab === 'manage' ? (
           /* Campaign Management Tab */
           <CampaignManagementContainer />
-        )}
+        ) : activeTab === 'multiply' ? (
+          /* Campaign Multiplication Tab */
+          <MultiplyContainer />
+        ) : null}
 
       </Paper>
     </Container>

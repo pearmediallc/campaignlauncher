@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -11,7 +11,11 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Divider
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   CheckCircle,
@@ -19,9 +23,11 @@ import {
   AdsClick,
   Share,
   Add,
-  OpenInNew
+  OpenInNew,
+  ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import { Strategy150Response } from '../../../types/strategy150';
+import MultiplyContainer from '../MultiplySection/MultiplyContainer';
 
 interface CompletionSummaryProps {
   campaignResult: Strategy150Response | null;
@@ -34,9 +40,35 @@ const CompletionSummary: React.FC<CompletionSummaryProps> = ({
   postId,
   onCreateNew
 }) => {
+  const [showMultiplyDialog, setShowMultiplyDialog] = useState(false);
+
+  // Store campaign data in session storage for multiplication
+  useEffect(() => {
+    if (campaignResult?.data?.campaign?.id && postId) {
+      sessionStorage.setItem('lastCreatedCampaign', JSON.stringify({
+        campaignId: campaignResult.data.campaign.id,
+        postId: postId,
+        timestamp: Date.now()
+      }));
+    }
+  }, [campaignResult, postId]);
+
   const handleOpenFacebookAdsManager = () => {
     const url = `https://www.facebook.com/adsmanager/manage/campaigns?act=${campaignResult?.data?.campaign.id}`;
     window.open(url, '_blank');
+  };
+
+  const handleOpenMultiply = () => {
+    setShowMultiplyDialog(true);
+  };
+
+  const handleCloseMultiply = () => {
+    setShowMultiplyDialog(false);
+  };
+
+  const handleMultiplyComplete = () => {
+    setShowMultiplyDialog(false);
+    // Optionally refresh or show a success message
   };
 
   const totalAdSets = campaignResult?.data?.duplicatedAdSets ?
@@ -225,6 +257,17 @@ const CompletionSummary: React.FC<CompletionSummaryProps> = ({
         </Button>
 
         <Button
+          variant="contained"
+          size="large"
+          color="secondary"
+          startIcon={<CopyIcon />}
+          onClick={handleOpenMultiply}
+          sx={{ minWidth: 200 }}
+        >
+          Multiply Campaign
+        </Button>
+
+        <Button
           variant="outlined"
           size="large"
           startIcon={<Add />}
@@ -258,6 +301,32 @@ const CompletionSummary: React.FC<CompletionSummaryProps> = ({
           </ListItem>
         </List>
       </Paper>
+
+      {/* Multiplication Dialog */}
+      <Dialog
+        open={showMultiplyDialog}
+        onClose={handleCloseMultiply}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <CopyIcon sx={{ mr: 2 }} />
+            Multiply Campaign
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <MultiplyContainer
+            initialCampaignId={campaignResult?.data?.campaign?.id}
+            initialPostId={postId}
+            onComplete={handleMultiplyComplete}
+            standalone={false}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseMultiply}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

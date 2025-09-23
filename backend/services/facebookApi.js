@@ -1586,6 +1586,212 @@ class FacebookAPI {
       throw error;
     }
   }
+
+  // ========== CAMPAIGN MULTIPLICATION HELPER FUNCTIONS ==========
+
+  // Get full campaign details including all settings
+  async getCampaignFullDetails(campaignId) {
+    try {
+      const url = `${this.baseURL}/${campaignId}`;
+      const params = {
+        access_token: this.accessToken,
+        fields: 'name,objective,status,daily_budget,lifetime_budget,bid_strategy,spend_cap,special_ad_categories,buying_type,configured_status,effective_status,issues_info,recommendations,source_campaign_id,start_time,stop_time,updated_time'
+      };
+
+      const response = await axios.get(url, { params });
+      console.log(`✅ Fetched campaign details for ${campaignId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Failed to fetch campaign details for ${campaignId}`);
+      this.handleError(error);
+    }
+  }
+
+  // Get all ad sets for a campaign
+  async getAdSetsForCampaign(campaignId) {
+    try {
+      const url = `${this.baseURL}/${campaignId}/adsets`;
+      const params = {
+        access_token: this.accessToken,
+        fields: 'id,name,status,daily_budget,lifetime_budget,targeting,optimization_goal,billing_event,bid_amount,bid_strategy,attribution_spec,promoted_object,destination_type,start_time,end_time',
+        limit: 100 // Strategy 150 has 50 adsets, so 100 is safe
+      };
+
+      const response = await axios.get(url, { params });
+      console.log(`✅ Fetched ${response.data.data.length} ad sets for campaign ${campaignId}`);
+      return response.data.data;
+    } catch (error) {
+      console.error(`❌ Failed to fetch ad sets for campaign ${campaignId}`);
+      this.handleError(error);
+    }
+  }
+
+  // Get post ID from the first ad in an ad set
+  async getPostIdFromAdSet(adSetId) {
+    try {
+      // First get ads from the ad set
+      const adsUrl = `${this.baseURL}/${adSetId}/ads`;
+      const adsParams = {
+        access_token: this.accessToken,
+        fields: 'id,creative',
+        limit: 1 // We only need the first ad
+      };
+
+      const adsResponse = await axios.get(adsUrl, { params: adsParams });
+
+      if (!adsResponse.data.data || adsResponse.data.data.length === 0) {
+        console.log(`No ads found in ad set ${adSetId}`);
+        return null;
+      }
+
+      const creativeId = adsResponse.data.data[0].creative?.id;
+      if (!creativeId) {
+        console.log(`No creative found for ad in ad set ${adSetId}`);
+        return null;
+      }
+
+      // Get the post ID from the creative
+      const creativeUrl = `${this.baseURL}/${creativeId}`;
+      const creativeParams = {
+        access_token: this.accessToken,
+        fields: 'effective_object_story_id,object_story_id,object_story_spec'
+      };
+
+      const creativeResponse = await axios.get(creativeUrl, { params: creativeParams });
+      const postId = creativeResponse.data.effective_object_story_id ||
+                     creativeResponse.data.object_story_id ||
+                     creativeResponse.data.object_story_spec?.link_data?.link ||
+                     creativeResponse.data.object_story_spec?.video_data?.call_to_action?.value?.link;
+
+      console.log(`✅ Retrieved post ID from ad set ${adSetId}: ${postId}`);
+      return postId;
+    } catch (error) {
+      console.error(`Failed to get post ID from ad set ${adSetId}:`, error.message);
+      return null;
+    }
+  }
+
+  // Main multiplication function - Clone entire Strategy 150 campaign
+  async multiplyStrategy150Campaign(multiplyData) {
+    const {
+      sourceCampaignId,
+      sourceAdSetIds,
+      postId,
+      campaignDetails,
+      copyNumber,
+      timestamp
+    } = multiplyData;
+
+    console.log(`\n🔄 Starting multiplication ${copyNumber}...`);
+
+    try {
+      // Step 1: Create new campaign with same settings
+      const newCampaignName = campaignDetails?.name
+        ? `${campaignDetails.name}_Copy${copyNumber}_${timestamp}`
+        : `Campaign_Copy${copyNumber}_${timestamp}`;
+
+      const campaignParams = {
+        name: newCampaignName,
+        objective: campaignDetails?.objective || 'OUTCOME_LEADS',
+        status: 'PAUSED', // Always create in paused state for safety
+        special_ad_categories: JSON.stringify(
+          campaignDetails?.special_ad_categories || []
+        ),
+        buying_type: campaignDetails?.buying_type || 'AUCTION',
+        access_token: this.accessToken
+      };
+
+      // Add budget if campaign had budget (CBO)
+      if (campaignDetails?.daily_budget) {
+        campaignParams.daily_budget = campaignDetails.daily_budget;
+      }
+      if (campaignDetails?.lifetime_budget) {
+        campaignParams.lifetime_budget = campaignDetails.lifetime_budget;
+      }
+      if (campaignDetails?.bid_strategy) {
+        campaignParams.bid_strategy = campaignDetails.bid_strategy;
+      }
+
+      console.log(`  Creating campaign: ${newCampaignName}`);
+      const campaignUrl = `${this.baseURL}/act_${this.adAccountId}/campaigns`;
+      const newCampaignResponse = await axios.post(campaignUrl, null, { params: campaignParams });
+      const newCampaignId = newCampaignResponse.data.id;
+      console.log(`  ✅ Created campaign: ${newCampaignId}`);
+
+      // Step 2: Clone all ad sets to new campaign
+      const clonedAdSets = [];
+      const clonedAds = [];
+      let successfulAdSets = 0;
+      let failedAdSets = 0;
+
+      for (let i = 0; i < sourceAdSetIds.length; i++) {
+        const sourceAdSetId = sourceAdSetIds[i];
+        console.log(`  Cloning ad set ${i + 1}/${sourceAdSetIds.length}...`);
+
+        try {
+          // Use Facebook's copy endpoint for ad sets
+          const copyUrl = `${this.baseURL}/${sourceAdSetId}/copies`;
+          const copyParams = {
+            campaign_id: newCampaignId,
+            deep_copy: false, // We'll create ads separately with the same post ID
+            status_option: 'PAUSED',
+            rename_options: JSON.stringify({
+              rename_suffix: `_Copy${copyNumber}`
+            }),
+            access_token: this.accessToken
+          };
+
+          const copyResponse = await axios.post(copyUrl, null, { params: copyParams });
+          const newAdSetId = copyResponse.data.copied_adset_id || copyResponse.data.id;
+          clonedAdSets.push(newAdSetId);
+
+          // Step 3: Create ad with same post ID for each cloned ad set
+          if (postId) {
+            console.log(`    Creating ad with post ${postId}...`);
+            const adParams = {
+              name: `Ad_${newAdSetId}_${timestamp}`,
+              adset_id: newAdSetId,
+              creative: JSON.stringify({
+                object_story_id: postId
+              }),
+              status: 'PAUSED',
+              access_token: this.accessToken
+            };
+
+            const adUrl = `${this.baseURL}/act_${this.adAccountId}/ads`;
+            const adResponse = await axios.post(adUrl, null, { params: adParams });
+            clonedAds.push(adResponse.data.id);
+            console.log(`    ✅ Created ad: ${adResponse.data.id}`);
+          }
+
+          successfulAdSets++;
+        } catch (error) {
+          console.error(`    ❌ Failed to clone ad set ${sourceAdSetId}:`, error.message);
+          failedAdSets++;
+        }
+      }
+
+      console.log(`\n✅ Campaign multiplication ${copyNumber} completed:`);
+      console.log(`  - Campaign ID: ${newCampaignId}`);
+      console.log(`  - Ad Sets: ${successfulAdSets} successful, ${failedAdSets} failed`);
+      console.log(`  - Ads created: ${clonedAds.length}`);
+
+      return {
+        campaign: {
+          id: newCampaignId,
+          name: newCampaignName
+        },
+        adSetsCreated: successfulAdSets,
+        adsCreated: clonedAds.length,
+        adSetIds: clonedAdSets,
+        adIds: clonedAds
+      };
+
+    } catch (error) {
+      console.error(`❌ Failed to multiply campaign ${copyNumber}:`, error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = FacebookAPI;
