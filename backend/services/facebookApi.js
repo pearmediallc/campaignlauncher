@@ -562,7 +562,7 @@ class FacebookAPI {
       };
       
       // Handle different media types
-      if (adData.mediaType === 'video' && adData.videoId) {
+      if ((adData.mediaType === 'video' || adData.mediaType === 'single_video') && adData.videoId) {
         // Video ad
         creative.object_story_spec.video_data = {
           video_id: adData.videoId,
@@ -576,20 +576,32 @@ class FacebookAPI {
             }
           }
         };
-      } else if (adData.mediaType === 'carousel' && adData.carouselCards) {
+      } else if (adData.mediaType === 'carousel' && (adData.carouselCards || adData.carouselImages)) {
         // Carousel ad
         creative.object_story_spec.link_data = {
           link: adData.url,
           message: adData.primaryText,
-          child_attachments: adData.carouselCards.map(card => ({
-            link: card.link || adData.url,
-            name: card.headline,
-            description: card.description,
-            image_hash: card.imageHash,
-            call_to_action: {
-              type: card.callToAction || adData.callToAction || 'LEARN_MORE'
-            }
-          })),
+          child_attachments: adData.carouselCards ?
+            // Use provided carousel cards
+            adData.carouselCards.map(card => ({
+              link: card.link || adData.url,
+              name: card.headline,
+              description: card.description,
+              image_hash: card.imageHash,
+              call_to_action: {
+                type: card.callToAction || adData.callToAction || 'LEARN_MORE'
+              }
+            })) :
+            // Or create cards from uploaded images
+            adData.carouselImages.map((imageHash, index) => ({
+              link: adData.url,
+              name: adData.headline,
+              description: adData.description,
+              image_hash: imageHash,
+              call_to_action: {
+                type: adData.callToAction || 'LEARN_MORE'
+              }
+            })),
           call_to_action: {
             type: adData.callToAction || 'LEARN_MORE'
           }
@@ -1065,8 +1077,34 @@ class FacebookAPI {
         } catch (error) {
           console.log('⚠️ Image upload skipped:', error.message);
         }
+      } else if (campaignData.videoPath) {
+        try {
+          const videoId = await this.uploadVideo(campaignData.videoPath);
+          if (videoId) {
+            mediaAssets.videoId = videoId;
+            console.log('✅ Video uploaded successfully with ID:', videoId);
+          }
+        } catch (error) {
+          console.log('⚠️ Video upload skipped:', error.message);
+        }
+      } else if (campaignData.imagePaths && campaignData.imagePaths.length > 0) {
+        try {
+          const carouselImages = [];
+          for (const imagePath of campaignData.imagePaths) {
+            const imageHash = await this.uploadImage(imagePath);
+            if (imageHash) {
+              carouselImages.push(imageHash);
+            }
+          }
+          if (carouselImages.length > 0) {
+            mediaAssets.carouselImages = carouselImages;
+            console.log(`✅ Carousel: ${carouselImages.length} images uploaded successfully`);
+          }
+        } catch (error) {
+          console.log('⚠️ Carousel upload skipped:', error.message);
+        }
       } else {
-        console.log('📷 No image provided, creating ad without media');
+        console.log('📷 No media provided, creating ad without media');
       }
 
       const ad = await this.createAd({
