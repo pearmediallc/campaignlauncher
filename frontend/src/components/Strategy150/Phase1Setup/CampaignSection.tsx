@@ -168,11 +168,12 @@ const CampaignSection: React.FC = () => {
           </Typography>
         </Box>
 
-        {/* Budget Level */}
+        {/* Budget Level - Default to Campaign (CBO) */}
         <Box>
           <Controller
             name="budgetLevel"
             control={control}
+            defaultValue="campaign"
             render={({ field }) => (
               <FormControl fullWidth>
                 <InputLabel>Budget Level</InputLabel>
@@ -220,6 +221,7 @@ const CampaignSection: React.FC = () => {
             <Controller
               name="budgetType"
               control={control}
+              defaultValue="daily"
               render={({ field }) => (
                 <FormControl fullWidth>
                   <InputLabel>Budget Type</InputLabel>
@@ -234,29 +236,51 @@ const CampaignSection: React.FC = () => {
 
           {/* Budget Amount - Campaign Level */}
           {budgetLevel === 'campaign' && (
-            <Box sx={{ flex: 1 }}>
-              <Controller
-                name={budgetType === 'daily' ? 'campaignBudget.dailyBudget' : 'campaignBudget.lifetimeBudget'}
-                control={control}
-                rules={{
-                  required: 'Budget amount is required',
-                  min: { value: 1, message: 'Budget must be at least $1' }
-                }}
-                render={({ field, fieldState: { error } }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    type="number"
-                    label={budgetType === 'daily' ? 'Daily Budget' : 'Lifetime Budget'}
-                    InputProps={{
-                      startAdornment: <InputAdornment position="start">$</InputAdornment>
-                    }}
-                    error={!!error}
-                    helperText={error?.message || `${budgetType === 'daily' ? 'Daily' : 'Total'} budget for this campaign`}
-                  />
-                )}
-              />
-            </Box>
+            <>
+              <Box sx={{ flex: 1 }}>
+                <Controller
+                  name={budgetType === 'daily' ? 'campaignBudget.dailyBudget' : 'campaignBudget.lifetimeBudget'}
+                  control={control}
+                  defaultValue={50}
+                  rules={{
+                    required: 'Budget amount is required',
+                    min: { value: 1, message: 'Budget must be at least $1' }
+                  }}
+                  render={({ field, fieldState: { error } }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      type="number"
+                      label={budgetType === 'daily' ? 'Daily Budget' : 'Lifetime Budget'}
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start">$</InputAdornment>
+                      }}
+                      error={!!error}
+                      helperText={error?.message || `${budgetType === 'daily' ? 'Daily' : 'Total'} budget for this campaign`}
+                    />
+                  )}
+                />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Controller
+                  name="campaignSpendingLimit"
+                  control={control}
+                  defaultValue={1}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      type="number"
+                      label="Campaign Spending Limit"
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start">$</InputAdornment>
+                      }}
+                      helperText="Maximum total spend for this campaign"
+                    />
+                  )}
+                />
+              </Box>
+            </>
           )}
         </Box>
 

@@ -64,13 +64,13 @@ class FacebookAPI {
       }
 
       // Add optional parameters if provided
-      if (campaignData.spend_cap) {
+      if (campaignData.spend_cap !== undefined) {
         params.spend_cap = Math.round(parseFloat(campaignData.spend_cap) * 100);
       }
-      if (campaignData.daily_budget) {
+      if (campaignData.daily_budget !== undefined) {
         params.daily_budget = Math.round(parseFloat(campaignData.daily_budget) * 100);
       }
-      if (campaignData.lifetime_budget) {
+      if (campaignData.lifetime_budget !== undefined) {
         params.lifetime_budget = Math.round(parseFloat(campaignData.lifetime_budget) * 100);
       }
 
@@ -194,23 +194,29 @@ class FacebookAPI {
         }
       }
       
-      // Handle budget based on type - use our improved parsing
-      if (adSetData.budgetType === 'lifetime') {
-        const lifetimeBudgetCents = this.parseBudgetValue(adSetData.lifetimeBudget);
-        if (lifetimeBudgetCents) {
-          params.lifetime_budget = lifetimeBudgetCents;
-        } else {
-          console.warn('⚠️ Invalid lifetime budget, using default $100');
-          params.lifetime_budget = 10000; // $100 default
+      // Handle budget based on type - only if values are provided (skip for CBO)
+      if (adSetData.dailyBudget !== undefined || adSetData.lifetimeBudget !== undefined) {
+        if (adSetData.budgetType === 'lifetime') {
+          const lifetimeBudgetCents = this.parseBudgetValue(adSetData.lifetimeBudget);
+          if (lifetimeBudgetCents) {
+            params.lifetime_budget = lifetimeBudgetCents;
+            console.log('  💰 AdSet Lifetime Budget:', `$${lifetimeBudgetCents/100}`);
+          } else {
+            console.warn('⚠️ Invalid lifetime budget, using default $100');
+            params.lifetime_budget = 10000; // $100 default
+          }
+        } else if (adSetData.dailyBudget !== undefined) {
+          const dailyBudgetCents = this.parseBudgetValue(adSetData.dailyBudget);
+          if (dailyBudgetCents) {
+            params.daily_budget = dailyBudgetCents;
+            console.log('  💰 AdSet Daily Budget:', `$${dailyBudgetCents/100}`);
+          } else {
+            console.warn('⚠️ Invalid daily budget, using default $50');
+            params.daily_budget = 5000; // $50 default
+          }
         }
       } else {
-        const dailyBudgetCents = this.parseBudgetValue(adSetData.dailyBudget);
-        if (dailyBudgetCents) {
-          params.daily_budget = dailyBudgetCents;
-        } else {
-          console.warn('⚠️ Invalid daily budget, using default $50');
-          params.daily_budget = 5000; // $50 default
-        }
+        console.log('  💰 No AdSet budget (using Campaign Budget Optimization)');
       }
 
       // Add bid caps and constraints if provided - use improved parsing
@@ -1143,8 +1149,8 @@ class FacebookAPI {
         : [];
       console.log('  🔐 Special Ad Categories:', specialAdCategories.length > 0 ? specialAdCategories : 'None (empty array)');
 
-      // Check if using campaign or ad set level budgets
-      const useCampaignBudget = campaignData.budgetLevel === 'campaign' || campaignData.campaignBudgetOptimization;
+      // Check if using campaign or ad set level budgets (default to CBO)
+      const useCampaignBudget = campaignData.budgetLevel === 'campaign' || campaignData.campaignBudgetOptimization || (!campaignData.budgetLevel && campaignData.campaignBudget?.dailyBudget);
 
       // Create campaign with Strategy 150 specific settings
       const campaignConfig = {
@@ -1158,9 +1164,14 @@ class FacebookAPI {
       // Only add bid_strategy if using campaign-level budget
       if (useCampaignBudget) {
         campaignConfig.bidStrategy = campaignData.bidStrategy || 'LOWEST_COST_WITHOUT_CAP';
-        campaignConfig.daily_budget = campaignData.campaignBudget?.dailyBudget;
-        campaignConfig.lifetime_budget = campaignData.campaignBudget?.lifetimeBudget;
+        // Use campaign budget values or defaults for CBO
+        campaignConfig.daily_budget = campaignData.campaignBudget?.dailyBudget || campaignData.dailyBudget || 50;
+        campaignConfig.lifetime_budget = campaignData.campaignBudget?.lifetimeBudget || campaignData.lifetimeBudget;
+        // Add spend cap if provided (default to $1 for CBO)
+        campaignConfig.spend_cap = campaignData.campaignSpendingLimit || 1;
         console.log('  💰 Using Campaign Budget Optimization (CBO)');
+        console.log('    - Daily Budget: $' + campaignConfig.daily_budget);
+        console.log('    - Spend Cap: $' + campaignConfig.spend_cap);
       } else {
         console.log('  💰 Using Ad Set level budgets (no bid strategy at campaign)');
       }
@@ -1187,8 +1198,9 @@ class FacebookAPI {
         campaignId: campaign.id,
         campaignName: campaignData.campaignName,
         budgetType: campaignData.budgetType,
-        dailyBudget: campaignData.dailyBudget,
-        lifetimeBudget: campaignData.lifetimeBudget,
+        // Only pass budget to ad set if not using CBO
+        dailyBudget: useCampaignBudget ? undefined : campaignData.dailyBudget,
+        lifetimeBudget: useCampaignBudget ? undefined : campaignData.lifetimeBudget,
         conversionLocation: campaignData.conversionLocation,
         targeting: campaignData.targeting,
         placementType: campaignData.placementType,

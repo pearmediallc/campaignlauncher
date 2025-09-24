@@ -487,10 +487,9 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
     // Parse and validate budget values (keep in dollars, FacebookAPI will convert to cents)
     const parseBudget = (value) => {
       if (value === undefined || value === null) return undefined;
+      // Frontend now sends values in dollars (we removed the * 100 multiplication)
       if (typeof value === 'number') {
-        // Frontend sends in cents, convert back to dollars for FacebookAPI
-        // FacebookAPI.parseBudgetValue will convert back to cents
-        return value / 100;
+        return value;  // Already in dollars
       }
       // Remove $ and commas, then parse to float
       const cleanValue = String(value).replace(/[$,]/g, '');
@@ -504,12 +503,12 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       campaignName: req.body.campaignName,
       buyingType: req.body.buyingType || 'AUCTION',
       objective: req.body.objective,
-      budgetLevel: req.body.budgetLevel || 'adset',
+      budgetLevel: req.body.budgetLevel || 'campaign',  // Default to CBO
       // Properly handle special ad categories - filter out NONE and empty strings
       specialAdCategories: Array.isArray(req.body.specialAdCategories)
         ? req.body.specialAdCategories.filter(cat => cat !== 'NONE' && cat !== '')
         : [],
-      campaignBudgetOptimization: req.body.campaignBudgetOptimization || false,
+      campaignBudgetOptimization: req.body.budgetLevel === 'campaign' ? true : (req.body.campaignBudgetOptimization || false),
       bidStrategy: req.body.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
 
       // Bid strategy related values
@@ -517,9 +516,12 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       costCap: parseBudget(req.body.costCap),
       minRoas: req.body.minRoas ? parseFloat(req.body.minRoas) : undefined,
 
-      // Campaign budget (when using CBO)
-      campaignBudget: req.body.campaignBudget || {},
-      campaignSpendingLimit: req.body.campaignSpendingLimit,
+      // Campaign budget (when using CBO) - set defaults if CBO is enabled
+      campaignBudget: req.body.budgetLevel === 'campaign' ? {
+        dailyBudget: parseBudget(req.body.campaignBudget?.dailyBudget) || 50,
+        lifetimeBudget: parseBudget(req.body.campaignBudget?.lifetimeBudget)
+      } : (req.body.campaignBudget || {}),
+      campaignSpendingLimit: req.body.campaignSpendingLimit || (req.body.budgetLevel === 'campaign' ? 1 : undefined),
 
       // Ad set level fields
       performanceGoal: req.body.performanceGoal || 'maximize_conversions',
@@ -529,18 +531,23 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       attributionSetting: req.body.attributionSetting || 'standard',
       attributionWindow: req.body.attributionWindow || '7_day',
 
-      // Ad set budget & schedule (ensure proper number parsing)
-      adSetBudget: {
+      // Ad set budget & schedule (only set if not using CBO)
+      adSetBudget: req.body.budgetLevel === 'adset' ? {
         ...req.body.adSetBudget,
         dailyBudget: parseBudget(req.body.adSetBudget?.dailyBudget) || parseBudget(req.body.dailyBudget) || 50,
         lifetimeBudget: parseBudget(req.body.adSetBudget?.lifetimeBudget) || parseBudget(req.body.lifetimeBudget),
         scheduleType: req.body.adSetBudget?.scheduleType || 'run_continuously'
-      },
+      } : {},
       budgetType: req.body.budgetType || 'daily',
 
       // Also send budgets at root level for FacebookAPI compatibility
-      dailyBudget: parseBudget(req.body.dailyBudget) || parseBudget(req.body.adSetBudget?.dailyBudget) || 50,
-      lifetimeBudget: parseBudget(req.body.lifetimeBudget) || parseBudget(req.body.adSetBudget?.lifetimeBudget),
+      // Use campaign budget if CBO, otherwise use ad set budget
+      dailyBudget: req.body.budgetLevel === 'campaign'
+        ? (parseBudget(req.body.campaignBudget?.dailyBudget) || 50)
+        : (parseBudget(req.body.dailyBudget) || parseBudget(req.body.adSetBudget?.dailyBudget) || 50),
+      lifetimeBudget: req.body.budgetLevel === 'campaign'
+        ? parseBudget(req.body.campaignBudget?.lifetimeBudget)
+        : (parseBudget(req.body.lifetimeBudget) || parseBudget(req.body.adSetBudget?.lifetimeBudget)),
 
       // Enhanced targeting (Meta-compliant)
       targeting: req.body.targeting || {

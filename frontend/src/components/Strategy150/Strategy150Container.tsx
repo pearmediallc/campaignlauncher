@@ -306,8 +306,8 @@ const Strategy150Container: React.FC = () => {
         } else if (typeof value === 'object' && !(value instanceof File)) {
           formData.append(key, JSON.stringify(value));
         } else if (key === 'dailyBudget' || key === 'lifetimeBudget') {
-          // Convert budgets to cents for Meta API
-          formData.append(key, String(Number(value) * 100));
+          // Keep budget values in dollars (backend will convert to cents)
+          formData.append(key, String(Number(value)));
         } else {
           formData.append(key, String(value));
         }
@@ -337,12 +337,12 @@ const Strategy150Container: React.FC = () => {
         formData.set('specialAdCategories', JSON.stringify(categories));
       }
 
-      // Handle nested budget object
+      // Handle nested budget object - keep values in dollars
       if (workingCampaignData.adSetBudget) {
         const adSetBudget = {
           ...workingCampaignData.adSetBudget,
-          dailyBudget: workingCampaignData.adSetBudget.dailyBudget ? workingCampaignData.adSetBudget.dailyBudget * 100 : undefined,
-          lifetimeBudget: workingCampaignData.adSetBudget.lifetimeBudget ? workingCampaignData.adSetBudget.lifetimeBudget * 100 : undefined
+          dailyBudget: workingCampaignData.adSetBudget.dailyBudget ? workingCampaignData.adSetBudget.dailyBudget : undefined,
+          lifetimeBudget: workingCampaignData.adSetBudget.lifetimeBudget ? workingCampaignData.adSetBudget.lifetimeBudget : undefined
         };
         formData.set('adSetBudget', JSON.stringify(adSetBudget));
       }
