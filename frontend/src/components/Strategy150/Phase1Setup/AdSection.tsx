@@ -499,18 +499,18 @@ const AdSection: React.FC = () => {
             control={control}
             rules={{
               required: 'Primary text is required',
-              maxLength: { value: 125, message: 'Primary text must be 125 characters or less' }
+              maxLength: { value: 2200, message: 'Primary text must be 2200 characters or less' }
             }}
             render={({ field, fieldState: { error } }) => (
               <TextField
                 {...field}
                 fullWidth
                 multiline
-                rows={3}
+                rows={4}
                 label="Primary Text"
                 placeholder="Main text that appears above your ad"
                 error={!!error}
-                helperText={error?.message || `${field.value?.length || 0}/125 characters`}
+                helperText={error?.message || `${field.value?.length || 0}/2200 characters (recommended: 125 for optimal display)`}
               />
             )}
           />

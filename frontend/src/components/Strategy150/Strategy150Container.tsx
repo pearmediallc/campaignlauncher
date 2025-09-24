@@ -166,6 +166,7 @@ const Strategy150Container: React.FC = () => {
         attributionSetting: data.attributionSetting,
         attributionWindow: data.attributionWindow,
         bidStrategy: data.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
+        bidAmount: data.bidAmount,
         costCap: data.costCap,
         minRoas: data.minRoas,
 
@@ -214,6 +215,12 @@ const Strategy150Container: React.FC = () => {
         specialAdCategories: campaignData.specialAdCategories || [],
         performanceGoal: campaignData.performanceGoal || 'maximize_conversions',
         conversionEvent: campaignData.conversionEvent || 'Lead',
+
+        // Bid strategy and related fields
+        bidStrategy: campaignData.bidStrategy,
+        bidAmount: campaignData.bidAmount,
+        costCap: campaignData.costCap,
+        minRoas: campaignData.minRoas,
 
         // URL fields
         url: campaignData.url || '',

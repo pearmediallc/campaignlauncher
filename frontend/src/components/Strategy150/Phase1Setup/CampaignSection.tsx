@@ -286,7 +286,35 @@ const CampaignSection: React.FC = () => {
           </Box>
         )}
 
-        {/* Cost Control (for certain bid strategies) */}
+        {/* Bid Amount Control (for bid cap strategy) */}
+        {watch('bidStrategy') === 'LOWEST_COST_WITH_BID_CAP' && (
+          <Box sx={{ maxWidth: '50%' }}>
+            <Controller
+              name="bidAmount"
+              control={control}
+              rules={{
+                required: 'Bid amount is required when using bid cap strategy',
+                min: { value: 0.01, message: 'Bid amount must be greater than 0' }
+              }}
+              render={({ field, fieldState: { error } }) => (
+                <TextField
+                  {...field}
+                  fullWidth
+                  type="number"
+                  label="Bid Cap Amount"
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                    inputProps: { step: 0.01, min: 0.01 }
+                  }}
+                  error={!!error}
+                  helperText={error?.message || "Maximum amount you're willing to bid per optimization event"}
+                />
+              )}
+            />
+          </Box>
+        )}
+
+        {/* Cost Control (for cost cap strategy) */}
         {watch('bidStrategy') === 'COST_CAP' && (
           <Box sx={{ maxWidth: '50%' }}>
             <Controller

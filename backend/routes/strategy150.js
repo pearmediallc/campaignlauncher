@@ -120,6 +120,20 @@ const validateStrategy150 = [
     'LOWEST_COST_WITH_MIN_ROAS'
   ]),
 
+  // Bid strategy related fields
+  body('bidAmount')
+    .optional()
+    .isFloat({ min: 0.01 })
+    .withMessage('Bid amount must be at least $0.01'),
+  body('costCap')
+    .optional()
+    .isFloat({ min: 0.01 })
+    .withMessage('Cost cap must be at least $0.01'),
+  body('minRoas')
+    .optional()
+    .isFloat({ min: 0.01 })
+    .withMessage('Minimum ROAS must be at least 0.01'),
+
   // Campaign budget validations
   body('campaignBudget.dailyBudget')
     .optional()
@@ -189,8 +203,8 @@ const validateStrategy150 = [
   body('primaryText')
     .notEmpty()
     .withMessage('Primary text is required')
-    .isLength({ max: 125 })
-    .withMessage('Primary text must be 125 characters or less'),
+    .isLength({ max: 2200 })
+    .withMessage('Primary text must be 2200 characters or less'),
   body('headline')
     .notEmpty()
     .withMessage('Headline is required')
@@ -464,6 +478,11 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
         : [],
       campaignBudgetOptimization: req.body.campaignBudgetOptimization || false,
       bidStrategy: req.body.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
+
+      // Bid strategy related values
+      bidAmount: parseBudget(req.body.bidAmount),
+      costCap: parseBudget(req.body.costCap),
+      minRoas: req.body.minRoas ? parseFloat(req.body.minRoas) : undefined,
 
       // Campaign budget (when using CBO)
       campaignBudget: req.body.campaignBudget || {},

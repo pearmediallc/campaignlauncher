@@ -6,7 +6,7 @@ export interface Strategy150FormData {
 
   // Campaign Level Extensions
   buyingType: 'AUCTION' | 'RESERVED';
-  objective: 'OUTCOME_LEADS' | 'PHONE_CALL';
+  objective: 'OUTCOME_LEADS' | 'PHONE_CALL' | 'OUTCOME_SALES';
   budgetLevel: 'campaign' | 'adset';
   specialAdCategories: string[];
   campaignBudgetOptimization?: boolean;
@@ -143,6 +143,7 @@ export interface Strategy150FormData {
   // Additional fields for type compatibility
   costCap?: number;
   minRoas?: number;
+  bidAmount?: number;  // For LOWEST_COST_WITH_BID_CAP strategy
   campaignSpendingLimit?: number;
   manualPixelId?: string;
 }
@@ -190,9 +191,11 @@ export const BUYING_TYPE_OPTIONS = [
 ];
 
 export const OBJECTIVE_OPTIONS = [
-  // Leads only
-  { value: 'OUTCOME_LEADS', label: 'Leads', category: 'Leads' },
-  { value: 'PHONE_CALL', label: 'Calls', category: 'Leads' }
+  // Lead Generation
+  { value: 'OUTCOME_LEADS', label: 'Leads', category: 'Lead Generation' },
+  { value: 'PHONE_CALL', label: 'Calls', category: 'Lead Generation' },
+  // Sales
+  { value: 'OUTCOME_SALES', label: 'Sales', category: 'Sales' }
 ];
 
 export const BUDGET_LEVEL_OPTIONS = [
@@ -212,6 +215,7 @@ export const SPECIAL_AD_CATEGORIES = [
   { value: 'CREDIT', label: 'Credit' },
   { value: 'EMPLOYMENT', label: 'Employment' },
   { value: 'HOUSING', label: 'Housing' },
+  { value: 'FINANCIAL_PRODUCTS_SERVICES', label: 'Financial products and services' },
   { value: 'SOCIAL_ISSUES', label: 'Social issues, elections or politics' },
   { value: 'ONLINE_GAMBLING_AND_GAMING', label: 'Online gambling and gaming' }
 ];
