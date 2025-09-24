@@ -2161,15 +2161,16 @@ class FacebookAPI {
             rename_options: JSON.stringify({
               rename_suffix: `_Copy${copyNumber}`
             }),
+            attribution_spec: JSON.stringify([
+              { event_type: 'CLICK_THROUGH', window_days: 1 },
+              { event_type: 'VIEW_THROUGH', window_days: 1 }
+            ]),
             access_token: this.accessToken
           };
 
           const copyResponse = await axios.post(copyUrl, null, { params: copyParams });
           const newAdSetId = copyResponse.data.copied_adset_id || copyResponse.data.id;
           clonedAdSets.push(newAdSetId);
-
-          // Update attribution settings for the copied ad set
-          await this.updateAdSetAttribution(newAdSetId);
 
           // Step 3: Create ad with same post ID for each cloned ad set
           if (postId) {
