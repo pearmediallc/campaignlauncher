@@ -22,7 +22,7 @@ export interface Strategy150FormData {
   performanceGoal: 'maximize_conversions' | 'cost_per_result' | 'lowest_cost';
   pixel?: string; // Renamed from dataset
   conversionEvent: 'Lead' | 'Contact' | 'Purchase';
-  attributionSetting: 'standard' | '1_day_view' | '7_day_click' | '28_day_click';
+  attributionSetting: 'standard' | '1_day_click' | '7_day_click' | '1_day_click_1_day_view' | '7_day_click_1_day_view' | '28_day_click_1_day_view';
   attributionWindow: '1_day' | '7_day' | '28_day';
 
   // Ad Set Budget & Schedule
