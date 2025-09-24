@@ -105,7 +105,7 @@ const AdSection: React.FC = () => {
     const fileArray = Array.from(files);
 
     // Validate files based on media type
-    if (mediaType === 'single_image' || mediaType === 'video') {
+    if (mediaType === 'single_image' || mediaType === 'single_video') {
       if (fileArray.length > 1) {
         alert('Please select only one file for single media');
         return;
@@ -129,7 +129,7 @@ const AdSection: React.FC = () => {
         return;
       }
 
-      if (mediaType === 'video' && !isVideo) {
+      if (mediaType === 'single_video' && !isVideo) {
         alert('Please select a video file');
         return;
       }
@@ -147,12 +147,37 @@ const AdSection: React.FC = () => {
 
     setMediaFiles(fileArray);
     setValue('mediaFiles', fileArray);
+
+    // Also set specific fields based on media type
+    if (mediaType === 'single_image' && fileArray[0]) {
+      setValue('image', fileArray[0]);
+    } else if (mediaType === 'single_video' && fileArray[0]) {
+      setValue('video', fileArray[0]);
+    } else if (mediaType === 'carousel') {
+      setValue('images', fileArray);
+    }
   };
 
   const removeMediaFile = (index: number) => {
     const newFiles = mediaFiles.filter((_, i) => i !== index);
     setMediaFiles(newFiles);
     setValue('mediaFiles', newFiles);
+
+    // Clear specific fields if all files removed
+    if (newFiles.length === 0) {
+      setValue('image', undefined);
+      setValue('video', undefined);
+      setValue('images', []);
+    } else {
+      // Update specific fields based on media type
+      if (mediaType === 'single_image' && newFiles[0]) {
+        setValue('image', newFiles[0]);
+      } else if (mediaType === 'single_video' && newFiles[0]) {
+        setValue('video', newFiles[0]);
+      } else if (mediaType === 'carousel') {
+        setValue('images', newFiles);
+      }
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -341,7 +366,7 @@ const AdSection: React.FC = () => {
                     }
                   />
                   <FormControlLabel
-                    value="video"
+                    value="single_video"
                     control={<Radio />}
                     label={
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -370,7 +395,7 @@ const AdSection: React.FC = () => {
         <Box sx={{ width: "100%" }}>
           <Alert severity="info" sx={{ mb: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
-              {mediaType === 'single_image' ? 'Image' : mediaType === 'video' ? 'Video' : 'Carousel'} Specifications:
+              {mediaType === 'single_image' ? 'Image' : mediaType === 'single_video' ? 'Video' : 'Carousel'} Specifications:
             </Typography>
             {mediaType === 'single_image' && (
               <Box>
@@ -380,7 +405,7 @@ const AdSection: React.FC = () => {
                 • Recommended aspect ratios: 1:1, 4:5, 16:9, 9:16
               </Box>
             )}
-            {mediaType === 'video' && (
+            {mediaType === 'single_video' && (
               <Box>
                 • Formats: {MEDIA_SPECS.video.formats.join(', ')}<br />
                 • Duration: {MEDIA_SPECS.video.minDuration} sec - {MEDIA_SPECS.video.maxDuration / 60} minutes<br />
@@ -404,7 +429,7 @@ const AdSection: React.FC = () => {
             <input
               accept={
                 mediaType === 'single_image' ? 'image/*' :
-                mediaType === 'video' ? 'video/*' :
+                mediaType === 'single_video' ? 'video/*' :
                 'image/*,video/*'
               }
               style={{ display: 'none' }}
@@ -421,7 +446,7 @@ const AdSection: React.FC = () => {
                 fullWidth
                 sx={{ py: 2 }}
               >
-                Upload {mediaType === 'single_image' ? 'Image' : mediaType === 'video' ? 'Video' : 'Media Files'}
+                Upload {mediaType === 'single_image' ? 'Image' : mediaType === 'single_video' ? 'Video' : 'Media Files'}
               </Button>
             </label>
           </Box>

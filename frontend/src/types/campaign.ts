@@ -11,7 +11,7 @@ export interface CampaignFormData {
   image?: File;
   images?: File[]; // For carousel ads
   video?: File;
-  mediaType: 'single_image' | 'carousel' | 'video';
+  mediaType: 'single_image' | 'carousel' | 'single_video';
   callToAction: string;
   conversionLocation: 'website' | 'calls';
   schedule?: {
@@ -62,7 +62,7 @@ export interface AdVariation {
   image?: File;
   images?: File[]; // For carousel ads
   video?: File;
-  mediaType?: 'single_image' | 'carousel' | 'video';
+  mediaType?: 'single_image' | 'carousel' | 'single_video';
   callToAction?: string;
 }
 

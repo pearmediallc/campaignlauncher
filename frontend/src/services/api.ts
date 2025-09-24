@@ -63,7 +63,7 @@ export const campaignApi = {
       data.images.forEach((img, index) => {
         formData.append(`images`, img);
       });
-    } else if (data.mediaType === 'video' && data.video) {
+    } else if (data.mediaType === 'single_video' && data.video) {
       formData.append('video', data.video);
     }
     
@@ -124,7 +124,7 @@ export const campaignApi = {
       data.images.forEach(img => {
         formData.append('mainImages', img);
       });
-    } else if (data.mediaType === 'video' && data.video) {
+    } else if (data.mediaType === 'single_video' && data.video) {
       formData.append('mainVideo', data.video);
     }
     
@@ -136,7 +136,7 @@ export const campaignApi = {
         variation.images.forEach(img => {
           formData.append(`variationImages_${index}`, img);
         });
-      } else if (variation.mediaType === 'video' && variation.video) {
+      } else if (variation.mediaType === 'single_video' && variation.video) {
         formData.append(`variationVideo_${index}`, variation.video);
       }
     });

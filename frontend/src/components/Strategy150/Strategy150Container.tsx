@@ -245,6 +245,9 @@ const Strategy150Container: React.FC = () => {
         // Media
         mediaType: campaignData.mediaType || 'single_image',
         mediaFiles: campaignData.mediaFiles,
+        image: campaignData.image,
+        video: campaignData.video,
+        images: campaignData.images,
 
         // Placements
         placements: {
@@ -310,12 +313,17 @@ const Strategy150Container: React.FC = () => {
         }
       });
 
-      // Handle media files
-      if (workingCampaignData.image instanceof File) {
+      // Handle media files based on mediaType
+      if (workingCampaignData.mediaType === 'single_image' && workingCampaignData.image instanceof File) {
         formData.append('media', workingCampaignData.image);
-      } else if (workingCampaignData.media instanceof File) {
-        formData.append('media', workingCampaignData.media);
+      } else if (workingCampaignData.mediaType === 'single_video' && workingCampaignData.video instanceof File) {
+        formData.append('media', workingCampaignData.video);
+      } else if (workingCampaignData.mediaType === 'carousel' && workingCampaignData.images && Array.isArray(workingCampaignData.images)) {
+        workingCampaignData.images.forEach((file: File) => {
+          formData.append('media', file);
+        });
       } else if (workingCampaignData.mediaFiles && Array.isArray(workingCampaignData.mediaFiles)) {
+        // Fallback to mediaFiles if specific fields aren't set
         workingCampaignData.mediaFiles.forEach((file: File) => {
           formData.append('media', file);
         });

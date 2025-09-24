@@ -98,7 +98,7 @@ export interface Strategy150FormData {
   displayLink?: string;
 
   // Media fields
-  mediaType?: 'single_image' | 'video' | 'carousel';
+  mediaType?: 'single_image' | 'single_video' | 'carousel';
   mediaFiles?: File[];
   image?: File;
   video?: File;

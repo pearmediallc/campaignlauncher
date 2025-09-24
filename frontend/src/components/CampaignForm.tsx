@@ -224,7 +224,7 @@ const CampaignForm: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [carouselImages, setCarouselImages] = useState<File[]>([]);
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [mediaType, setMediaType] = useState<'single_image' | 'carousel' | 'video'>('single_image');
+  const [mediaType, setMediaType] = useState<'single_image' | 'carousel' | 'single_video'>('single_image');
   const [linkPreview, setLinkPreview] = useState<LinkPreview | null>(null);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [budgetType, setBudgetType] = useState<'daily' | 'lifetime'>('daily');
@@ -745,7 +745,7 @@ const CampaignForm: React.FC = () => {
         mediaType,
         image: mediaType === 'single_image' ? processedImageFile || undefined : undefined,
         images: mediaType === 'carousel' ? carouselImages : undefined,
-        video: mediaType === 'video' ? videoFile || undefined : undefined,
+        video: mediaType === 'single_video' ? videoFile || undefined : undefined,
         schedule: (scheduleEnabled || budgetType === 'lifetime') ? {
           ...data.schedule,
           dayparting: Object.keys(dayparting).length > 0 ? dayparting : undefined
@@ -1196,7 +1196,7 @@ const CampaignForm: React.FC = () => {
               </>
             )}
 
-            {mediaType === 'video' && (
+            {mediaType === 'single_video' && (
               <>
                 <Button
                   variant="outlined"
@@ -1792,7 +1792,7 @@ const CampaignForm: React.FC = () => {
                         </Button>
                       )}
                       
-                      {variation.mediaType === 'video' && (
+                      {variation.mediaType === 'single_video' && (
                         <Button
                           variant="outlined"
                           component="label"
