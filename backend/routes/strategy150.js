@@ -521,7 +521,7 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
         dailyBudget: parseBudget(req.body.campaignBudget?.dailyBudget) || 50,
         lifetimeBudget: parseBudget(req.body.campaignBudget?.lifetimeBudget)
       } : (req.body.campaignBudget || {}),
-      campaignSpendingLimit: req.body.campaignSpendingLimit || (req.body.budgetLevel === 'campaign' ? 1 : undefined),
+      campaignSpendingLimit: req.body.campaignSpendingLimit, // Only set if user provides it
 
       // Ad set level fields
       performanceGoal: req.body.performanceGoal || 'maximize_conversions',

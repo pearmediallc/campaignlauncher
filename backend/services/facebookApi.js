@@ -1167,11 +1167,13 @@ class FacebookAPI {
         // Use campaign budget values or defaults for CBO
         campaignConfig.daily_budget = campaignData.campaignBudget?.dailyBudget || campaignData.dailyBudget || 50;
         campaignConfig.lifetime_budget = campaignData.campaignBudget?.lifetimeBudget || campaignData.lifetimeBudget;
-        // Add spend cap if provided (default to $1 for CBO)
-        campaignConfig.spend_cap = campaignData.campaignSpendingLimit || 1;
+        // Only add spend cap if explicitly provided by user
+        if (campaignData.campaignSpendingLimit) {
+          campaignConfig.spend_cap = campaignData.campaignSpendingLimit;
+          console.log('    - Spend Cap: $' + campaignConfig.spend_cap);
+        }
         console.log('  💰 Using Campaign Budget Optimization (CBO)');
         console.log('    - Daily Budget: $' + campaignConfig.daily_budget);
-        console.log('    - Spend Cap: $' + campaignConfig.spend_cap);
       } else {
         console.log('  💰 Using Ad Set level budgets (no bid strategy at campaign)');
       }

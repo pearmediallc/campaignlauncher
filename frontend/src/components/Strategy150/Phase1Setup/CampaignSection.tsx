@@ -265,17 +265,17 @@ const CampaignSection: React.FC = () => {
                 <Controller
                   name="campaignSpendingLimit"
                   control={control}
-                  defaultValue={1}
                   render={({ field }) => (
                     <TextField
                       {...field}
                       fullWidth
                       type="number"
-                      label="Campaign Spending Limit"
+                      label="Campaign Spending Limit (Optional)"
+                      placeholder="Leave empty for no limit"
                       InputProps={{
                         startAdornment: <InputAdornment position="start">$</InputAdornment>
                       }}
-                      helperText="Maximum total spend for this campaign"
+                      helperText="Maximum total spend for this campaign (optional)"
                     />
                   )}
                 />
@@ -382,34 +382,6 @@ const CampaignSection: React.FC = () => {
           </Box>
         )}
 
-        {/* Campaign Spending Limit */}
-        {budgetLevel === 'campaign' && (
-          <>
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Campaign Spending Limits (Optional)
-              </Typography>
-            </Box>
-            <Box sx={{ maxWidth: '50%' }}>
-              <Controller
-                name="campaignSpendingLimit"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    type="number"
-                    label="Campaign Spending Limit"
-                    InputProps={{
-                      startAdornment: <InputAdornment position="start">$</InputAdornment>
-                    }}
-                    helperText="Maximum amount to spend on this campaign"
-                  />
-                )}
-              />
-            </Box>
-          </>
-        )}
 
         {/* Info Alert for Ad Set Budget */}
         {budgetLevel === 'adset' && (
