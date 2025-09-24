@@ -2156,15 +2156,11 @@ class FacebookAPI {
           const copyUrl = `${this.baseURL}/${sourceAdSetId}/copies`;
           const copyParams = {
             campaign_id: newCampaignId,
-            deep_copy: false, // We'll create ads separately with the same post ID
+            deep_copy: true, // Deep copy to preserve all settings including attribution
             status_option: 'PAUSED',
             rename_options: JSON.stringify({
               rename_suffix: `_Copy${copyNumber}`
             }),
-            attribution_spec: JSON.stringify([
-              { event_type: 'CLICK_THROUGH', window_days: 1 },
-              { event_type: 'VIEW_THROUGH', window_days: 1 }
-            ]),
             access_token: this.accessToken
           };
 
@@ -2172,9 +2168,15 @@ class FacebookAPI {
           const newAdSetId = copyResponse.data.copied_adset_id || copyResponse.data.id;
           clonedAdSets.push(newAdSetId);
 
-          // Step 3: Create ad with same post ID for each cloned ad set
-          if (postId) {
-            // Small delay before creating ad
+          // With deep_copy: true, ads are already copied
+          // Check if copied ads exist and track them
+          if (copyResponse.data.copied_ad_ids && copyResponse.data.copied_ad_ids.length > 0) {
+            // Ads were copied with deep_copy
+            clonedAds.push(...copyResponse.data.copied_ad_ids);
+            console.log(`    ✅ Deep copied ${copyResponse.data.copied_ad_ids.length} ad(s)`);
+          } else if (postId && !copyResponse.data.copied_ad_ids) {
+            // Only create new ad if deep_copy didn't copy any ads
+            // This handles edge case where original might not have had ads
             await this.delay(rateLimits.betweenAds);
 
             console.log(`    Creating ad with post ${postId}...`);
