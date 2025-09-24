@@ -2168,6 +2168,9 @@ class FacebookAPI {
           const newAdSetId = copyResponse.data.copied_adset_id || copyResponse.data.id;
           clonedAdSets.push(newAdSetId);
 
+          // Update attribution settings for the copied ad set
+          await this.updateAdSetAttribution(newAdSetId);
+
           // Step 3: Create ad with same post ID for each cloned ad set
           if (postId) {
             // Small delay before creating ad
@@ -2225,6 +2228,27 @@ class FacebookAPI {
       }
 
       throw error;
+    }
+  }
+
+  // Helper method to update ad set attribution settings after copying
+  async updateAdSetAttribution(adSetId) {
+    try {
+      const updateUrl = `${this.baseURL}/${adSetId}`;
+      const updateParams = {
+        attribution_spec: JSON.stringify([
+          { event_type: 'CLICK_THROUGH', window_days: 1 },
+          { event_type: 'VIEW_THROUGH', window_days: 1 }
+        ]),
+        access_token: this.accessToken
+      };
+
+      await axios.post(updateUrl, null, { params: updateParams });
+      console.log(`    ✅ Attribution settings applied (1-day click, 1-day view)`);
+      return true;
+    } catch (error) {
+      console.warn(`    ⚠️ Attribution update failed: ${error.message}`);
+      return false; // Don't fail the entire duplication
     }
   }
 }
