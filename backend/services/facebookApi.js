@@ -576,6 +576,14 @@ class FacebookAPI {
             }
           }
         };
+
+        // Add thumbnail if available (Facebook requires this for video ads)
+        if (adData.videoThumbnail) {
+          creative.object_story_spec.video_data.image_url = adData.videoThumbnail;
+        } else if (adData.imageHash) {
+          // Fallback to image hash if provided
+          creative.object_story_spec.video_data.image_hash = adData.imageHash;
+        }
       } else if (adData.mediaType === 'carousel' && (adData.carouselCards || adData.carouselImages)) {
         // Carousel ad
         creative.object_story_spec.link_data = {
@@ -697,6 +705,33 @@ class FacebookAPI {
         console.error('Facebook API Error:', fbError);
       }
       console.error('Video upload failed:', error.message);
+      return null;
+    }
+  }
+
+  async getVideoThumbnail(videoId) {
+    try {
+      console.log(`📷 Fetching thumbnail for video ${videoId}...`);
+      const url = `${this.baseURL}/${videoId}`;
+      const params = {
+        fields: 'thumbnails',
+        access_token: this.accessToken
+      };
+
+      const response = await axios.get(url, { params });
+
+      // Facebook returns thumbnails array
+      if (response.data?.thumbnails?.data && response.data.thumbnails.data.length > 0) {
+        // Get the best quality thumbnail (usually the first one)
+        const thumbnail = response.data.thumbnails.data[0];
+        console.log('✅ Video thumbnail retrieved:', thumbnail.uri);
+        return thumbnail.uri;
+      }
+
+      console.log('⚠️ No thumbnails found for video');
+      return null;
+    } catch (error) {
+      console.error('⚠️ Could not fetch video thumbnail:', error.message);
       return null;
     }
   }
@@ -1083,6 +1118,16 @@ class FacebookAPI {
           if (videoId) {
             mediaAssets.videoId = videoId;
             console.log('✅ Video uploaded successfully with ID:', videoId);
+
+            // Get thumbnail from Facebook
+            const thumbnailUrl = await this.getVideoThumbnail(videoId);
+            if (thumbnailUrl) {
+              mediaAssets.videoThumbnail = thumbnailUrl;
+              console.log('✅ Video thumbnail ready for ad creation');
+            } else {
+              console.log('⚠️ No thumbnail available, ad creation may fail');
+              // Could implement fallback here if needed
+            }
           }
         } catch (error) {
           console.log('⚠️ Video upload skipped:', error.message);
