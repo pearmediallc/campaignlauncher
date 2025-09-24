@@ -215,31 +215,13 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       schedule: req.body.schedule
     });
     
-    // Get current/switched resources for the user
+    // Get current/switched resources for the user (already handled above)
     const { FacebookAuth, UserResourceConfig } = db;
     const userId = req.userId || req.user.id;
-    
-    // First check for switched resources
-    const activeConfig = await UserResourceConfig.getActiveConfig(userId);
-    let selectedPageId, selectedAdAccountId, selectedPixelId;
-    
-    if (activeConfig) {
-      // Use switched resources
-      selectedPageId = activeConfig.pageId;
-      selectedAdAccountId = activeConfig.adAccountId;
-      selectedPixelId = activeConfig.pixelId;
-      console.log('Using switched resources:', { selectedPageId, selectedAdAccountId, selectedPixelId });
-    } else {
-      // Fall back to originally selected resources
-      const facebookAuth = await FacebookAuth.findOne({ where: { userId } });
-      if (facebookAuth) {
-        selectedPageId = facebookAuth.selectedPageId;
-        selectedAdAccountId = facebookAuth.selectedAdAccountId;
-        selectedPixelId = facebookAuth.selectedPixelId;
-        console.log('Using original resources:', { selectedPageId, selectedAdAccountId, selectedPixelId });
-      }
-    }
-    
+
+    // Note: activeConfig, selectedPageId, selectedAdAccountId, selectedPixelId
+    // are already defined above when creating FacebookAPI instance
+
     // Use request body only as last resort (backward compatibility)
     if (!selectedPageId && req.body.selectedPageId) {
       selectedPageId = req.body.selectedPageId;
