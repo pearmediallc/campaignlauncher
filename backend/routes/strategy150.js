@@ -528,7 +528,7 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       pixel: req.body.pixel || pixelId, // Use provided pixel or fallback to selected
       manualPixelId: req.body.manualPixelId, // For manual pixel entry
       conversionEvent: req.body.conversionEvent || 'Lead',
-      attributionSetting: req.body.attributionSetting || 'standard',
+      attributionSetting: req.body.attributionSetting || '1_day_click_1_day_view',
       attributionWindow: req.body.attributionWindow || '7_day',
 
       // Ad set budget & schedule (only set if not using CBO)

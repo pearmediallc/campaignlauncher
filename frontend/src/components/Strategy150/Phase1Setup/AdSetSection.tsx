@@ -324,6 +324,7 @@ const AdSetSection: React.FC = () => {
           <Controller
             name="attributionSetting"
             control={control}
+            defaultValue="1_day_click_1_day_view"
             render={({ field }) => (
               <FormControl fullWidth>
                 <InputLabel>Attribution Setting</InputLabel>

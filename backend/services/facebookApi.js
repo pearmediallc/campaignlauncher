@@ -177,18 +177,49 @@ class FacebookAPI {
       // Add attribution spec if provided
       if (adSetData.attributionSetting || adSetData.attributionWindow) {
         const attributionSpec = [];
-        if (adSetData.attributionWindow?.click || adSetData.attributionWindow?.['1_day_click']) {
-          attributionSpec.push({
-            event_type: 'CLICK_THROUGH',
-            window_days: parseInt(adSetData.attributionWindow?.click || adSetData.attributionWindow?.['1_day_click'] || 1)
-          });
+
+        // Handle the new default: 1_day_click_1_day_view
+        if (adSetData.attributionSetting === '1_day_click_1_day_view') {
+          attributionSpec.push(
+            { event_type: 'CLICK_THROUGH', window_days: 1 },
+            { event_type: 'VIEW_THROUGH', window_days: 1 }
+          );
         }
-        if (adSetData.attributionWindow?.view || adSetData.attributionWindow?.['1_day_view']) {
-          attributionSpec.push({
-            event_type: 'VIEW_THROUGH',
-            window_days: parseInt(adSetData.attributionWindow?.view || adSetData.attributionWindow?.['1_day_view'] || 1)
-          });
+        // Handle other attribution settings
+        else if (adSetData.attributionSetting === '7_day_click_1_day_view') {
+          attributionSpec.push(
+            { event_type: 'CLICK_THROUGH', window_days: 7 },
+            { event_type: 'VIEW_THROUGH', window_days: 1 }
+          );
         }
+        else if (adSetData.attributionSetting === '28_day_click_1_day_view') {
+          attributionSpec.push(
+            { event_type: 'CLICK_THROUGH', window_days: 28 },
+            { event_type: 'VIEW_THROUGH', window_days: 1 }
+          );
+        }
+        else if (adSetData.attributionSetting === '1_day_click') {
+          attributionSpec.push({ event_type: 'CLICK_THROUGH', window_days: 1 });
+        }
+        else if (adSetData.attributionSetting === '7_day_click') {
+          attributionSpec.push({ event_type: 'CLICK_THROUGH', window_days: 7 });
+        }
+        // Fallback to original logic for backward compatibility
+        else {
+          if (adSetData.attributionWindow?.click || adSetData.attributionWindow?.['1_day_click']) {
+            attributionSpec.push({
+              event_type: 'CLICK_THROUGH',
+              window_days: parseInt(adSetData.attributionWindow?.click || adSetData.attributionWindow?.['1_day_click'] || 1)
+            });
+          }
+          if (adSetData.attributionWindow?.view || adSetData.attributionWindow?.['1_day_view']) {
+            attributionSpec.push({
+              event_type: 'VIEW_THROUGH',
+              window_days: parseInt(adSetData.attributionWindow?.view || adSetData.attributionWindow?.['1_day_view'] || 1)
+            });
+          }
+        }
+
         if (attributionSpec.length > 0) {
           params.attribution_spec = JSON.stringify(attributionSpec);
         }
