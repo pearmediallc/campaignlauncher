@@ -210,20 +210,51 @@ const FacebookAccountSelector: React.FC<FacebookAccountSelectorProps> = ({ onCom
               onChange={(e) => setSelectedAdAccountId(e.target.value)}
               label="Ad Account"
               startAdornment={<CampaignIcon sx={{ mr: 1, color: 'action.active' }} />}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    maxHeight: 400, // Increased height for better visibility
+                    '& .MuiList-root': {
+                      paddingTop: 0,
+                      paddingBottom: 0,
+                    }
+                  }
+                },
+                // Virtual scrolling for performance with many items
+                disableScrollLock: true,
+                // Keep menu open on scroll
+                autoFocus: false
+              }}
             >
+              {/* Show total count if more than 25 accounts */}
+              {resources.adAccounts.length > 25 && (
+                <MenuItem disabled sx={{ opacity: 1, backgroundColor: 'action.hover' }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {resources.adAccounts.length} accounts available - scroll to see all
+                  </Typography>
+                </MenuItem>
+              )}
+
               {resources.adAccounts.map((account) => (
                 <MenuItem key={account.id} value={account.id}>
                   <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                     <Typography sx={{ flexGrow: 1 }}>{account.name}</Typography>
-                    <Chip 
-                      label={account.currency} 
-                      size="small" 
+                    <Chip
+                      label={account.currency}
+                      size="small"
                       color={account.status === 1 ? 'success' : 'default'}
                     />
                   </Box>
                 </MenuItem>
               ))}
             </Select>
+
+            {/* Show helper text if many accounts */}
+            {resources.adAccounts.length > 25 && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                Tip: Type to search or scroll to find your account
+              </Typography>
+            )}
           </FormControl>
 
           {/* Page Selection */}

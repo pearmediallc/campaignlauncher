@@ -139,11 +139,32 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       }
     }
     
-    // Create FacebookAPI instance with user credentials
+    // Check for switched/active resource configuration FIRST
+    const activeConfig = await UserResourceConfig.getActiveConfig(userId);
+    let selectedAdAccountId, selectedPageId, selectedPixelId;
+
+    if (activeConfig && (activeConfig.adAccountId || activeConfig.pageId)) {
+      // User has switched resources - use the active configuration
+      console.log('📋 Using switched resource configuration for campaign');
+      selectedAdAccountId = activeConfig.adAccountId || facebookAuth.selectedAdAccount?.id;
+      selectedPageId = activeConfig.pageId || facebookAuth.selectedPage?.id;
+      selectedPixelId = activeConfig.pixelId || pixelId;
+
+      if (selectedPixelId) {
+        pixelId = selectedPixelId;
+      }
+    } else {
+      // Use original selected resources
+      selectedAdAccountId = facebookAuth.selectedAdAccount?.id;
+      selectedPageId = facebookAuth.selectedPage?.id;
+      selectedPixelId = facebookAuth.selectedPixel?.id || pixelId;
+    }
+
+    // Create FacebookAPI instance with selected resources
     const userFacebookApi = new FacebookAPI({
       accessToken: decryptedToken,
-      adAccountId: facebookAuth.selectedAdAccount.id.replace('act_', ''),
-      pageId: facebookAuth.selectedPage.id,
+      adAccountId: (selectedAdAccountId || facebookAuth.selectedAdAccount.id).replace('act_', ''),
+      pageId: selectedPageId || facebookAuth.selectedPage.id,
       pixelId: pixelId
     });
 
