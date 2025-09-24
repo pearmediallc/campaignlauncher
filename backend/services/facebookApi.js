@@ -1858,166 +1858,114 @@ class FacebookAPI {
     }
   }
 
-  // NEW OPTIMIZED: Batch multiplication using direct campaign duplication
+  // NATIVE FACEBOOK: Deep copy entire campaign structure in ONE API call
+  async deepCopyCampaign(sourceCampaignId, copyNumber = 1, timestamp = Date.now()) {
+    try {
+      console.log(`\n📋 Using Facebook's native deep_copy for campaign ${sourceCampaignId}...`);
+
+      // Get original campaign name for the copy
+      const campaignResponse = await axios.get(
+        `${this.baseURL}/${sourceCampaignId}`,
+        {
+          params: {
+            fields: 'name',
+            access_token: this.accessToken
+          }
+        }
+      );
+      const originalName = campaignResponse.data.name || 'Campaign';
+
+      // Use Facebook's native /copies endpoint with deep_copy
+      const copyData = {
+        source_campaign_id: sourceCampaignId,
+        deep_copy: true, // This copies EVERYTHING - campaign, adsets, ads
+        status_option: 'PAUSED', // Always create paused for safety
+        rename_option: 'RENAME_WITH_SUFFIX',
+        rename_suffix: `_Copy${copyNumber}_${timestamp}`,
+        access_token: this.accessToken
+      };
+
+      console.log(`  🔄 Deep copying campaign (includes all 50 adsets and ads)...`);
+
+      // Facebook's native batch copy API
+      const response = await axios.post(
+        `${this.baseURL}/act_${this.adAccountId}/copies`,
+        null,
+        { params: copyData }
+      );
+
+      // The response contains the copy operation details
+      const copyId = response.data.copied_campaign_id || response.data.id;
+
+      if (copyId) {
+        console.log(`  ✅ Deep copy successful! New campaign ID: ${copyId}`);
+
+        // Optionally fetch the new campaign details
+        const newCampaign = {
+          id: copyId,
+          name: `${originalName}_Copy${copyNumber}_${timestamp}`,
+          status: 'PAUSED'
+        };
+
+        return {
+          success: true,
+          campaign: newCampaign,
+          copyId: copyId,
+          message: `Successfully deep copied campaign with all adsets and ads`
+        };
+      } else {
+        throw new Error('Deep copy did not return a campaign ID');
+      }
+    } catch (error) {
+      console.error(`❌ Deep copy failed for copy ${copyNumber}:`, error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  // NEW OPTIMIZED: Batch multiplication using Facebook's native deep copy
   async batchMultiplyCampaigns(sourceCampaignId, multiplyCount, updateProgress) {
-    console.log('\n🚀 CAMPAIGN MULTIPLICATION: Creating multiple complete campaigns');
+    console.log('\n🚀 NATIVE FACEBOOK DEEP COPY: Creating multiple complete campaigns');
     console.log(`  Source Campaign: ${sourceCampaignId}`);
     console.log(`  Copies to create: ${multiplyCount}`);
-    console.log('  Method: Direct campaign duplication with all ad sets and ads');
+    console.log('  Method: Facebook native deep_copy (copies everything in 1 API call per campaign)');
 
     try {
       const results = [];
       const errors = [];
       const timestamp = Date.now();
+      const rateLimits = this.getMultiplicationRateLimits();
 
-      // For each multiplication, we'll duplicate the entire campaign
+      // For each multiplication, use Facebook's native deep copy
       for (let i = 0; i < multiplyCount; i++) {
         const copyNumber = i + 1;
 
-        console.log(`\n📋 Creating campaign copy ${copyNumber} of ${multiplyCount}...`);
+        console.log(`\n📋 Deep copying campaign ${copyNumber} of ${multiplyCount}...`);
         if (updateProgress) {
-          updateProgress(`Creating campaign copy ${copyNumber} of ${multiplyCount}...`);
+          updateProgress(`Deep copying campaign ${copyNumber} of ${multiplyCount} (includes all 50 adsets and ads)...`);
         }
 
         try {
-          // Get original campaign details
-          const campaignResponse = await axios.get(
-            `${this.baseURL}/${sourceCampaignId}`,
-            {
-              params: {
-                fields: 'name,objective,daily_budget,lifetime_budget,special_ad_categories,buying_type,status',
-                access_token: this.accessToken
-              }
-            }
-          );
-
-          const originalCampaign = campaignResponse.data;
-
-          // Create new campaign with same settings
-          const newCampaignData = {
-            name: `${originalCampaign.name}_Copy${copyNumber}_${timestamp}`,
-            objective: originalCampaign.objective,
-            special_ad_categories: originalCampaign.special_ad_categories || [],
-            buying_type: originalCampaign.buying_type || 'AUCTION',
-            status: 'PAUSED',
-            access_token: this.accessToken
-          };
-
-          // Add budget if exists
-          if (originalCampaign.daily_budget) {
-            newCampaignData.daily_budget = originalCampaign.daily_budget;
-          }
-          if (originalCampaign.lifetime_budget) {
-            newCampaignData.lifetime_budget = originalCampaign.lifetime_budget;
+          // Apply smart delay between campaigns (except for first one)
+          if (i > 0) {
+            console.log(`⏱️ Waiting ${rateLimits.betweenCampaigns / 1000}s before next campaign...`);
+            await this.delay(rateLimits.betweenCampaigns);
           }
 
-          const newCampaignResponse = await axios.post(
-            `${this.baseURL}/act_${this.adAccountId}/campaigns`,
-            null,
-            { params: newCampaignData }
-          );
+          // Use native deep copy - ONE API call copies everything!
+          const copyResult = await this.deepCopyCampaign(sourceCampaignId, copyNumber, timestamp);
 
-          const newCampaignId = newCampaignResponse.data.id;
-          console.log(`  ✅ Created new campaign: ${newCampaignId}`);
+          if (copyResult.success) {
+            results.push({
+              copyNumber,
+              campaign: copyResult.campaign,
+              status: 'success',
+              message: 'Deep copy successful - all 50 adsets and ads copied'
+            });
 
-          // Now get all ad sets from original campaign and duplicate them
-          const adSetsResponse = await axios.get(
-            `${this.baseURL}/${sourceCampaignId}/adsets`,
-            {
-              params: {
-                fields: 'id,name,targeting,daily_budget,lifetime_budget,optimization_goal,billing_event,promoted_object,bid_strategy',
-                limit: 100,
-                access_token: this.accessToken
-              }
-            }
-          );
-
-          const originalAdSets = adSetsResponse.data.data || [];
-          console.log(`  📊 Found ${originalAdSets.length} ad sets to duplicate`);
-
-          let adSetsCreated = 0;
-          let adsCreated = 0;
-
-          // Duplicate each ad set
-          for (const originalAdSet of originalAdSets) {
-            try {
-              // Create new ad set
-              const newAdSetData = {
-                name: originalAdSet.name,
-                campaign_id: newCampaignId,
-                targeting: originalAdSet.targeting,
-                optimization_goal: originalAdSet.optimization_goal,
-                billing_event: originalAdSet.billing_event,
-                promoted_object: originalAdSet.promoted_object,
-                status: 'PAUSED',
-                access_token: this.accessToken
-              };
-
-              // Add budget
-              if (originalAdSet.daily_budget) {
-                newAdSetData.daily_budget = originalAdSet.daily_budget;
-              }
-              if (originalAdSet.lifetime_budget) {
-                newAdSetData.lifetime_budget = originalAdSet.lifetime_budget;
-              }
-              if (originalAdSet.bid_strategy) {
-                newAdSetData.bid_strategy = originalAdSet.bid_strategy;
-              }
-
-              const newAdSetResponse = await axios.post(
-                `${this.baseURL}/act_${this.adAccountId}/adsets`,
-                null,
-                { params: newAdSetData }
-              );
-
-              const newAdSetId = newAdSetResponse.data.id;
-              adSetsCreated++;
-
-              // Get ads from original ad set
-              const adsResponse = await axios.get(
-                `${this.baseURL}/${originalAdSet.id}/ads`,
-                {
-                  params: {
-                    fields: 'id,name,creative,status',
-                    limit: 10,
-                    access_token: this.accessToken
-                  }
-                }
-              );
-
-              const originalAds = adsResponse.data.data || [];
-
-              // Duplicate each ad
-              for (const originalAd of originalAds) {
-                try {
-                  const newAdData = {
-                    name: originalAd.name,
-                    adset_id: newAdSetId,
-                    creative: originalAd.creative,
-                    status: 'PAUSED',
-                    access_token: this.accessToken
-                  };
-
-                  await axios.post(
-                    `${this.baseURL}/act_${this.adAccountId}/ads`,
-                    null,
-                    { params: newAdData }
-                  );
-
-                  adsCreated++;
-                } catch (adError) {
-                  console.error(`    ⚠️ Failed to duplicate ad: ${adError.message}`);
-                }
-              }
-
-              // Small delay to avoid rate limits
-              if (adSetsCreated % 10 === 0) {
-                await this.delay(1000);
-              }
-
-            } catch (adSetError) {
-              console.error(`  ⚠️ Failed to duplicate ad set: ${adSetError.message}`);
-            }
+            console.log(`  ✅ Copy ${copyNumber} completed successfully`);
+            console.log(`    New Campaign ID: ${copyResult.campaign?.id}`);
+          } else {
+            throw new Error('Deep copy did not return success status');
           }
 
           results.push({

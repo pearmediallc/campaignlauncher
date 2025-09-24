@@ -139,22 +139,37 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       }
     }
     
-    // Check for switched/active resource configuration FIRST
-    const activeConfig = await UserResourceConfig.getActiveConfig(userId);
+    // Get userId safely
+    const userId = req.user?.id || req.userId || req.user;
+
+    // Initialize resource variables
     let selectedAdAccountId, selectedPageId, selectedPixelId;
 
-    if (activeConfig && (activeConfig.adAccountId || activeConfig.pageId)) {
-      // User has switched resources - use the active configuration
-      console.log('📋 Using switched resource configuration for campaign');
-      selectedAdAccountId = activeConfig.adAccountId || facebookAuth.selectedAdAccount?.id;
-      selectedPageId = activeConfig.pageId || facebookAuth.selectedPage?.id;
-      selectedPixelId = activeConfig.pixelId || pixelId;
+    // Check for switched/active resource configuration with error handling
+    try {
+      if (UserResourceConfig && typeof UserResourceConfig.getActiveConfig === 'function' && userId) {
+        const activeConfig = await UserResourceConfig.getActiveConfig(userId).catch(err => {
+          console.log('⚠️ Could not fetch active config:', err.message);
+          return null;
+        });
 
-      if (selectedPixelId) {
-        pixelId = selectedPixelId;
+        if (activeConfig && (activeConfig.adAccountId || activeConfig.pageId)) {
+          console.log('📋 Using switched resource configuration for campaign');
+          selectedAdAccountId = activeConfig.adAccountId || facebookAuth.selectedAdAccount?.id;
+          selectedPageId = activeConfig.pageId || facebookAuth.selectedPage?.id;
+          selectedPixelId = activeConfig.pixelId || pixelId;
+
+          if (selectedPixelId) {
+            pixelId = selectedPixelId;
+          }
+        }
       }
-    } else {
-      // Use original selected resources
+    } catch (error) {
+      console.log('⚠️ UserResourceConfig not available, using defaults');
+    }
+
+    // Fallback to original resources if not set
+    if (!selectedAdAccountId || !selectedPageId) {
       selectedAdAccountId = facebookAuth.selectedAdAccount?.id;
       selectedPageId = facebookAuth.selectedPage?.id;
       selectedPixelId = facebookAuth.selectedPixel?.id || pixelId;
@@ -217,9 +232,7 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
     
     // Get current/switched resources for the user (already handled above)
     const { FacebookAuth, UserResourceConfig } = db;
-    const userId = req.userId || req.user.id;
-
-    // Note: activeConfig, selectedPageId, selectedAdAccountId, selectedPixelId
+    // Note: userId, selectedPageId, selectedAdAccountId, selectedPixelId
     // are already defined above when creating FacebookAPI instance
 
     // Use request body only as last resort (backward compatibility)

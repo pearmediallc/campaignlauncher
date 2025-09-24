@@ -381,29 +381,47 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       }
     }
 
-    // Check for switched/active resource configuration FIRST before using defaults
-    const { UserResourceConfig } = db;
-    const activeConfig = await UserResourceConfig.getActiveConfig(userId);
+    // Get userId safely from multiple possible sources
+    const userId = req.user?.id || req.userId || req.user;
 
+    // Check for switched/active resource configuration if UserResourceConfig exists
     let selectedAdAccountId, selectedPageId, selectedPixelId;
 
-    if (activeConfig && (activeConfig.adAccountId || activeConfig.pageId)) {
-      // User has switched resources - use the active configuration
-      console.log('📋 Using switched resource configuration from UserResourceConfig');
-      selectedAdAccountId = activeConfig.adAccountId || facebookAuth.selectedAdAccount?.id;
-      selectedPageId = activeConfig.pageId || facebookAuth.selectedPage?.id;
-      selectedPixelId = activeConfig.pixelId || pixelId;
+    try {
+      // Only try to use UserResourceConfig if it exists in the database models
+      const { UserResourceConfig } = db;
 
-      console.log('  Ad Account:', selectedAdAccountId);
-      console.log('  Page:', selectedPageId);
-      console.log('  Pixel:', selectedPixelId || 'None');
+      if (UserResourceConfig && typeof UserResourceConfig.getActiveConfig === 'function' && userId) {
+        // Try to get active config, but don't fail if it doesn't work
+        const activeConfig = await UserResourceConfig.getActiveConfig(userId).catch(err => {
+          console.log('⚠️ Could not fetch active config:', err.message);
+          return null;
+        });
 
-      // Update pixelId to use the switched one if available
-      if (selectedPixelId) {
-        pixelId = selectedPixelId;
+        if (activeConfig && (activeConfig.adAccountId || activeConfig.pageId)) {
+          // User has switched resources - use the active configuration
+          console.log('📋 Using switched resource configuration from UserResourceConfig');
+          selectedAdAccountId = activeConfig.adAccountId || facebookAuth.selectedAdAccount?.id;
+          selectedPageId = activeConfig.pageId || facebookAuth.selectedPage?.id;
+          selectedPixelId = activeConfig.pixelId || pixelId;
+
+          console.log('  Ad Account:', selectedAdAccountId);
+          console.log('  Page:', selectedPageId);
+          console.log('  Pixel:', selectedPixelId || 'None');
+
+          // Update pixelId to use the switched one if available
+          if (selectedPixelId) {
+            pixelId = selectedPixelId;
+          }
+        }
       }
-    } else {
-      // Use original selected resources from FacebookAuth
+    } catch (configError) {
+      // If UserResourceConfig doesn't exist or has issues, log but continue
+      console.log('⚠️ UserResourceConfig not available, using default resources');
+    }
+
+    // If no switched config or it failed, use original selected resources
+    if (!selectedAdAccountId || !selectedPageId) {
       console.log('📋 Using original selected resources from FacebookAuth');
       selectedAdAccountId = facebookAuth.selectedAdAccount?.id;
       selectedPageId = facebookAuth.selectedPage?.id;
@@ -1017,21 +1035,36 @@ router.post('/multiply', authenticate, requireFacebookAuth, refreshFacebookToken
       });
     }
 
-    // Check for switched/active resource configuration FIRST
-    const { UserResourceConfig } = db;
-    const userId = req.user.id;
-    const activeConfig = await UserResourceConfig.getActiveConfig(userId);
+    // Get userId safely
+    const userId = req.user?.id || req.userId || req.user;
 
+    // Check for switched resources with proper error handling
     let selectedAdAccountId, selectedPageId;
 
-    if (activeConfig && (activeConfig.adAccountId || activeConfig.pageId)) {
-      // User has switched resources - use the active configuration
-      console.log('📋 Using switched resource configuration for multiply');
-      selectedAdAccountId = activeConfig.adAccountId || facebookAuth.selectedAdAccount?.id;
-      selectedPageId = activeConfig.pageId || facebookAuth.selectedPage?.id;
-    } else {
-      // Use original selected resources
+    try {
+      const { UserResourceConfig } = db;
+
+      if (UserResourceConfig && typeof UserResourceConfig.getActiveConfig === 'function' && userId) {
+        const activeConfig = await UserResourceConfig.getActiveConfig(userId).catch(err => {
+          console.log('⚠️ Could not fetch active config for multiply:', err.message);
+          return null;
+        });
+
+        if (activeConfig && (activeConfig.adAccountId || activeConfig.pageId)) {
+          console.log('📋 Using switched resource configuration for multiply');
+          selectedAdAccountId = activeConfig.adAccountId || facebookAuth.selectedAdAccount?.id;
+          selectedPageId = activeConfig.pageId || facebookAuth.selectedPage?.id;
+        }
+      }
+    } catch (error) {
+      console.log('⚠️ UserResourceConfig not available for multiply, using defaults');
+    }
+
+    // Fallback to original resources if not set
+    if (!selectedAdAccountId) {
       selectedAdAccountId = facebookAuth.selectedAdAccount?.id;
+    }
+    if (!selectedPageId) {
       selectedPageId = facebookAuth.selectedPage?.id;
     }
 
