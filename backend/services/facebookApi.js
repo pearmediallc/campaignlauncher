@@ -579,7 +579,14 @@ class FacebookAPI {
 
         // Add thumbnail if available (Facebook requires this for video ads)
         if (adData.videoThumbnail) {
-          creative.object_story_spec.video_data.image_url = adData.videoThumbnail;
+          // Check if it's an image hash (from extracted frame) or URL
+          if (adData.videoThumbnail.match(/^[a-f0-9]{32}$/i)) {
+            // It's an image hash from extracted frame
+            creative.object_story_spec.video_data.image_hash = adData.videoThumbnail;
+          } else {
+            // It's a URL from Facebook
+            creative.object_story_spec.video_data.image_url = adData.videoThumbnail;
+          }
         } else if (adData.imageHash) {
           // Fallback to image hash if provided
           creative.object_story_spec.video_data.image_hash = adData.imageHash;
@@ -709,56 +716,144 @@ class FacebookAPI {
     }
   }
 
-  async getVideoThumbnail(videoId) {
+  async getVideoThumbnail(videoId, videoPath = null, retryCount = 0) {
+    const VideoUtils = require('../utils/videoUtils');
+    const maxRetries = 3;
+    const retryDelay = 5000; // 5 seconds
+
     try {
-      console.log(`📷 Fetching thumbnail for video ${videoId}...`);
+      console.log(`📷 Fetching thumbnail for video ${videoId} (attempt ${retryCount + 1}/${maxRetries + 1})...`);
 
       // Try multiple approaches to get thumbnail
       // 1. First try the thumbnails field
       const url = `${this.baseURL}/${videoId}`;
       const params = {
-        fields: 'thumbnails,picture,source',
+        fields: 'thumbnails,picture,source,status',
         access_token: this.accessToken
       };
 
       const response = await axios.get(url, { params });
 
+      // Check video processing status
+      if (response.data?.status?.processing_phase) {
+        console.log(`⏳ Video processing status: ${response.data.status.processing_phase}`);
+      }
+
       // Check for thumbnails array (preferred)
       if (response.data?.thumbnails?.data && response.data.thumbnails.data.length > 0) {
         const thumbnail = response.data.thumbnails.data[0];
-        console.log('✅ Video thumbnail retrieved from thumbnails:', thumbnail.uri);
-        return thumbnail.uri;
+        const thumbnailUrl = thumbnail.uri || thumbnail.url;
+
+        // Check if it's a placeholder
+        if (VideoUtils.isPlaceholderThumbnail(thumbnailUrl)) {
+          console.log('⚠️ Facebook returned placeholder thumbnail:', thumbnailUrl);
+
+          // If we have retries left and video is still processing, wait and retry
+          if (retryCount < maxRetries && response.data?.status?.processing_phase !== 'complete') {
+            console.log(`⏱️ Waiting ${retryDelay/1000}s before retry...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            return this.getVideoThumbnail(videoId, videoPath, retryCount + 1);
+          }
+
+          // If no more retries or video is complete but still placeholder, extract frame
+          if (videoPath) {
+            console.log('🎬 Extracting first frame from video...');
+            return await this.extractAndUploadVideoFrame(videoPath);
+          }
+        }
+
+        console.log('✅ Video thumbnail retrieved from thumbnails:', thumbnailUrl);
+        return thumbnailUrl;
       }
 
       // 2. Try the picture field (alternate method)
       if (response.data?.picture) {
-        console.log('✅ Video thumbnail retrieved from picture field:', response.data.picture);
-        return response.data.picture;
-      }
+        const pictureUrl = response.data.picture;
 
-      // 3. Try constructing a thumbnail URL manually
-      // Facebook often provides thumbnails at predictable URLs
-      const manualThumbnailUrl = `https://graph.facebook.com/${videoId}/picture`;
-      console.log('📸 Trying manual thumbnail URL:', manualThumbnailUrl);
+        // Check if it's a placeholder
+        if (VideoUtils.isPlaceholderThumbnail(pictureUrl)) {
+          console.log('⚠️ Facebook returned placeholder in picture field:', pictureUrl);
 
-      // Test if the URL works
-      try {
-        const testResponse = await axios.head(manualThumbnailUrl, {
-          params: { access_token: this.accessToken }
-        });
-        if (testResponse.status === 200) {
-          console.log('✅ Manual thumbnail URL works');
-          return `${manualThumbnailUrl}?access_token=${this.accessToken}`;
+          // Retry or extract frame
+          if (retryCount < maxRetries) {
+            console.log(`⏱️ Waiting ${retryDelay/1000}s before retry...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            return this.getVideoThumbnail(videoId, videoPath, retryCount + 1);
+          }
+
+          if (videoPath) {
+            console.log('🎬 Extracting first frame from video...');
+            return await this.extractAndUploadVideoFrame(videoPath);
+          }
         }
-      } catch (e) {
-        // URL doesn't work, continue to next fallback
+
+        console.log('✅ Video thumbnail retrieved from picture field:', pictureUrl);
+        return pictureUrl;
       }
 
-      console.log('⚠️ No thumbnails found for video');
+      // If no thumbnail found and we have the video path, extract frame
+      if (videoPath) {
+        console.log('⚠️ No thumbnail from Facebook, extracting first frame...');
+        return await this.extractAndUploadVideoFrame(videoPath);
+      }
+
+      console.log('⚠️ No thumbnails found for video and no video path provided');
       return null;
     } catch (error) {
       console.error('⚠️ Could not fetch video thumbnail:', error.message);
+
+      // If fetch failed and we have video path, try extracting frame
+      if (videoPath) {
+        console.log('🎬 Fallback: Extracting first frame from video...');
+        try {
+          return await this.extractAndUploadVideoFrame(videoPath);
+        } catch (extractError) {
+          console.error('❌ Frame extraction also failed:', extractError.message);
+        }
+      }
+
       return null;
+    }
+  }
+
+  async extractAndUploadVideoFrame(videoPath) {
+    const VideoUtils = require('../utils/videoUtils');
+    const fs = require('fs').promises;
+    const path = require('path');
+
+    try {
+      console.log('🎬 Extracting first frame from video:', videoPath);
+
+      // Extract and optimize frame
+      const frameBuffer = await VideoUtils.extractAndOptimizeFrame(videoPath);
+
+      // Save to temporary file
+      const tempDir = path.join(__dirname, '../uploads/temp');
+      await fs.mkdir(tempDir, { recursive: true });
+
+      const tempPath = path.join(tempDir, `frame_${Date.now()}.jpg`);
+      await fs.writeFile(tempPath, frameBuffer);
+
+      console.log('📸 Uploading extracted frame to Facebook...');
+
+      // Upload frame as image
+      const imageHash = await this.uploadImage(tempPath);
+
+      // Clean up temp file
+      await fs.unlink(tempPath).catch(err => {
+        console.warn('Could not delete temp frame:', err.message);
+      });
+
+      if (imageHash) {
+        // Return the URL format that Facebook expects
+        console.log('✅ Frame uploaded successfully, hash:', imageHash);
+        return imageHash; // Return hash, will be used with image_hash in ad creation
+      }
+
+      throw new Error('Failed to upload extracted frame');
+    } catch (error) {
+      console.error('❌ Error extracting/uploading video frame:', error);
+      throw error;
     }
   }
 
@@ -1145,65 +1240,14 @@ class FacebookAPI {
             mediaAssets.videoId = videoId;
             console.log('✅ Video uploaded successfully with ID:', videoId);
 
-            // Get thumbnail from Facebook
-            const thumbnailUrl = await this.getVideoThumbnail(videoId);
+            // Get thumbnail from Facebook with video path for fallback
+            const thumbnailUrl = await this.getVideoThumbnail(videoId, campaignData.videoPath);
             if (thumbnailUrl) {
               mediaAssets.videoThumbnail = thumbnailUrl;
               console.log('✅ Video thumbnail ready for ad creation');
             } else {
-              console.log('⚠️ No thumbnail from Facebook, extracting frame from video...');
-
-              // Fallback: Extract first frame and upload as image
-              try {
-                // Use the video file path to extract a frame
-                const fs = require('fs');
-                const path = require('path');
-                const { exec } = require('child_process');
-                const util = require('util');
-                const execPromise = util.promisify(exec);
-
-                const videoFileName = path.basename(campaignData.videoPath);
-                const thumbnailPath = campaignData.videoPath.replace(path.extname(videoFileName), '_thumb.jpg');
-
-                // Try to extract first frame using ffmpeg if available
-                try {
-                  await execPromise(`ffmpeg -i "${campaignData.videoPath}" -ss 00:00:01 -vframes 1 -q:v 2 "${thumbnailPath}" -y`);
-                  console.log('📸 Frame extracted from video');
-
-                  // Upload the extracted frame as an image
-                  const imageHash = await this.uploadImage(thumbnailPath);
-                  if (imageHash) {
-                    mediaAssets.imageHash = imageHash; // Use imageHash as fallback
-                    console.log('✅ Extracted thumbnail uploaded as image');
-                  }
-
-                  // Clean up temp thumbnail file
-                  if (fs.existsSync(thumbnailPath)) {
-                    fs.unlinkSync(thumbnailPath);
-                  }
-                } catch (ffmpegError) {
-                  console.log('⚠️ ffmpeg not available, using default fallback');
-
-                  // Final fallback: Create a simple placeholder image
-                  // This ensures ad creation won't fail
-                  const placeholderPath = path.join(path.dirname(campaignData.videoPath), 'video_placeholder.jpg');
-
-                  // Check if we have a default placeholder image
-                  const defaultPlaceholder = path.join(__dirname, '..', 'assets', 'video_placeholder.jpg');
-                  if (fs.existsSync(defaultPlaceholder)) {
-                    fs.copyFileSync(defaultPlaceholder, placeholderPath);
-                    const imageHash = await this.uploadImage(placeholderPath);
-                    if (imageHash) {
-                      mediaAssets.imageHash = imageHash;
-                      console.log('✅ Default placeholder image uploaded');
-                    }
-                    fs.unlinkSync(placeholderPath);
-                  }
-                }
-              } catch (fallbackError) {
-                console.error('❌ Thumbnail fallback failed:', fallbackError.message);
-                // Continue anyway - let Facebook handle the error
-              }
+              console.log('⚠️ No thumbnail available, cannot create video ad');
+              throw new Error('Video thumbnail is required for video ads');
             }
           }
         } catch (error) {
