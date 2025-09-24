@@ -712,20 +712,46 @@ class FacebookAPI {
   async getVideoThumbnail(videoId) {
     try {
       console.log(`📷 Fetching thumbnail for video ${videoId}...`);
+
+      // Try multiple approaches to get thumbnail
+      // 1. First try the thumbnails field
       const url = `${this.baseURL}/${videoId}`;
       const params = {
-        fields: 'thumbnails',
+        fields: 'thumbnails,picture,source',
         access_token: this.accessToken
       };
 
       const response = await axios.get(url, { params });
 
-      // Facebook returns thumbnails array
+      // Check for thumbnails array (preferred)
       if (response.data?.thumbnails?.data && response.data.thumbnails.data.length > 0) {
-        // Get the best quality thumbnail (usually the first one)
         const thumbnail = response.data.thumbnails.data[0];
-        console.log('✅ Video thumbnail retrieved:', thumbnail.uri);
+        console.log('✅ Video thumbnail retrieved from thumbnails:', thumbnail.uri);
         return thumbnail.uri;
+      }
+
+      // 2. Try the picture field (alternate method)
+      if (response.data?.picture) {
+        console.log('✅ Video thumbnail retrieved from picture field:', response.data.picture);
+        return response.data.picture;
+      }
+
+      // 3. Try constructing a thumbnail URL manually
+      // Facebook often provides thumbnails at predictable URLs
+      const manualThumbnailUrl = `https://graph.facebook.com/${videoId}/picture`;
+      console.log('📸 Trying manual thumbnail URL:', manualThumbnailUrl);
+
+      // Test if the URL works
+      try {
+        const testResponse = await axios.head(manualThumbnailUrl, {
+          params: { access_token: this.accessToken }
+        });
+        if (testResponse.status === 200) {
+          console.log('✅ Manual thumbnail URL works');
+          return `${manualThumbnailUrl}?access_token=${this.accessToken}`;
+        }
+      } catch (e) {
+        // URL doesn't work, continue to next fallback
       }
 
       console.log('⚠️ No thumbnails found for video');
@@ -1125,8 +1151,59 @@ class FacebookAPI {
               mediaAssets.videoThumbnail = thumbnailUrl;
               console.log('✅ Video thumbnail ready for ad creation');
             } else {
-              console.log('⚠️ No thumbnail available, ad creation may fail');
-              // Could implement fallback here if needed
+              console.log('⚠️ No thumbnail from Facebook, extracting frame from video...');
+
+              // Fallback: Extract first frame and upload as image
+              try {
+                // Use the video file path to extract a frame
+                const fs = require('fs');
+                const path = require('path');
+                const { exec } = require('child_process');
+                const util = require('util');
+                const execPromise = util.promisify(exec);
+
+                const videoFileName = path.basename(campaignData.videoPath);
+                const thumbnailPath = campaignData.videoPath.replace(path.extname(videoFileName), '_thumb.jpg');
+
+                // Try to extract first frame using ffmpeg if available
+                try {
+                  await execPromise(`ffmpeg -i "${campaignData.videoPath}" -ss 00:00:01 -vframes 1 -q:v 2 "${thumbnailPath}" -y`);
+                  console.log('📸 Frame extracted from video');
+
+                  // Upload the extracted frame as an image
+                  const imageHash = await this.uploadImage(thumbnailPath);
+                  if (imageHash) {
+                    mediaAssets.imageHash = imageHash; // Use imageHash as fallback
+                    console.log('✅ Extracted thumbnail uploaded as image');
+                  }
+
+                  // Clean up temp thumbnail file
+                  if (fs.existsSync(thumbnailPath)) {
+                    fs.unlinkSync(thumbnailPath);
+                  }
+                } catch (ffmpegError) {
+                  console.log('⚠️ ffmpeg not available, using default fallback');
+
+                  // Final fallback: Create a simple placeholder image
+                  // This ensures ad creation won't fail
+                  const placeholderPath = path.join(path.dirname(campaignData.videoPath), 'video_placeholder.jpg');
+
+                  // Check if we have a default placeholder image
+                  const defaultPlaceholder = path.join(__dirname, '..', 'assets', 'video_placeholder.jpg');
+                  if (fs.existsSync(defaultPlaceholder)) {
+                    fs.copyFileSync(defaultPlaceholder, placeholderPath);
+                    const imageHash = await this.uploadImage(placeholderPath);
+                    if (imageHash) {
+                      mediaAssets.imageHash = imageHash;
+                      console.log('✅ Default placeholder image uploaded');
+                    }
+                    fs.unlinkSync(placeholderPath);
+                  }
+                }
+              } catch (fallbackError) {
+                console.error('❌ Thumbnail fallback failed:', fallbackError.message);
+                // Continue anyway - let Facebook handle the error
+              }
             }
           }
         } catch (error) {
