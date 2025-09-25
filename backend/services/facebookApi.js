@@ -1547,34 +1547,32 @@ class FacebookAPI {
         }
 
         // After all ad sets and ads are created, ensure attribution is correct
-        if (newAdSetIds.length > 0) {
-          console.log('\n🔧 Verifying attribution settings for all duplicated ad sets...');
-          const attributionResults = [];
+        console.log('\n🔧 Verifying attribution settings for all duplicated ad sets...');
+        const attributionResults = [];
 
-          for (let j = 0; j < newAdSetIds.length; j++) {
-            const adSetId = newAdSetIds[j];
-            console.log(`  Checking ad set ${j + 1}/${newAdSetIds.length}...`);
+        for (let j = 0; j < newAdSetIds.length; j++) {
+          const adSetId = newAdSetIds[j];
+          console.log(`  Checking ad set ${j + 1}/${newAdSetIds.length}...`);
 
-            const result = await this.ensureAdSetAttribution(adSetId);
-            attributionResults.push(result);
+          const result = await this.ensureAdSetAttribution(adSetId);
+          attributionResults.push(result);
 
-            // Small delay to avoid rate limits
-            if (j > 0 && j % 10 === 0) {
-              await this.delay(1000);
-            }
+          // Small delay to avoid rate limits
+          if (j > 0 && j % 10 === 0) {
+            await this.delay(1000);
           }
+        }
 
-          // Log summary
-          const updated = attributionResults.filter(r => r.updated).length;
-          const correct = attributionResults.filter(r => !r.updated && !r.error).length;
-          const errors = attributionResults.filter(r => r.error).length;
+        // Log summary
+        const updated = attributionResults.filter(r => r.updated).length;
+        const correct = attributionResults.filter(r => !r.updated && !r.error).length;
+        const errors = attributionResults.filter(r => r.error).length;
 
-          console.log('\n📊 Attribution Verification Summary:');
-          console.log(`  ✅ Updated: ${updated} ad sets`);
-          console.log(`  ✓ Already correct: ${correct} ad sets`);
-          if (errors > 0) {
-            console.log(`  ⚠️ Failed to verify: ${errors} ad sets`);
-          }
+        console.log('\n📊 Attribution Verification Summary:');
+        console.log(`  ✅ Updated: ${updated} ad sets`);
+        console.log(`  ✓ Already correct: ${correct} ad sets`);
+        if (errors > 0) {
+          console.log(`  ⚠️ Failed to verify: ${errors} ad sets`);
         }
       }
 
