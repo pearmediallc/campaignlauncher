@@ -182,7 +182,7 @@ const CampaignManagement: React.FC = () => {
               <Form.Group className="mb-3">
                 <Form.Label>My Launched Campaigns</Form.Label>
                 <Form.Select
-                  onChange={(e) => e.target.value && fetchCampaignDetails(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => e.target.value && fetchCampaignDetails(e.target.value)}
                   value={selectedCampaign || ''}
                 >
                   <option value="">-- Select a campaign --</option>
@@ -207,7 +207,7 @@ const CampaignManagement: React.FC = () => {
                   <Form.Control
                     type="text"
                     value={manualCampaignId}
-                    onChange={(e) => setManualCampaignId(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualCampaignId(e.target.value)}
                     placeholder="Enter campaign ID"
                     className="me-2"
                   />
@@ -237,7 +237,7 @@ const CampaignManagement: React.FC = () => {
           id="auto-refresh"
           label="Auto-refresh every 30 seconds"
           checked={autoRefresh}
-          onChange={(e) => setAutoRefresh(e.target.checked)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAutoRefresh(e.target.checked)}
         />
       </div>
 
