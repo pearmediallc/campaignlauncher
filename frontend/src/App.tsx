@@ -24,10 +24,11 @@ import Strategy150Container from './components/Strategy150/Strategy150Container'
 // Configure axios defaults for production
 if (process.env.NODE_ENV === 'production') {
   // In production, API calls should be relative to the same domain
-  axios.defaults.baseURL = '/api';
+  // Empty string means use the same domain with full path from components
+  axios.defaults.baseURL = '';
 } else {
-  // In development, use the environment variable or localhost
-  axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5002/api';
+  // In development, use the environment variable or localhost (without /api suffix)
+  axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5002';
 }
 
 const theme = createTheme({
