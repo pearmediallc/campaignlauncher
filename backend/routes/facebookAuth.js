@@ -879,18 +879,45 @@ router.get('/pixels', authenticate, async (req, res) => {
 
       if (adAccountId) {
         try {
-          // Fetch pixels from Facebook Graph API
-          const pixelsResponse = await axios.get(
-            `https://graph.facebook.com/v18.0/${adAccountId}/adspixels`,
-            {
-              params: {
-                access_token: accessToken,
-                fields: 'id,name,code,last_fired_time,is_unavailable'
-              }
-            }
-          );
+          // Fetch ALL pixels from Facebook Graph API with pagination
+          let allPixels = [];
+          let url = `https://graph.facebook.com/v18.0/${adAccountId}/adspixels`;
+          let params = {
+            access_token: accessToken,
+            fields: 'id,name,code,last_fired_time,is_unavailable',
+            limit: 100 // Maximum allowed by Facebook
+          };
 
-          pixels = pixelsResponse.data.data || [];
+          console.log('📊 Fetching all pixels with pagination...');
+          let pageCount = 0;
+
+          while (url) {
+            try {
+              const pixelsResponse = await axios.get(url, params ? { params } : {});
+
+              if (pixelsResponse.data && pixelsResponse.data.data) {
+                // Filter out unavailable pixels
+                const validPixels = pixelsResponse.data.data.filter(pixel => !pixel.is_unavailable);
+                allPixels = allPixels.concat(validPixels);
+                pageCount++;
+                console.log(`  ✅ Fetched page ${pageCount}: ${validPixels.length} valid pixels (Total: ${allPixels.length})`);
+              }
+
+              // Check for next page
+              if (pixelsResponse.data.paging && pixelsResponse.data.paging.next) {
+                url = pixelsResponse.data.paging.next;
+                params = null; // Next URL already contains all parameters
+              } else {
+                break; // No more pages
+              }
+            } catch (pageError) {
+              console.error(`Error fetching pixels page ${pageCount + 1}:`, pageError.message);
+              break; // Stop pagination on error but return what we have
+            }
+          }
+
+          console.log(`✅ Total pixels fetched: ${allPixels.length}`);
+          pixels = allPixels;
 
           // Update stored pixels
           await facebookAuth.update({ pixels });

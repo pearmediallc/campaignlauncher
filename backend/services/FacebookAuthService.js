@@ -272,18 +272,44 @@ class FacebookAuthService {
         console.error('Token sample:', typeof accessToken === 'string' ? accessToken.substring(0, 50) : 'not a string');
         return [];
       }
-      
-      const response = await axios.get(
-        `${this.baseGraphUrl}/me/adaccounts`,
-        {
-          params: {
-            fields: 'id,name,account_status,disable_reason,currency,timezone_name,spend_cap,amount_spent,balance',
-            access_token: decryptedToken
+
+      // Fetch ALL ad accounts with pagination
+      let allAdAccounts = [];
+      let url = `${this.baseGraphUrl}/me/adaccounts`;
+      let params = {
+        fields: 'id,name,account_status,disable_reason,currency,timezone_name,spend_cap,amount_spent,balance',
+        limit: 100, // Maximum allowed by Facebook
+        access_token: decryptedToken
+      };
+
+      console.log('📊 Fetching all ad accounts with pagination...');
+      let pageCount = 0;
+
+      while (url) {
+        try {
+          const response = await axios.get(url, params ? { params } : {});
+
+          if (response.data && response.data.data) {
+            allAdAccounts = allAdAccounts.concat(response.data.data);
+            pageCount++;
+            console.log(`  ✅ Fetched page ${pageCount}: ${response.data.data.length} accounts (Total: ${allAdAccounts.length})`);
           }
+
+          // Check for next page
+          if (response.data.paging && response.data.paging.next) {
+            url = response.data.paging.next;
+            params = null; // Next URL already contains all parameters
+          } else {
+            break; // No more pages
+          }
+        } catch (pageError) {
+          console.error(`Error fetching page ${pageCount + 1}:`, pageError.message);
+          break; // Stop pagination on error but return what we have
         }
-      );
-      
-      return response.data.data || [];
+      }
+
+      console.log(`✅ Total ad accounts fetched: ${allAdAccounts.length}`);
+      return allAdAccounts;
     } catch (error) {
       console.error('Get ad accounts error:', error.response?.data || error);
       console.error('Token used (first 20 chars):', accessToken?.substring(0, 20));
