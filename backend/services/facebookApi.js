@@ -1957,41 +1957,56 @@ class FacebookAPI {
 
       // Use Facebook's native /copies endpoint with deep_copy
       const copyData = {
-        source_campaign_id: sourceCampaignId,
         deep_copy: true, // This copies EVERYTHING - campaign, adsets, ads
         status_option: 'PAUSED', // Always create paused for safety
-        rename_option: 'RENAME_WITH_SUFFIX',
-        rename_suffix: `_Copy${copyNumber}_${timestamp}`,
+        rename_options: JSON.stringify({
+          rename_suffix: `_Copy${copyNumber}_${timestamp}`,
+          rename_strategy: 'DEEP_RENAME' // Renames campaign, adsets, and ads
+        }),
+        // Force 1-day click, 1-day view attribution on all copied ad sets
+        attribution_spec: JSON.stringify([
+          { event_type: 'CLICK_THROUGH', window_days: 1 },
+          { event_type: 'VIEW_THROUGH', window_days: 1 }
+        ]),
         access_token: this.accessToken
       };
 
       console.log(`  🔄 Deep copying campaign (includes all 50 adsets and ads)...`);
 
-      // Facebook's native batch copy API
+      // Facebook's native campaign copy API - copies everything in one call
       const response = await axios.post(
-        `${this.baseURL}/act_${this.adAccountId}/copies`,
+        `${this.baseURL}/${sourceCampaignId}/copies`,
         null,
         { params: copyData }
       );
 
       // The response contains the copy operation details
       const copyId = response.data.copied_campaign_id || response.data.id;
+      const copiedAdSetIds = response.data.copied_adset_ids || [];
+      const copiedAdIds = response.data.copied_ad_ids || [];
 
       if (copyId) {
         console.log(`  ✅ Deep copy successful! New campaign ID: ${copyId}`);
 
-        // Optionally fetch the new campaign details
+        // Return complete campaign copy details
         const newCampaign = {
           id: copyId,
           name: `${originalName}_Copy${copyNumber}_${timestamp}`,
           status: 'PAUSED'
         };
 
+        console.log(`  📊 Deep copy complete:`);
+        console.log(`    - Campaign: ${copyId}`);
+        console.log(`    - Ad Sets copied: ${copiedAdSetIds.length}`);
+        console.log(`    - Ads copied: ${copiedAdIds.length}`);
+
         return {
           success: true,
           campaign: newCampaign,
           copyId: copyId,
-          message: `Successfully deep copied campaign with all adsets and ads`
+          adSetIds: copiedAdSetIds,
+          adIds: copiedAdIds,
+          message: `Successfully deep copied campaign with ${copiedAdSetIds.length} adsets and ${copiedAdIds.length} ads`
         };
       } else {
         throw new Error('Deep copy did not return a campaign ID');
@@ -2037,27 +2052,23 @@ class FacebookAPI {
           if (copyResult.success) {
             results.push({
               copyNumber,
-              campaign: copyResult.campaign,
+              campaignId: copyResult.campaign.id,
+              campaignName: copyResult.campaign.name,
+              adSetsCreated: copyResult.adSetIds ? copyResult.adSetIds.length : 50,
+              adsCreated: copyResult.adIds ? copyResult.adIds.length : 50,
+              adSetIds: copyResult.adSetIds,
+              adIds: copyResult.adIds,
               status: 'success',
-              message: 'Deep copy successful - all 50 adsets and ads copied'
+              message: copyResult.message
             });
 
             console.log(`  ✅ Copy ${copyNumber} completed successfully`);
             console.log(`    New Campaign ID: ${copyResult.campaign?.id}`);
+            console.log(`    Ad Sets: ${copyResult.adSetIds?.length || 'unknown'}`);
+            console.log(`    Ads: ${copyResult.adIds?.length || 'unknown'}`);
           } else {
             throw new Error('Deep copy did not return success status');
           }
-
-          results.push({
-            copyNumber,
-            campaignId: newCampaignId,
-            campaignName: newCampaignData.name,
-            adSetsCreated,
-            adsCreated,
-            status: 'success'
-          });
-
-          console.log(`  ✅ Campaign copy ${copyNumber} complete: ${adSetsCreated} ad sets, ${adsCreated} ads`);
 
         } catch (error) {
           console.error(`  ❌ Failed to create campaign copy ${copyNumber}:`, error.message);
