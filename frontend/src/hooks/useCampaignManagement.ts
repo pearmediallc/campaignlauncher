@@ -1,5 +1,49 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CampaignListItem, CampaignFilters, CampaignMetrics } from '../types/campaignManagement';
+import axios from 'axios';
+
+interface TrackedCampaign {
+  campaign_id: string;
+  campaign_name: string;
+  status: string;
+  created_at: string;
+  strategy_type: string;
+  ad_account_id: string;
+  learning_phase_summary?: {
+    total_adsets: number;
+    learning: number;
+    active: number;
+    limited: number;
+  };
+}
+
+interface CampaignDetails {
+  id: string;
+  name: string;
+  status: string;
+  objective: string;
+  created_time: string;
+  daily_budget?: number;
+  lifetime_budget?: number;
+  adsets?: {
+    data: Array<{
+      id: string;
+      name: string;
+      status: string;
+      learning_status: string;
+      learning_message: string;
+      daily_budget?: number;
+      metrics?: {
+        impressions: number;
+        clicks: number;
+        spend: number;
+        ctr: number;
+        cpm: number;
+        conversions?: number;
+      };
+    }>;
+  };
+}
 
 export const useCampaignManagement = () => {
   const [campaigns, setCampaigns] = useState<CampaignListItem[]>([]);
@@ -16,84 +60,6 @@ export const useCampaignManagement = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-
-  // Mock data for initial implementation
-  const generateMockCampaigns = (): CampaignListItem[] => {
-    return [
-      {
-        id: '1',
-        name: 'Summer Sale Campaign',
-        status: 'ACTIVE',
-        createdDate: '2024-01-15',
-        adSetsCount: 50,
-        totalSpend: 1247.50,
-        impressions: 156200,
-        clicks: 3890,
-        ctr: 2.49,
-        cpc: 0.32,
-        conversions: 127,
-        roas: 3.2,
-        dailyBudget: 50,
-        budgetType: 'daily',
-        facebookCampaignId: 'fb_12345',
-        objective: 'CONVERSIONS',
-        originalAdSetId: 'adset_001',
-        duplicatedAdSets: Array.from({ length: 49 }, (_, i) => ({
-          id: `adset_${String(i + 2).padStart(3, '0')}`,
-          name: `Summer Sale - Ad Set ${i + 2}`,
-          status: 'ACTIVE'
-        }))
-      },
-      {
-        id: '2',
-        name: 'Winter Promotion',
-        status: 'PAUSED',
-        createdDate: '2024-01-10',
-        adSetsCount: 50,
-        totalSpend: 892.30,
-        impressions: 98500,
-        clicks: 2140,
-        ctr: 2.17,
-        cpc: 0.42,
-        conversions: 76,
-        roas: 2.8,
-        dailyBudget: 30,
-        budgetType: 'daily',
-        facebookCampaignId: 'fb_12346',
-        objective: 'CONVERSIONS',
-        originalAdSetId: 'adset_101',
-        duplicatedAdSets: Array.from({ length: 49 }, (_, i) => ({
-          id: `adset_${String(i + 102).padStart(3, '0')}`,
-          name: `Winter Promotion - Ad Set ${i + 2}`,
-          status: 'PAUSED'
-        }))
-      },
-      {
-        id: '3',
-        name: 'Flash Sale Weekend',
-        status: 'ACTIVE',
-        createdDate: '2024-01-20',
-        adSetsCount: 50,
-        totalSpend: 2156.80,
-        impressions: 245600,
-        clicks: 7890,
-        ctr: 3.21,
-        cpc: 0.27,
-        conversions: 234,
-        roas: 4.1,
-        dailyBudget: 100,
-        budgetType: 'daily',
-        facebookCampaignId: 'fb_12347',
-        objective: 'CONVERSIONS',
-        originalAdSetId: 'adset_201',
-        duplicatedAdSets: Array.from({ length: 49 }, (_, i) => ({
-          id: `adset_${String(i + 202).padStart(3, '0')}`,
-          name: `Flash Sale Weekend - Ad Set ${i + 2}`,
-          status: 'ACTIVE'
-        }))
-      }
-    ];
-  };
 
   const calculateMetrics = (campaignList: CampaignListItem[]): CampaignMetrics => {
     const activeCampaigns = campaignList.filter(c => c.status === 'ACTIVE');
@@ -116,20 +82,76 @@ export const useCampaignManagement = () => {
       setLoading(true);
       setError('');
 
-      // For now, use mock data. In production, this would call:
-      // const response = await fetch('/api/campaigns/strategy-150/list', {
-      //   headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      // });
+      // Fetch tracked campaigns from real API
+      const trackedResponse = await axios.get('/api/campaigns/manage/tracked');
+      const trackedCampaigns: TrackedCampaign[] = trackedResponse.data.campaigns || [];
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Fetch detailed information for each campaign
+      const campaignDetailsPromises = trackedCampaigns.map(async (tracked) => {
+        try {
+          const detailsResponse = await axios.get(`/api/campaigns/manage/details/${tracked.campaign_id}`);
+          return detailsResponse.data.campaign as CampaignDetails;
+        } catch (error) {
+          console.error(`Failed to fetch details for campaign ${tracked.campaign_id}:`, error);
+          return null;
+        }
+      });
 
-      const mockCampaigns = generateMockCampaigns();
-      setCampaigns(mockCampaigns);
-      setMetrics(calculateMetrics(mockCampaigns));
+      const campaignDetails = (await Promise.all(campaignDetailsPromises)).filter(c => c !== null) as CampaignDetails[];
+
+      // Transform API data to CampaignListItem format
+      const transformedCampaigns: CampaignListItem[] = campaignDetails.map(campaign => {
+        const adsets = campaign.adsets?.data || [];
+
+        // Calculate aggregated metrics from ad sets
+        const totalMetrics = adsets.reduce((acc, adset) => {
+          const m = adset.metrics || { impressions: 0, clicks: 0, spend: 0, conversions: 0 };
+          return {
+            impressions: acc.impressions + (m.impressions || 0),
+            clicks: acc.clicks + (m.clicks || 0),
+            spend: acc.spend + (m.spend || 0),
+            conversions: acc.conversions + (m.conversions || 0)
+          };
+        }, { impressions: 0, clicks: 0, spend: 0, conversions: 0 });
+
+        const ctr = totalMetrics.impressions > 0 ? (totalMetrics.clicks / totalMetrics.impressions) * 100 : 0;
+        const cpc = totalMetrics.clicks > 0 ? totalMetrics.spend / totalMetrics.clicks : 0;
+        const roas = totalMetrics.spend > 0 ? (totalMetrics.conversions * 50) / totalMetrics.spend : 0; // Assuming $50 value per conversion
+
+        return {
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status as 'ACTIVE' | 'PAUSED',
+          createdDate: new Date(campaign.created_time).toISOString().split('T')[0],
+          adSetsCount: adsets.length,
+          totalSpend: totalMetrics.spend / 100, // Convert from cents
+          impressions: totalMetrics.impressions,
+          clicks: totalMetrics.clicks,
+          ctr: parseFloat(ctr.toFixed(2)),
+          cpc: parseFloat((cpc / 100).toFixed(2)), // Convert from cents
+          conversions: totalMetrics.conversions,
+          roas: parseFloat(roas.toFixed(2)),
+          dailyBudget: campaign.daily_budget ? campaign.daily_budget / 100 : 0,
+          budgetType: campaign.daily_budget ? 'daily' : 'lifetime',
+          facebookCampaignId: campaign.id,
+          objective: campaign.objective,
+          originalAdSetId: adsets[0]?.id || '',
+          duplicatedAdSets: adsets.map(adset => ({
+            id: adset.id,
+            name: adset.name,
+            status: adset.status as 'ACTIVE' | 'PAUSED',
+            learningStatus: adset.learning_status,
+            learningMessage: adset.learning_message
+          }))
+        };
+      });
+
+      setCampaigns(transformedCampaigns);
+      setMetrics(calculateMetrics(transformedCampaigns));
 
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch campaigns');
+      console.error('Error fetching campaigns:', err);
+      setError(err.response?.data?.message || err.message || 'Failed to fetch campaigns');
     } finally {
       setLoading(false);
     }
@@ -146,21 +168,17 @@ export const useCampaignManagement = () => {
           : campaign
       ));
 
-      // In production, this would call:
-      // await fetch(`/api/campaigns/strategy-150/status/${campaignId}`, {
-      //   method: 'PUT',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${localStorage.getItem('token')}`
-      //   },
-      //   body: JSON.stringify({ status })
-      // });
+      // Call real API to update campaign status
+      await axios.post('/api/campaigns/manage/status', {
+        campaignId,
+        status
+      });
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Fetch updated campaign details to ensure synchronization
+      setTimeout(() => fetchCampaigns(), 1000);
 
     } catch (err: any) {
-      setError(err.message || 'Failed to update campaign status');
+      setError(err.response?.data?.message || err.message || 'Failed to update campaign status');
       // Revert local state on error
       fetchCampaigns();
     }
@@ -177,28 +195,26 @@ export const useCampaignManagement = () => {
           : campaign
       ));
 
-      // In production, bulk API call would be made here
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Update each campaign status via API
+      const updatePromises = campaignIds.map(campaignId =>
+        axios.post('/api/campaigns/manage/status', { campaignId, status })
+      );
+
+      await Promise.all(updatePromises);
+
+      // Refresh campaign data after updates
+      setTimeout(() => fetchCampaigns(), 1000);
 
     } catch (err: any) {
-      setError(err.message || 'Failed to update campaigns');
+      setError(err.response?.data?.message || err.message || 'Failed to update campaigns');
       fetchCampaigns();
     }
   }, [fetchCampaigns]);
 
   const refreshMetrics = useCallback(() => {
-    const updatedCampaigns = campaigns.map(campaign => ({
-      ...campaign,
-      // Simulate real-time metric updates
-      totalSpend: campaign.totalSpend + Math.random() * 10,
-      impressions: campaign.impressions + Math.floor(Math.random() * 1000),
-      clicks: campaign.clicks + Math.floor(Math.random() * 50),
-      conversions: campaign.conversions + Math.floor(Math.random() * 5)
-    }));
-
-    setCampaigns(updatedCampaigns);
-    setMetrics(calculateMetrics(updatedCampaigns));
-  }, [campaigns]);
+    // Simply refetch from API for real-time data
+    fetchCampaigns();
+  }, [fetchCampaigns]);
 
   useEffect(() => {
     fetchCampaigns();

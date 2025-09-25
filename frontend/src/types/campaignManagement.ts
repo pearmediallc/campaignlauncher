@@ -31,6 +31,8 @@ export interface CampaignListItem {
     id: string;
     name: string;
     status: string;
+    learningStatus?: string;
+    learningMessage?: string;
   }>;
 }
 

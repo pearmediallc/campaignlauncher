@@ -195,6 +195,7 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
                 </TableSortLabel>
               </TableCell>
               <TableCell align="right">Ad Sets</TableCell>
+              <TableCell align="center">Learning Phase</TableCell>
               <TableCell align="right">
                 <TableSortLabel
                   active={sortField === 'totalSpend'}
@@ -291,6 +292,47 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
                   <Typography variant="body2">
                     {formatNumber(campaign.adSetsCount)}
                   </Typography>
+                </TableCell>
+                <TableCell align="center">
+                  {campaign.duplicatedAdSets && (() => {
+                    const learningCount = campaign.duplicatedAdSets.filter(a => a.learningStatus === 'LEARNING').length;
+                    const activeCount = campaign.duplicatedAdSets.filter(a => a.learningStatus === 'SUCCESS').length;
+                    const limitedCount = campaign.duplicatedAdSets.filter(a => a.learningStatus === 'FAIL').length;
+
+                    return (
+                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                        {learningCount > 0 && (
+                          <Chip
+                            label={`${learningCount} Learning`}
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                          />
+                        )}
+                        {activeCount > 0 && (
+                          <Chip
+                            label={`${activeCount} Active`}
+                            size="small"
+                            color="success"
+                            variant="outlined"
+                          />
+                        )}
+                        {limitedCount > 0 && (
+                          <Chip
+                            label={`${limitedCount} Limited`}
+                            size="small"
+                            color="error"
+                            variant="outlined"
+                          />
+                        )}
+                        {learningCount === 0 && activeCount === 0 && limitedCount === 0 && (
+                          <Typography variant="caption" color="text.secondary">
+                            No data
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell align="right">
                   <Typography variant="body2" fontWeight="medium">
