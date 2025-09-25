@@ -1461,7 +1461,8 @@ class FacebookAPI {
 
           const originalAdSet = originalAdSetResponse.data;
 
-          // Create new ad set with same settings
+          // Create new ad set with same settings + forced 1-day attribution
+          console.log(`  ⚙️ Setting attribution to 1-day click, 1-day view for copy ${i + 1}`);
           const newAdSetData = {
             name: `${originalAdSet.name} - Copy ${i + 1}`,
             campaign_id: campaignId,
@@ -1472,6 +1473,11 @@ class FacebookAPI {
             billing_event: originalAdSet.billing_event,
             bid_strategy: originalAdSet.bid_strategy,
             promoted_object: originalAdSet.promoted_object,
+            // FORCE 1-DAY CLICK, 1-DAY VIEW ATTRIBUTION FROM THE START
+            attribution_spec: JSON.stringify([
+              { event_type: 'CLICK_THROUGH', window_days: 1 },
+              { event_type: 'VIEW_THROUGH', window_days: 1 }
+            ]),
             status: 'ACTIVE',
             access_token: this.accessToken
           };
@@ -1554,7 +1560,7 @@ class FacebookAPI {
           const adSetId = newAdSetIds[j];
           console.log(`  Checking ad set ${j + 1}/${newAdSetIds.length}...`);
 
-          const result = await this.ensureAdSetAttribution(adSetId);
+          const result = await this.verifyAdSetAttribution(adSetId);
           attributionResults.push(result);
 
           // Small delay to avoid rate limits
@@ -2181,6 +2187,7 @@ class FacebookAPI {
         if (updateProgress) updateProgress(`Cloning ad set ${i + 1}/${sourceAdSetIds.length}...`);
 
         try {
+          console.log(`    ⚙️ Forcing 1-day click, 1-day view attribution on ad set ${i + 1}`);
           // Use Facebook's copy endpoint for ad sets
           const copyUrl = `${this.baseURL}/${sourceAdSetId}/copies`;
           const copyParams = {
@@ -2190,6 +2197,11 @@ class FacebookAPI {
             rename_options: JSON.stringify({
               rename_suffix: `_Copy${copyNumber}`
             }),
+            // FORCE 1-DAY CLICK, 1-DAY VIEW ATTRIBUTION FROM THE START
+            attribution_spec: JSON.stringify([
+              { event_type: 'CLICK_THROUGH', window_days: 1 },
+              { event_type: 'VIEW_THROUGH', window_days: 1 }
+            ]),
             access_token: this.accessToken
           };
 
@@ -2240,7 +2252,7 @@ class FacebookAPI {
         const adSetId = clonedAdSets[i];
         console.log(`  Checking ad set ${i + 1}/${clonedAdSets.length}...`);
 
-        const result = await this.ensureAdSetAttribution(adSetId);
+        const result = await this.verifyAdSetAttribution(adSetId);
         attributionResults.push(result);
 
         // Small delay to avoid rate limits
@@ -2250,13 +2262,13 @@ class FacebookAPI {
       }
 
       // Log summary
-      const updated = attributionResults.filter(r => r.updated).length;
-      const correct = attributionResults.filter(r => !r.updated && !r.error).length;
+      const verified = attributionResults.filter(r => r.verified).length;
+      const notVerified = attributionResults.filter(r => !r.verified && !r.error).length;
       const errors = attributionResults.filter(r => r.error).length;
 
       console.log('\n📊 Attribution Verification Summary:');
-      console.log(`  ✅ Updated: ${updated} ad sets`);
-      console.log(`  ✓ Already correct: ${correct} ad sets`);
+      console.log(`  ✅ Verified correct: ${verified} ad sets`);
+      console.log(`  ⚠️ Not verified: ${notVerified} ad sets`);
       if (errors > 0) {
         console.log(`  ⚠️ Failed to verify: ${errors} ad sets`);
       }
@@ -2292,7 +2304,44 @@ class FacebookAPI {
     }
   }
 
-  // Helper method to ensure ad set has correct attribution settings
+  // NEW: Verification-only method that doesn't try to update (since attribution is immutable)
+  async verifyAdSetAttribution(adSetId) {
+    try {
+      const getUrl = `${this.baseURL}/${adSetId}`;
+      const getParams = {
+        fields: 'attribution_spec,name',
+        access_token: this.accessToken
+      };
+
+      const currentAdSet = await axios.get(getUrl, { params: getParams });
+      const currentAttribution = currentAdSet.data.attribution_spec;
+
+      if (currentAttribution && Array.isArray(currentAttribution)) {
+        const hasOneClickDay = currentAttribution.some(
+          spec => spec.event_type === 'CLICK_THROUGH' && spec.window_days === 1
+        );
+        const hasOneViewDay = currentAttribution.some(
+          spec => spec.event_type === 'VIEW_THROUGH' && spec.window_days === 1
+        );
+
+        if (hasOneClickDay && hasOneViewDay && currentAttribution.length === 2) {
+          console.log(`    ✅ Verified: 1-day click, 1-day view is set for ${adSetId}`);
+          return { verified: true, adSetId };
+        } else {
+          console.log(`    ⚠️ Warning: Attribution not as expected for ${adSetId}`);
+          return { verified: false, adSetId, currentAttribution };
+        }
+      } else {
+        console.log(`    ⚠️ No attribution spec found for ${adSetId}`);
+        return { verified: false, adSetId, currentAttribution };
+      }
+    } catch (error) {
+      console.warn(`    ⚠️ Could not verify attribution for ${adSetId}: ${error.message}`);
+      return { error: true, adSetId, message: error.message };
+    }
+  }
+
+  // LEGACY: Helper method to ensure ad set has correct attribution settings (kept for backward compatibility)
   async ensureAdSetAttribution(adSetId) {
     try {
       // First, GET the current attribution to check if update is needed
