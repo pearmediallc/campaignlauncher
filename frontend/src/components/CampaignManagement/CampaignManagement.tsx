@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Alert, Button, Card, Form, Table, Badge, Spinner, Container, Row, Col } from 'react-bootstrap';
-import { FaPlay, FaPause, FaSync, FaChartLine, FaExclamationTriangle } from 'react-icons/fa';
 import './CampaignManagement.css';
 
 interface Campaign {
@@ -133,18 +131,33 @@ const CampaignManagement: React.FC = () => {
     }
   };
 
-  const getLearningBadge = (status: string) => {
+  const getLearningBadgeClass = (status: string) => {
     switch(status) {
       case 'LEARNING':
-        return <Badge bg="warning">🔄 Learning</Badge>;
+        return 'badge bg-warning';
       case 'SUCCESS':
-        return <Badge bg="success">✅ Active</Badge>;
+        return 'badge bg-success';
       case 'FAIL':
-        return <Badge bg="danger">⚠️ Limited</Badge>;
+        return 'badge bg-danger';
       case 'WAIVING':
-        return <Badge bg="info">⏭️ Waived</Badge>;
+        return 'badge bg-info';
       default:
-        return <Badge bg="secondary">Unknown</Badge>;
+        return 'badge bg-secondary';
+    }
+  };
+
+  const getLearningBadgeText = (status: string) => {
+    switch(status) {
+      case 'LEARNING':
+        return '🔄 Learning';
+      case 'SUCCESS':
+        return '✅ Active';
+      case 'FAIL':
+        return '⚠️ Limited';
+      case 'WAIVING':
+        return '⏭️ Waived';
+      default:
+        return 'Unknown';
     }
   };
 
@@ -159,30 +172,33 @@ const CampaignManagement: React.FC = () => {
   };
 
   return (
-    <Container className="campaign-management mt-4">
+    <div className="container campaign-management mt-4">
       <h2 className="mb-4">Campaign Management</h2>
 
       {error && (
-        <Alert variant="danger" dismissible onClose={() => setError(null)}>
+        <div className="alert alert-danger alert-dismissible" role="alert">
           {error}
-        </Alert>
+          <button type="button" className="btn-close" onClick={() => setError(null)}></button>
+        </div>
       )}
 
       {success && (
-        <Alert variant="success" dismissible onClose={() => setSuccess(null)}>
+        <div className="alert alert-success alert-dismissible" role="alert">
           {success}
-        </Alert>
+          <button type="button" className="btn-close" onClick={() => setSuccess(null)}></button>
+        </div>
       )}
 
-      <Row className="mb-4">
-        <Col md={6}>
-          <Card>
-            <Card.Body>
-              <Card.Title>Select Campaign</Card.Title>
-              <Form.Group className="mb-3">
-                <Form.Label>My Launched Campaigns</Form.Label>
-                <Form.Select
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => e.target.value && fetchCampaignDetails(e.target.value)}
+      <div className="row mb-4">
+        <div className="col-md-6">
+          <div className="card">
+            <div className="card-body">
+              <h5 className="card-title">Select Campaign</h5>
+              <div className="mb-3">
+                <label className="form-label">My Launched Campaigns</label>
+                <select
+                  className="form-select"
+                  onChange={(e) => e.target.value && fetchCampaignDetails(e.target.value)}
                   value={selectedCampaign || ''}
                 >
                   <option value="">-- Select a campaign --</option>
@@ -191,113 +207,112 @@ const CampaignManagement: React.FC = () => {
                       {campaign.campaign_name} ({campaign.campaign_id})
                     </option>
                   ))}
-                </Form.Select>
-              </Form.Group>
-            </Card.Body>
-          </Card>
-        </Col>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        <Col md={6}>
-          <Card>
-            <Card.Body>
-              <Card.Title>Manual Campaign Entry</Card.Title>
-              <Form.Group>
-                <Form.Label>Enter Campaign ID</Form.Label>
+        <div className="col-md-6">
+          <div className="card">
+            <div className="card-body">
+              <h5 className="card-title">Manual Campaign Entry</h5>
+              <div className="mb-3">
+                <label className="form-label">Enter Campaign ID</label>
                 <div className="d-flex">
-                  <Form.Control
+                  <input
                     type="text"
+                    className="form-control me-2"
                     value={manualCampaignId}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualCampaignId(e.target.value)}
+                    onChange={(e) => setManualCampaignId(e.target.value)}
                     placeholder="Enter campaign ID"
-                    className="me-2"
                   />
-                  <Button
-                    variant="primary"
+                  <button
+                    className="btn btn-primary"
                     onClick={() => manualCampaignId && fetchCampaignDetails(manualCampaignId)}
                   >
                     Fetch
-                  </Button>
-                  <Button
-                    variant="outline-secondary"
+                  </button>
+                  <button
+                    className="btn btn-outline-secondary ms-2"
                     onClick={trackManualCampaign}
-                    className="ms-2"
                   >
                     Track
-                  </Button>
+                  </button>
                 </div>
-              </Form.Group>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="mb-3">
-        <Form.Check
-          type="switch"
-          id="auto-refresh"
-          label="Auto-refresh every 30 seconds"
-          checked={autoRefresh}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAutoRefresh(e.target.checked)}
-        />
+        <div className="form-check form-switch">
+          <input
+            className="form-check-input"
+            type="checkbox"
+            id="auto-refresh"
+            checked={autoRefresh}
+            onChange={(e) => setAutoRefresh(e.target.checked)}
+          />
+          <label className="form-check-label" htmlFor="auto-refresh">
+            Auto-refresh every 30 seconds
+          </label>
+        </div>
       </div>
 
       {loading && (
         <div className="text-center my-5">
-          <Spinner animation="border" role="status">
+          <div className="spinner-border" role="status">
             <span className="visually-hidden">Loading...</span>
-          </Spinner>
+          </div>
           <p className="mt-2">Fetching campaign details...</p>
         </div>
       )}
 
       {!loading && campaignDetails && (
-        <Card className="campaign-details">
-          <Card.Body>
+        <div className="card campaign-details">
+          <div className="card-body">
             <div className="d-flex justify-content-between align-items-center mb-4">
               <div>
                 <h3>{campaignDetails.name}</h3>
-                <Badge bg={campaignDetails.status === 'ACTIVE' ? 'success' : 'warning'} className="me-2">
+                <span className={`badge ${campaignDetails.status === 'ACTIVE' ? 'bg-success' : 'bg-warning'} me-2`}>
                   {campaignDetails.status}
-                </Badge>
-                <Badge bg="info">{campaignDetails.objective}</Badge>
+                </span>
+                <span className="badge bg-info">{campaignDetails.objective}</span>
               </div>
               <div>
-                <Button
-                  variant={campaignDetails.status === 'ACTIVE' ? 'warning' : 'success'}
+                <button
+                  className={`btn ${campaignDetails.status === 'ACTIVE' ? 'btn-warning' : 'btn-success'} me-2`}
                   onClick={() => updateCampaignStatus(
                     campaignDetails.id,
                     campaignDetails.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE'
                   )}
-                  className="me-2"
                 >
-                  {campaignDetails.status === 'ACTIVE' ? (
-                    <><FaPause /> Pause</>
-                  ) : (
-                    <><FaPlay /> Resume</>
-                  )}
-                </Button>
-                <Button
-                  variant="outline-primary"
+                  {campaignDetails.status === 'ACTIVE' ? '⏸ Pause' : '▶ Resume'}
+                </button>
+                <button
+                  className="btn btn-outline-primary"
                   onClick={() => fetchCampaignDetails(campaignDetails.id)}
                 >
-                  <FaSync /> Refresh
-                </Button>
+                  🔄 Refresh
+                </button>
               </div>
             </div>
 
-            <Row className="mb-3">
-              <Col>
+            <div className="row mb-3">
+              <div className="col">
                 <strong>Campaign ID:</strong> {campaignDetails.id}
-              </Col>
-              <Col>
+              </div>
+              <div className="col">
                 <strong>Created:</strong> {new Date(campaignDetails.created_time).toLocaleDateString()}
-              </Col>
+              </div>
               {campaignDetails.daily_budget && (
-                <Col>
+                <div className="col">
                   <strong>Daily Budget:</strong> {formatCurrency(campaignDetails.daily_budget)}
-                </Col>
+                </div>
               )}
-            </Row>
+            </div>
 
             <h4 className="mt-4 mb-3">
               Ad Sets ({campaignDetails.adsets?.data?.length || 0})
@@ -305,7 +320,7 @@ const CampaignManagement: React.FC = () => {
 
             {campaignDetails.adsets?.data && campaignDetails.adsets.data.length > 0 ? (
               <div className="table-responsive">
-                <Table striped bordered hover>
+                <table className="table table-striped table-bordered table-hover">
                   <thead>
                     <tr>
                       <th>Ad Set Name</th>
@@ -324,12 +339,14 @@ const CampaignManagement: React.FC = () => {
                       <tr key={adset.id}>
                         <td>{adset.name}</td>
                         <td>
-                          <Badge bg={adset.status === 'ACTIVE' ? 'success' : 'secondary'}>
+                          <span className={`badge ${adset.status === 'ACTIVE' ? 'bg-success' : 'bg-secondary'}`}>
                             {adset.status}
-                          </Badge>
+                          </span>
                         </td>
                         <td>
-                          {getLearningBadge(adset.learning_status)}
+                          <span className={getLearningBadgeClass(adset.learning_status)}>
+                            {getLearningBadgeText(adset.learning_status)}
+                          </span>
                           <small className="d-block text-muted">{adset.learning_message}</small>
                         </td>
                         <td>{formatCurrency(adset.daily_budget)}</td>
@@ -341,43 +358,43 @@ const CampaignManagement: React.FC = () => {
                       </tr>
                     ))}
                   </tbody>
-                </Table>
+                </table>
               </div>
             ) : (
-              <Alert variant="info">
+              <div className="alert alert-info">
                 No ad sets found in this campaign.
-              </Alert>
+              </div>
             )}
 
             {/* Learning Phase Summary */}
             {campaignDetails.adsets?.data && campaignDetails.adsets.data.length > 0 && (
-              <Card className="mt-3">
-                <Card.Body>
+              <div className="card mt-3">
+                <div className="card-body">
                   <h5>Learning Phase Summary</h5>
-                  <Row>
-                    <Col>
-                      <FaChartLine className="text-warning" />
+                  <div className="row">
+                    <div className="col">
+                      <span className="text-warning">📊</span>
                       <strong> Learning:</strong>{' '}
                       {campaignDetails.adsets.data.filter(a => a.learning_status === 'LEARNING').length}
-                    </Col>
-                    <Col>
-                      <FaPlay className="text-success" />
+                    </div>
+                    <div className="col">
+                      <span className="text-success">▶</span>
                       <strong> Active:</strong>{' '}
                       {campaignDetails.adsets.data.filter(a => a.learning_status === 'SUCCESS').length}
-                    </Col>
-                    <Col>
-                      <FaExclamationTriangle className="text-danger" />
+                    </div>
+                    <div className="col">
+                      <span className="text-danger">⚠️</span>
                       <strong> Limited:</strong>{' '}
                       {campaignDetails.adsets.data.filter(a => a.learning_status === 'FAIL').length}
-                    </Col>
-                  </Row>
-                </Card.Body>
-              </Card>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
-          </Card.Body>
-        </Card>
+          </div>
+        </div>
       )}
-    </Container>
+    </div>
   );
 };
 
