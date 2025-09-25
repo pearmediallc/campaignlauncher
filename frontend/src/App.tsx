@@ -31,6 +31,47 @@ if (process.env.NODE_ENV === 'production') {
   axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5002';
 }
 
+// Add axios interceptor to automatically include authentication token
+axios.interceptors.request.use(
+  (config) => {
+    // Get token from localStorage
+    const token = localStorage.getItem('token');
+
+    // If token exists, add it to the Authorization header
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    // Handle request error
+    return Promise.reject(error);
+  }
+);
+
+// Optional: Add response interceptor to handle auth errors globally
+axios.interceptors.response.use(
+  (response) => {
+    // Return successful response as-is
+    return response;
+  },
+  (error) => {
+    // If we get a 401, the token might be expired
+    if (error.response?.status === 401) {
+      // Only redirect to login if we're not already on the login page
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        // Token is invalid or expired
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 const theme = createTheme({
   palette: {
     primary: {
