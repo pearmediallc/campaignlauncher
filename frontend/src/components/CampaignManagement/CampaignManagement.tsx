@@ -161,14 +161,18 @@ const CampaignManagement: React.FC = () => {
     }
   };
 
-  const formatCurrency = (amount?: number) => {
+  const formatCurrency = (amount?: number | string) => {
     if (!amount) return '$0.00';
-    return `$${(amount / 100).toFixed(2)}`;
+    const numAmount = Number(amount);
+    if (isNaN(numAmount)) return '$0.00';
+    return `$${(numAmount / 100).toFixed(2)}`;
   };
 
-  const formatNumber = (num?: number) => {
+  const formatNumber = (num?: number | string) => {
     if (!num) return '0';
-    return num.toLocaleString();
+    const numValue = Number(num);
+    if (isNaN(numValue)) return '0';
+    return numValue.toLocaleString();
   };
 
   return (
@@ -353,7 +357,7 @@ const CampaignManagement: React.FC = () => {
                         <td>{formatNumber(adset.metrics?.impressions)}</td>
                         <td>{formatNumber(adset.metrics?.clicks)}</td>
                         <td>{formatCurrency(adset.metrics?.spend)}</td>
-                        <td>{adset.metrics?.ctr ? Number(adset.metrics.ctr).toFixed(2) : '0.00'}%</td>
+                        <td>{adset.metrics?.ctr ? (isNaN(Number(adset.metrics.ctr)) ? '0.00' : Number(adset.metrics.ctr).toFixed(2)) : '0.00'}%</td>
                         <td>{formatCurrency(adset.metrics?.cpm)}</td>
                       </tr>
                     ))}
