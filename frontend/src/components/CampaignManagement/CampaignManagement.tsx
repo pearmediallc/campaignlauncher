@@ -353,7 +353,7 @@ const CampaignManagement: React.FC = () => {
                         <td>{formatNumber(adset.metrics?.impressions)}</td>
                         <td>{formatNumber(adset.metrics?.clicks)}</td>
                         <td>{formatCurrency(adset.metrics?.spend)}</td>
-                        <td>{adset.metrics?.ctr ? adset.metrics.ctr.toFixed(2) : '0.00'}%</td>
+                        <td>{adset.metrics?.ctr ? Number(adset.metrics.ctr).toFixed(2) : '0.00'}%</td>
                         <td>{formatCurrency(adset.metrics?.cpm)}</td>
                       </tr>
                     ))}
