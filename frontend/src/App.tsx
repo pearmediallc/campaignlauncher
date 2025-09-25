@@ -20,6 +20,7 @@ import FacebookAuthCallback from './pages/FacebookAuthCallback';
 import FacebookSDKTest from './pages/FacebookSDKTest';
 import ResourcesManagement from './pages/ResourcesManagement';
 import Strategy150Container from './components/Strategy150/Strategy150Container';
+import CampaignManagement from './components/CampaignManagement/CampaignManagement';
 
 // Configure axios defaults for production
 if (process.env.NODE_ENV === 'production') {
@@ -185,6 +186,19 @@ function App() {
                   <>
                     <Navigation />
                     <Strategy150Container />
+                  </>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/campaign-management"
+              element={
+                <ProtectedRoute>
+                  <>
+                    <Navigation />
+                    <Container maxWidth="lg" sx={{ py: 4 }}>
+                      <CampaignManagement />
+                    </Container>
                   </>
                 </ProtectedRoute>
               }

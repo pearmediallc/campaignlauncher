@@ -98,6 +98,28 @@ const Navigation: React.FC = () => {
               Strategy 1-50-1
             </Button>
 
+            {/* Campaign Management Button */}
+            <Button
+              variant="outlined"
+              startIcon={<Dashboard />}
+              onClick={() => navigate('/campaign-management')}
+              sx={{
+                borderColor: '#1877f2',
+                color: '#1877f2',
+                textTransform: 'none',
+                fontWeight: 500,
+                fontSize: '14px',
+                px: 2,
+                '&:hover': {
+                  borderColor: '#166fe5',
+                  color: '#166fe5',
+                  backgroundColor: 'rgba(24, 119, 242, 0.04)'
+                }
+              }}
+            >
+              Manage Campaigns
+            </Button>
+
             {/* Temporary Analytics Button - Remove when no longer needed */}
             <Button
               variant="contained"
