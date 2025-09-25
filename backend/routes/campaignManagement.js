@@ -2,7 +2,7 @@ const router = require('express').Router();
 const axios = require('axios');
 const { CampaignTracking, FacebookAuth } = require('../models');
 const { authenticate } = require('../middleware/auth');
-const { decryptToken } = require('../utils/encryption');
+const { decryptToken } = require('./facebookSDKAuth');
 
 /**
  * @route   GET /api/campaigns/manage/tracked
