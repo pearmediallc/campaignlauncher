@@ -412,4 +412,5 @@ function checkEligibility(adAccounts) {
 }
 
 module.exports = router;
+module.exports.encryptToken = encryptToken;
 module.exports.decryptToken = decryptToken;

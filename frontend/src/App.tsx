@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Container, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import axios from 'axios';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/Login';
@@ -19,6 +20,15 @@ import FacebookAuthCallback from './pages/FacebookAuthCallback';
 import FacebookSDKTest from './pages/FacebookSDKTest';
 import ResourcesManagement from './pages/ResourcesManagement';
 import Strategy150Container from './components/Strategy150/Strategy150Container';
+
+// Configure axios defaults for production
+if (process.env.NODE_ENV === 'production') {
+  // In production, API calls should be relative to the same domain
+  axios.defaults.baseURL = '/api';
+} else {
+  // In development, use the environment variable or localhost
+  axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5002/api';
+}
 
 const theme = createTheme({
   palette: {

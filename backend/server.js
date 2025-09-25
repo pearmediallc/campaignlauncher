@@ -146,12 +146,55 @@ app.get('/api/health', (req, res) => {
 
 // Serve static frontend files in production
 if (process.env.NODE_ENV === 'production') {
+  const fs = require('fs');
+
+  console.log('=== Render Directory Info ===');
+  console.log('Current working directory (process.cwd()):', process.cwd());
+  console.log('Current file directory (__dirname):', __dirname);
+
+  // Try multiple possible paths for the frontend build
+  const possiblePaths = [
+    path.join(__dirname, '../frontend/build'),
+    path.join(process.cwd(), 'frontend/build'),
+    path.join(process.cwd(), '../frontend/build'),
+    '/opt/render/project/src/frontend/build'
+  ];
+
+  let frontendBuildPath = null;
+  for (const tryPath of possiblePaths) {
+    console.log(`Checking path: ${tryPath} - exists: ${fs.existsSync(tryPath)}`);
+    if (fs.existsSync(tryPath)) {
+      frontendBuildPath = tryPath;
+      console.log(`✓ Found frontend build at: ${frontendBuildPath}`);
+      break;
+    }
+  }
+
+  if (!frontendBuildPath) {
+    console.error('❌ Frontend build not found in any expected location!');
+    console.log('Directory listing of current dir:', fs.readdirSync(process.cwd()));
+    console.log('Directory listing of parent:', fs.readdirSync(path.join(process.cwd(), '..')));
+    frontendBuildPath = path.join(__dirname, '../frontend/build'); // Fallback
+  }
+  console.log('=========================');
+
   // Serve static files from React build
-  app.use(express.static(path.join(__dirname, '../frontend/build')));
-  
+  app.use(express.static(frontendBuildPath));
+
   // Handle React routing, return all requests to React app
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
+    const indexPath = path.join(frontendBuildPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      console.error('Frontend build not found at:', indexPath);
+      res.status(404).json({
+        error: 'Frontend not built. Please run build script.',
+        attemptedPath: indexPath,
+        currentDir: __dirname,
+        cwd: process.cwd()
+      });
+    }
   });
 }
 
