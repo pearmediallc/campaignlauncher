@@ -50,15 +50,15 @@ router.get('/details/:campaignId', authenticate, async (req, res) => {
 
     // Get user's Facebook auth
     const facebookAuth = await FacebookAuth.findOne({
-      where: { user_id: userId },
-      order: [['created_at', 'DESC']]
+      where: { userId: userId },
+      order: [['createdAt', 'DESC']]
     });
 
-    if (!facebookAuth || !facebookAuth.access_token) {
+    if (!facebookAuth || !facebookAuth.accessToken) {
       return res.status(401).json({ error: 'Facebook authentication required' });
     }
 
-    const accessToken = decryptToken(facebookAuth.access_token);
+    const accessToken = decryptToken(facebookAuth.accessToken);
     if (!accessToken) {
       return res.status(401).json({ error: 'Invalid Facebook access token' });
     }
@@ -184,15 +184,15 @@ router.post('/status', authenticate, async (req, res) => {
 
     // Get user's Facebook auth
     const facebookAuth = await FacebookAuth.findOne({
-      where: { user_id: userId },
-      order: [['created_at', 'DESC']]
+      where: { userId: userId },
+      order: [['createdAt', 'DESC']]
     });
 
-    if (!facebookAuth || !facebookAuth.access_token) {
+    if (!facebookAuth || !facebookAuth.accessToken) {
       return res.status(401).json({ error: 'Facebook authentication required' });
     }
 
-    const accessToken = decryptToken(facebookAuth.access_token);
+    const accessToken = decryptToken(facebookAuth.accessToken);
     if (!accessToken) {
       return res.status(401).json({ error: 'Invalid Facebook access token' });
     }
@@ -261,15 +261,15 @@ router.post('/track', authenticate, async (req, res) => {
 
     // Get user's Facebook auth
     const facebookAuth = await FacebookAuth.findOne({
-      where: { user_id: userId },
-      order: [['created_at', 'DESC']]
+      where: { userId: userId },
+      order: [['createdAt', 'DESC']]
     });
 
     if (!facebookAuth) {
       return res.status(401).json({ error: 'Facebook authentication required' });
     }
 
-    const accessToken = decryptToken(facebookAuth.access_token);
+    const accessToken = decryptToken(facebookAuth.accessToken);
 
     // Fetch campaign info from Facebook to verify access
     const url = `https://graph.facebook.com/v19.0/${campaignId}`;
