@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const FacebookAuthService = require('../services/FacebookAuthService');
+const { decryptToken } = require('./facebookSDKAuth');
 const { AuthAuditLog, User, FacebookAuth, EligibilityCheck } = require('../models');
 const { authenticate, requireFacebookAuth, refreshFacebookToken } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
@@ -871,7 +872,7 @@ router.get('/pixels', authenticate, async (req, res) => {
 
     // If no pixels stored or we need to refresh, fetch from Facebook
     if (pixels.length === 0 || req.query.refresh === 'true') {
-      const accessToken = await FacebookAuthService.decryptToken(facebookAuth.accessToken);
+      const accessToken = decryptToken(facebookAuth.accessToken);
       const db = require('../models');
 
       // Get the selected ad account
@@ -957,7 +958,7 @@ router.get('/audiences', authenticate, async (req, res) => {
 
     let accessToken;
     try {
-      accessToken = await FacebookAuthService.decryptToken(facebookAuth.accessToken);
+      accessToken = decryptToken(facebookAuth.accessToken);
     } catch (decryptError) {
       console.error('Token decryption error:', decryptError);
       return res.status(401).json({ error: 'Failed to decrypt access token. Please reconnect Facebook.' });
