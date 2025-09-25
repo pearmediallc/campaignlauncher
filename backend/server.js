@@ -131,6 +131,9 @@ app.use('/api/variations', variationsRoutes);
 // Strategy 1-50-1 routes
 app.use('/api/campaigns/strategy-150', require('./routes/strategy150'));
 
+// Campaign management routes (for tracking and managing launched campaigns)
+app.use('/api/campaigns/manage', require('./routes/campaignManagement'));
+
 // Image proxy routes for external image downloads
 app.use('/api/images', require('./routes/images'));
 

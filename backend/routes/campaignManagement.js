@@ -1,0 +1,349 @@
+const router = require('express').Router();
+const axios = require('axios');
+const { CampaignTracking, FacebookAuth } = require('../models');
+const { authenticate } = require('../middleware/auth');
+const { decryptToken } = require('../utils/encryption');
+
+/**
+ * @route   GET /api/campaigns/manage/tracked
+ * @desc    Get all campaigns tracked by the current user
+ * @access  Private
+ */
+router.get('/tracked', authenticate, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const campaigns = await CampaignTracking.findByUserId(userId);
+
+    res.json({
+      success: true,
+      campaigns: campaigns || [],
+      count: campaigns?.length || 0
+    });
+  } catch (error) {
+    console.error('Error fetching tracked campaigns:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch tracked campaigns',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route   GET /api/campaigns/manage/details/:campaignId
+ * @desc    Get detailed campaign information including learning phase
+ * @access  Private
+ */
+router.get('/details/:campaignId', authenticate, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = req.user?.id || req.userId;
+
+    if (!campaignId) {
+      return res.status(400).json({ error: 'Campaign ID is required' });
+    }
+
+    // Get user's Facebook auth
+    const facebookAuth = await FacebookAuth.findOne({
+      where: { user_id: userId },
+      order: [['created_at', 'DESC']]
+    });
+
+    if (!facebookAuth || !facebookAuth.access_token) {
+      return res.status(401).json({ error: 'Facebook authentication required' });
+    }
+
+    const accessToken = decryptToken(facebookAuth.access_token);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Invalid Facebook access token' });
+    }
+
+    // Fetch campaign details with ad sets and learning info from Facebook
+    const url = `https://graph.facebook.com/v19.0/${campaignId}`;
+    const params = {
+      fields: 'id,name,status,objective,created_time,daily_budget,lifetime_budget,spend_cap,bid_strategy,adsets{id,name,status,daily_budget,lifetime_budget,optimization_goal,billing_event,learning_stage_info,targeting,attribution_spec,insights.date_preset(lifetime){impressions,clicks,spend,conversions,cost_per_conversion,ctr,cpm}}',
+      access_token: accessToken
+    };
+
+    console.log(`📊 Fetching campaign details for ${campaignId}...`);
+
+    const response = await axios.get(url, { params });
+    const campaignData = response.data;
+
+    // Process learning phase data for each ad set
+    if (campaignData.adsets && campaignData.adsets.data) {
+      campaignData.adsets.data = campaignData.adsets.data.map(adset => {
+        const learningInfo = adset.learning_stage_info || {};
+
+        // Determine learning status and message
+        let learningStatus = learningInfo.status || 'UNKNOWN';
+        let learningMessage = '';
+        let learningProgress = null;
+
+        switch(learningStatus) {
+          case 'LEARNING':
+            learningMessage = 'Learning in progress - optimizing delivery';
+            // Try to calculate progress (Facebook doesn't always provide this)
+            if (learningInfo.attribution_window_days) {
+              learningMessage += ` (${learningInfo.attribution_window_days} days)`;
+            }
+            break;
+          case 'SUCCESS':
+            learningMessage = 'Learning phase complete - delivering optimally';
+            break;
+          case 'FAIL':
+            learningMessage = 'Learning limited - not enough conversions to optimize';
+            break;
+          case 'WAIVING':
+            learningMessage = 'Learning phase waived';
+            break;
+          default:
+            learningMessage = 'Learning status unknown';
+        }
+
+        return {
+          ...adset,
+          learning_status: learningStatus,
+          learning_message: learningMessage,
+          learning_progress: learningProgress,
+          // Extract insights if available
+          metrics: adset.insights?.data?.[0] || {
+            impressions: 0,
+            clicks: 0,
+            spend: 0,
+            ctr: 0,
+            cpm: 0
+          }
+        };
+      });
+    }
+
+    // Update tracking table with last fetched time
+    await CampaignTracking.update(
+      {
+        last_fetched: new Date(),
+        status: campaignData.status,
+        learning_phase_summary: {
+          total_adsets: campaignData.adsets?.data?.length || 0,
+          learning: campaignData.adsets?.data?.filter(a => a.learning_status === 'LEARNING').length || 0,
+          active: campaignData.adsets?.data?.filter(a => a.learning_status === 'SUCCESS').length || 0,
+          limited: campaignData.adsets?.data?.filter(a => a.learning_status === 'FAIL').length || 0
+        }
+      },
+      { where: { campaign_id: campaignId } }
+    );
+
+    console.log(`✅ Successfully fetched campaign ${campaignId} with ${campaignData.adsets?.data?.length || 0} ad sets`);
+
+    res.json({
+      success: true,
+      campaign: campaignData
+    });
+
+  } catch (error) {
+    console.error('Error fetching campaign details:', error.response?.data || error);
+
+    if (error.response?.status === 400) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid campaign ID or no access to this campaign',
+        message: error.response?.data?.error?.message || 'Facebook API error'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch campaign details',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route   POST /api/campaigns/manage/status
+ * @desc    Update campaign status (pause/resume)
+ * @access  Private
+ */
+router.post('/status', authenticate, async (req, res) => {
+  try {
+    const { campaignId, status } = req.body;
+    const userId = req.user?.id || req.userId;
+
+    if (!campaignId || !status) {
+      return res.status(400).json({ error: 'Campaign ID and status are required' });
+    }
+
+    if (!['ACTIVE', 'PAUSED'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be ACTIVE or PAUSED' });
+    }
+
+    // Get user's Facebook auth
+    const facebookAuth = await FacebookAuth.findOne({
+      where: { user_id: userId },
+      order: [['created_at', 'DESC']]
+    });
+
+    if (!facebookAuth || !facebookAuth.access_token) {
+      return res.status(401).json({ error: 'Facebook authentication required' });
+    }
+
+    const accessToken = decryptToken(facebookAuth.access_token);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Invalid Facebook access token' });
+    }
+
+    // Update campaign status on Facebook
+    const url = `https://graph.facebook.com/v19.0/${campaignId}`;
+    const params = {
+      status: status,
+      access_token: accessToken
+    };
+
+    console.log(`🔄 Updating campaign ${campaignId} status to ${status}...`);
+
+    await axios.post(url, null, { params });
+
+    // Update local tracking
+    await CampaignTracking.update(
+      { status },
+      { where: { campaign_id: campaignId } }
+    );
+
+    console.log(`✅ Campaign ${campaignId} status updated to ${status}`);
+
+    res.json({
+      success: true,
+      message: `Campaign ${status === 'ACTIVE' ? 'resumed' : 'paused'} successfully`,
+      status
+    });
+
+  } catch (error) {
+    console.error('Error updating campaign status:', error.response?.data || error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update campaign status',
+      message: error.response?.data?.error?.message || error.message
+    });
+  }
+});
+
+/**
+ * @route   POST /api/campaigns/manage/track
+ * @desc    Add a campaign to tracking (for manually entered campaign IDs)
+ * @access  Private
+ */
+router.post('/track', authenticate, async (req, res) => {
+  try {
+    const { campaignId } = req.body;
+    const userId = req.user?.id || req.userId;
+
+    if (!campaignId) {
+      return res.status(400).json({ error: 'Campaign ID is required' });
+    }
+
+    // Check if already tracking
+    const existing = await CampaignTracking.findOne({
+      where: { campaign_id: campaignId }
+    });
+
+    if (existing) {
+      return res.json({
+        success: true,
+        message: 'Campaign already being tracked',
+        campaign: existing
+      });
+    }
+
+    // Get user's Facebook auth
+    const facebookAuth = await FacebookAuth.findOne({
+      where: { user_id: userId },
+      order: [['created_at', 'DESC']]
+    });
+
+    if (!facebookAuth) {
+      return res.status(401).json({ error: 'Facebook authentication required' });
+    }
+
+    const accessToken = decryptToken(facebookAuth.access_token);
+
+    // Fetch campaign info from Facebook to verify access
+    const url = `https://graph.facebook.com/v19.0/${campaignId}`;
+    const params = {
+      fields: 'id,name,status,objective',
+      access_token: accessToken
+    };
+
+    const response = await axios.get(url, { params });
+    const campaignData = response.data;
+
+    // Add to tracking
+    const tracking = await CampaignTracking.create({
+      campaign_id: campaignId,
+      campaign_name: campaignData.name || 'Unknown Campaign',
+      user_id: userId,
+      ad_account_id: facebookAuth.selectedAdAccount?.id || 'unknown',
+      strategy_type: 'manual',
+      status: campaignData.status
+    });
+
+    res.json({
+      success: true,
+      message: 'Campaign added to tracking',
+      campaign: tracking
+    });
+
+  } catch (error) {
+    console.error('Error adding campaign to tracking:', error.response?.data || error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to add campaign to tracking',
+      message: error.response?.data?.error?.message || error.message
+    });
+  }
+});
+
+/**
+ * @route   DELETE /api/campaigns/manage/track/:campaignId
+ * @desc    Remove a campaign from tracking
+ * @access  Private
+ */
+router.delete('/track/:campaignId', authenticate, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = req.user?.id || req.userId;
+
+    const deleted = await CampaignTracking.destroy({
+      where: {
+        campaign_id: campaignId,
+        user_id: userId
+      }
+    });
+
+    if (deleted) {
+      res.json({
+        success: true,
+        message: 'Campaign removed from tracking'
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        error: 'Campaign not found in tracking'
+      });
+    }
+
+  } catch (error) {
+    console.error('Error removing campaign from tracking:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to remove campaign from tracking',
+      message: error.message
+    });
+  }
+});
+
+module.exports = router;

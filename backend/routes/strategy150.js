@@ -645,6 +645,25 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
 
     await AuditService.logRequest(req, 'strategy150.create', 'campaign', result.campaign?.id);
 
+    // Store campaign in tracking table for management
+    try {
+      const { CampaignTracking } = require('../models');
+      await CampaignTracking.create({
+        campaign_id: result.campaign.id,
+        campaign_name: campaignData.campaignName,
+        user_id: userId,
+        ad_account_id: facebookAuth.selectedAdAccount?.id || selectedAdAccountId,
+        strategy_type: '1-50-1',
+        post_id: result.postId || null,
+        ad_set_count: 1, // Initial creation, will be 50 after duplication
+        status: 'ACTIVE'
+      });
+      console.log(`📊 Campaign ${result.campaign.id} added to tracking for management`);
+    } catch (trackingError) {
+      console.error('Warning: Could not add campaign to tracking:', trackingError.message);
+      // Don't fail the request if tracking fails
+    }
+
     res.json({
       success: true,
       message: 'Strategy 1-50-1 initial campaign created successfully',
@@ -1295,6 +1314,29 @@ async function processMultiplicationAsync(jobId, campaignStructure, multiplyCoun
         // Update job with successful result
         job.campaigns.push(multipliedCampaign);
         console.log(`✅ Job ${jobId}: Successfully created copy ${i + 1}`);
+
+        // Store multiplied campaign in tracking table
+        try {
+          const { CampaignTracking } = require('../models');
+          const facebookAuth = await FacebookAuth.findOne({
+            where: { user_id: req.user?.id || req.userId },
+            order: [['created_at', 'DESC']]
+          });
+
+          await CampaignTracking.create({
+            campaign_id: multipliedCampaign.campaign.id,
+            campaign_name: multipliedCampaign.campaign.name,
+            user_id: req.user?.id || req.userId,
+            ad_account_id: facebookAuth?.selectedAdAccount?.id || 'unknown',
+            strategy_type: 'multiplication',
+            post_id: postId || null,
+            ad_set_count: multipliedCampaign.adSetsCreated || 50,
+            status: 'ACTIVE'
+          });
+          console.log(`📊 Multiplied campaign ${multipliedCampaign.campaign.id} added to tracking`);
+        } catch (trackingError) {
+          console.error('Warning: Could not add multiplied campaign to tracking:', trackingError.message);
+        }
 
       } catch (error) {
         console.error(`❌ Job ${jobId}: Failed to create copy ${i + 1}:`, error.message);
