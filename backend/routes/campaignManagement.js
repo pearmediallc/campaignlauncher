@@ -66,7 +66,7 @@ router.get('/details/:campaignId', authenticate, async (req, res) => {
     // Fetch campaign details with ad sets and learning info from Facebook
     const url = `https://graph.facebook.com/v19.0/${campaignId}`;
     const params = {
-      fields: 'id,name,status,objective,created_time,daily_budget,lifetime_budget,spend_cap,bid_strategy,adsets{id,name,status,daily_budget,lifetime_budget,optimization_goal,billing_event,learning_stage_info,targeting,attribution_spec,insights.date_preset(maximum){impressions,clicks,spend,conversions,cost_per_conversion,ctr,cpm}}',
+      fields: 'id,name,status,objective,created_time,daily_budget,lifetime_budget,spend_cap,bid_strategy,adsets{id,name,status,daily_budget,lifetime_budget,optimization_goal,billing_event,learning_stage_info,targeting,attribution_spec,insights.date_preset(maximum){impressions,clicks,spend,conversions,cost_per_conversion,ctr,cpm,actions,cost_per_action_type,frequency,reach}}',
       access_token: accessToken
     };
 
@@ -112,12 +112,30 @@ router.get('/details/:campaignId', authenticate, async (req, res) => {
           learning_message: learningMessage,
           learning_progress: learningProgress,
           // Extract insights if available
-          metrics: adset.insights?.data?.[0] || {
+          metrics: adset.insights?.data?.[0] ? {
+            impressions: adset.insights.data[0].impressions || 0,
+            clicks: adset.insights.data[0].clicks || 0,
+            spend: adset.insights.data[0].spend || 0,
+            ctr: adset.insights.data[0].ctr || 0,
+            cpm: adset.insights.data[0].cpm || 0,
+            reach: adset.insights.data[0].reach || 0,
+            frequency: adset.insights.data[0].frequency || 0,
+            results: adset.insights.data[0].actions?.find(a =>
+              ['purchase', 'lead', 'link_click', 'offsite_conversion'].includes(a.action_type)
+            )?.value || 0,
+            cost_per_result: adset.insights.data[0].cost_per_action_type?.find(a =>
+              ['purchase', 'lead', 'link_click', 'offsite_conversion'].includes(a.action_type)
+            )?.value || 0
+          } : {
             impressions: 0,
             clicks: 0,
             spend: 0,
             ctr: 0,
-            cpm: 0
+            cpm: 0,
+            reach: 0,
+            frequency: 0,
+            results: 0,
+            cost_per_result: 0
           }
         };
       });
@@ -160,6 +178,137 @@ router.get('/details/:campaignId', authenticate, async (req, res) => {
       success: false,
       error: 'Failed to fetch campaign details',
       message: error.message
+    });
+  }
+});
+
+/**
+ * @route   GET /api/campaigns/manage/all
+ * @desc    Get all campaigns from the ad account with date filtering
+ * @access  Private
+ */
+router.get('/all', authenticate, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.userId;
+    const {
+      date_preset = 'last_15d',  // Default to last 15 days
+      limit = 50,
+      after,  // Pagination cursor
+    } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Get user's Facebook auth
+    const facebookAuth = await FacebookAuth.findOne({
+      where: { userId: userId },
+      order: [['createdAt', 'DESC']]
+    });
+
+    if (!facebookAuth || !facebookAuth.accessToken) {
+      return res.status(401).json({
+        error: 'Facebook authentication required. Please connect your Facebook account.',
+        requiresAuth: true
+      });
+    }
+
+    // Check if we have a selected ad account
+    const adAccountId = facebookAuth.selectedAdAccount?.id || facebookAuth.adAccountId;
+    if (!adAccountId) {
+      return res.status(400).json({
+        error: 'No ad account selected. Please select an ad account first.',
+        requiresSelection: true
+      });
+    }
+
+    const accessToken = decryptToken(facebookAuth.accessToken);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'Invalid Facebook access token' });
+    }
+
+    // Fetch all campaigns from the ad account with date filtering
+    const url = `https://graph.facebook.com/v19.0/${adAccountId}/campaigns`;
+    const params = {
+      fields: 'id,name,status,objective,created_time,daily_budget,lifetime_budget,spend_cap,bid_strategy,special_ad_categories,insights.date_preset(' + date_preset + '){impressions,clicks,spend,ctr,cpm,reach,frequency,actions,cost_per_action_type}',
+      limit: limit,
+      access_token: accessToken
+    };
+
+    // Add pagination cursor if provided
+    if (after) {
+      params.after = after;
+    }
+
+    console.log(`📊 Fetching all campaigns from ad account ${adAccountId} with date preset: ${date_preset}`);
+
+    const response = await axios.get(url, { params });
+    const campaignsData = response.data;
+
+    // Process campaigns to extract Results based on objective
+    if (campaignsData.data) {
+      campaignsData.data = campaignsData.data.map(campaign => {
+        const insights = campaign.insights?.data?.[0];
+
+        // Determine the relevant action type based on objective
+        let resultActionType = 'link_click'; // Default
+        switch(campaign.objective) {
+          case 'OUTCOME_SALES':
+          case 'CONVERSIONS':
+            resultActionType = 'purchase';
+            break;
+          case 'OUTCOME_LEADS':
+          case 'LEAD_GENERATION':
+            resultActionType = 'lead';
+            break;
+          case 'OUTCOME_ENGAGEMENT':
+          case 'POST_ENGAGEMENT':
+            resultActionType = 'post_engagement';
+            break;
+          case 'OUTCOME_TRAFFIC':
+          case 'LINK_CLICKS':
+            resultActionType = 'link_click';
+            break;
+          case 'OUTCOME_APP_PROMOTION':
+            resultActionType = 'mobile_app_install';
+            break;
+        }
+
+        return {
+          ...campaign,
+          metrics: insights ? {
+            impressions: insights.impressions || 0,
+            clicks: insights.clicks || 0,
+            spend: insights.spend || 0,
+            ctr: insights.ctr || 0,
+            cpm: insights.cpm || 0,
+            reach: insights.reach || 0,
+            frequency: insights.frequency || 0,
+            results: insights.actions?.find(a => a.action_type === resultActionType)?.value || 0,
+            cost_per_result: insights.cost_per_action_type?.find(a => a.action_type === resultActionType)?.value || 0
+          } : null
+        };
+      });
+    }
+
+    res.json({
+      success: true,
+      campaigns: campaignsData.data || [],
+      paging: campaignsData.paging || null,
+      summary: {
+        total_campaigns: campaignsData.data?.length || 0,
+        active_campaigns: campaignsData.data?.filter(c => c.status === 'ACTIVE').length || 0,
+        paused_campaigns: campaignsData.data?.filter(c => c.status === 'PAUSED').length || 0,
+        date_range: date_preset
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching all campaigns:', error.response?.data || error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch campaigns',
+      message: error.response?.data?.error?.message || error.message
     });
   }
 });

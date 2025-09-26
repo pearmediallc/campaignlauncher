@@ -23,6 +23,10 @@ interface AdSet {
     spend: number;
     ctr: number;
     cpm: number;
+    reach?: number;
+    frequency?: number;
+    results?: number;
+    cost_per_result?: number;
   };
 }
 
@@ -41,6 +45,9 @@ interface CampaignDetails {
 
 const CampaignManagement: React.FC = () => {
   const [trackedCampaigns, setTrackedCampaigns] = useState<Campaign[]>([]);
+  const [allCampaigns, setAllCampaigns] = useState<Campaign[]>([]);
+  const [viewMode, setViewMode] = useState<'tracked' | 'all'>('tracked');
+  const [datePreset, setDatePreset] = useState('last_15d');
   const [manualCampaignId, setManualCampaignId] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [campaignDetails, setCampaignDetails] = useState<CampaignDetails | null>(null);
@@ -48,6 +55,7 @@ const CampaignManagement: React.FC = () => {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [paging, setPaging] = useState<any>(null);
 
   useEffect(() => {
     fetchTrackedCampaigns();
@@ -72,6 +80,32 @@ const CampaignManagement: React.FC = () => {
     } catch (error: any) {
       console.error('Error fetching tracked campaigns:', error);
       setError('Failed to fetch tracked campaigns');
+    }
+  };
+
+  const fetchAllCampaigns = async (datePreset: string = 'last_15d', after?: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params: any = { date_preset: datePreset, limit: 50 };
+      if (after) params.after = after;
+
+      const response = await axios.get('/api/campaigns/manage/all', { params });
+
+      if (after && response.data.campaigns) {
+        // Append to existing campaigns for pagination
+        setAllCampaigns(prev => [...prev, ...response.data.campaigns]);
+      } else {
+        // Replace campaigns for new fetch
+        setAllCampaigns(response.data.campaigns || []);
+      }
+
+      setPaging(response.data.paging);
+    } catch (error: any) {
+      console.error('Error fetching all campaigns:', error);
+      setError(error.response?.data?.message || 'Failed to fetch all campaigns');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -193,24 +227,81 @@ const CampaignManagement: React.FC = () => {
         </div>
       )}
 
+      {/* View Mode Toggle and Date Preset Selector */}
+      <div className="row mb-3">
+        <div className="col-md-6">
+          <div className="btn-group" role="group">
+            <button
+              className={`btn ${viewMode === 'tracked' ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => setViewMode('tracked')}
+            >
+              My Campaigns
+            </button>
+            <button
+              className={`btn ${viewMode === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => {
+                setViewMode('all');
+                if (allCampaigns.length === 0) {
+                  fetchAllCampaigns(datePreset);
+                }
+              }}
+            >
+              All Account Campaigns
+            </button>
+          </div>
+        </div>
+        {viewMode === 'all' && (
+          <div className="col-md-6">
+            <select
+              className="form-select"
+              value={datePreset}
+              onChange={(e) => {
+                setDatePreset(e.target.value);
+                fetchAllCampaigns(e.target.value);
+              }}
+            >
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="last_3d">Last 3 Days</option>
+              <option value="last_7d">Last 7 Days</option>
+              <option value="last_14d">Last 14 Days</option>
+              <option value="last_15d">Last 15 Days</option>
+              <option value="last_30d">Last 30 Days</option>
+              <option value="last_90d">Last 90 Days</option>
+              <option value="maximum">All Time</option>
+            </select>
+          </div>
+        )}
+      </div>
+
       <div className="row mb-4">
         <div className="col-md-6">
           <div className="card">
             <div className="card-body">
               <h5 className="card-title">Select Campaign</h5>
               <div className="mb-3">
-                <label className="form-label">My Launched Campaigns</label>
+                <label className="form-label">
+                  {viewMode === 'tracked' ? 'My Launched Campaigns' : 'All Campaigns'}
+                </label>
                 <select
                   className="form-select"
                   onChange={(e) => e.target.value && fetchCampaignDetails(e.target.value)}
                   value={selectedCampaign || ''}
                 >
                   <option value="">-- Select a campaign --</option>
-                  {trackedCampaigns.map(campaign => (
-                    <option key={campaign.campaign_id} value={campaign.campaign_id}>
-                      {campaign.campaign_name} ({campaign.campaign_id})
-                    </option>
-                  ))}
+                  {viewMode === 'tracked' ? (
+                    trackedCampaigns.map(campaign => (
+                      <option key={campaign.campaign_id} value={campaign.campaign_id}>
+                        {campaign.campaign_name} ({campaign.campaign_id})
+                      </option>
+                    ))
+                  ) : (
+                    allCampaigns.map((campaign: any) => (
+                      <option key={campaign.id} value={campaign.id}>
+                        {campaign.name} - {campaign.status} ({campaign.id})
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
@@ -334,6 +425,8 @@ const CampaignManagement: React.FC = () => {
                       <th>Impressions</th>
                       <th>Clicks</th>
                       <th>Spend</th>
+                      <th>Results</th>
+                      <th>Cost/Result</th>
                       <th>CTR</th>
                       <th>CPM</th>
                     </tr>
@@ -357,6 +450,8 @@ const CampaignManagement: React.FC = () => {
                         <td>{formatNumber(adset.metrics?.impressions)}</td>
                         <td>{formatNumber(adset.metrics?.clicks)}</td>
                         <td>{formatCurrency(adset.metrics?.spend)}</td>
+                        <td>{formatNumber(adset.metrics?.results)}</td>
+                        <td>{formatCurrency(adset.metrics?.cost_per_result)}</td>
                         <td>{adset.metrics?.ctr ? (isNaN(Number(adset.metrics.ctr)) ? '0.00' : Number(adset.metrics.ctr).toFixed(2)) : '0.00'}%</td>
                         <td>{formatCurrency(adset.metrics?.cpm)}</td>
                       </tr>
