@@ -771,9 +771,22 @@ class FacebookAuthService {
         return { valid: false, reason: 'Eligibility check has expired' };
       }
       
+      // Decrypt the token before returning
+      const decryptedToken = decryptToken(facebookAuth.accessToken);
+      if (!decryptedToken) {
+        return { valid: false, reason: 'Failed to decrypt access token' };
+      }
+
+      // Return with decrypted token
+      const authWithDecryptedToken = {
+        ...facebookAuth.toJSON(),
+        accessToken: decryptedToken
+      };
+
       return {
         valid: true,
-        facebookAuth,
+        facebookAuth: authWithDecryptedToken,
+        authRecord: authWithDecryptedToken,
         eligibilityCheck: latestEligibility
       };
     } catch (error) {

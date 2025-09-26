@@ -564,7 +564,7 @@ router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refresh
     }
 
     // Create the duplicate campaign
-    const newCampaign = await facebookApi.createCampaign(`act_${adAccountId}`, duplicateData);
+    const newCampaign = await facebookApi.createCampaignFromExisting(adAccountId, duplicateData);
 
     // Audit log
     await AuditService.log({
@@ -709,7 +709,7 @@ router.post('/batch', authenticate, requireFacebookAuth, refreshFacebookToken, a
             };
 
             const adAccountId = facebookAuth.selectedAdAccount?.id || facebookAuth.adAccounts?.[0]?.id;
-            result = await facebookApi.createCampaign(`act_${adAccountId}`, duplicateData);
+            result = await facebookApi.createCampaignFromExisting(adAccountId, duplicateData);
             break;
         }
 

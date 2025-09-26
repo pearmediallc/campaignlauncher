@@ -1,38 +1,5 @@
 const FacebookAuthService = require('../services/FacebookAuthService');
 const { AuthAuditLog } = require('../models');
-const crypto = require('crypto');
-
-// Decryption function for tokens
-const algorithm = 'aes-256-gcm';
-const encryptionKey = Buffer.from(process.env.ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'hex');
-
-function decryptToken(encryptedData) {
-  try {
-    if (!encryptedData) return null;
-
-    // If token starts with 'EAA', it's already decrypted
-    if (typeof encryptedData === 'string' && encryptedData.startsWith('EAA')) {
-      return encryptedData;
-    }
-
-    const data = typeof encryptedData === 'string' ? JSON.parse(encryptedData) : encryptedData;
-    const decipher = crypto.createDecipheriv(
-      algorithm,
-      encryptionKey,
-      Buffer.from(data.iv, 'hex')
-    );
-
-    decipher.setAuthTag(Buffer.from(data.authTag, 'hex'));
-
-    let decrypted = decipher.update(data.encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-
-    return decrypted;
-  } catch (error) {
-    console.error('Token decryption failed:', error.message);
-    return null;
-  }
-}
 
 /**
  * Middleware to check if user has valid Facebook authentication and is eligible
@@ -89,20 +56,11 @@ const requireFacebookAuth = async (req, res, next) => {
     // Attach Facebook auth info to request
     const authRecord = validationResult.facebookAuth || validationResult.authRecord;
 
-    // Decrypt the access token before attaching
-    const decryptedToken = decryptToken(authRecord.accessToken);
-    if (!decryptedToken) {
-      return res.status(401).json({
-        success: false,
-        error: 'Failed to decrypt access token',
-        requiresAuth: true
-      });
-    }
-
+    // Token is already decrypted by validateAuthStatus
     req.facebookAuth = {
       authRecord: authRecord,
       eligibilityCheck: validationResult.eligibilityCheck,
-      accessToken: decryptedToken, // Use DECRYPTED token
+      accessToken: authRecord.accessToken, // Already decrypted by validateAuthStatus
       facebookUserId: authRecord.facebookUserId,
       adAccounts: authRecord.adAccounts,
       pages: authRecord.pages,
@@ -150,13 +108,12 @@ const checkFacebookAuth = async (req, res, next) => {
     
     if (validationResult.valid && validationResult.eligibilityCheck.status === 'eligible') {
       req.hasFacebookAuth = true;
-      const authRecord = validationResult.authRecord;
-      const decryptedToken = decryptToken(authRecord.accessToken);
+      const authRecord = validationResult.authRecord || validationResult.facebookAuth;
 
       req.facebookAuth = {
         authRecord: authRecord,
         eligibilityCheck: validationResult.eligibilityCheck,
-        accessToken: decryptedToken || authRecord.accessToken, // Use decrypted if successful
+        accessToken: authRecord.accessToken, // Already decrypted by validateAuthStatus
         facebookUserId: authRecord.facebookUserId,
         adAccounts: authRecord.adAccounts,
         pages: authRecord.pages,

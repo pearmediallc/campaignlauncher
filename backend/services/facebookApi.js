@@ -2426,6 +2426,66 @@ class FacebookAPI {
       return false; // Don't fail the entire duplication
     }
   }
+
+  /**
+   * Update an existing campaign
+   * Facebook API endpoint: POST /{campaign_id}
+   * Documentation: https://developers.facebook.com/docs/marketing-api/reference/ad-campaign-group/
+   */
+  async updateCampaign(campaignId, updateData) {
+    try {
+      const url = `${this.baseURL}/${campaignId}`;
+      const params = {
+        access_token: this.accessToken
+      };
+
+      // Add update parameters
+      if (updateData.name) params.name = updateData.name;
+      if (updateData.status) params.status = updateData.status;
+      if (updateData.daily_budget) params.daily_budget = updateData.daily_budget;
+      if (updateData.lifetime_budget) params.lifetime_budget = updateData.lifetime_budget;
+      if (updateData.special_ad_categories) {
+        params.special_ad_categories = JSON.stringify(updateData.special_ad_categories);
+      }
+
+      console.log(`📝 Updating campaign ${campaignId}:`, params);
+      const response = await axios.post(url, null, { params });
+      console.log(`✅ Campaign ${campaignId} updated successfully`);
+
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Failed to update campaign ${campaignId}:`, error.response?.data || error.message);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Create a new campaign (wrapper for existing method)
+   */
+  async createCampaignFromExisting(adAccountId, campaignData) {
+    try {
+      const url = `${this.baseURL}/act_${adAccountId}/campaigns`;
+      const params = {
+        name: campaignData.name,
+        objective: campaignData.objective,
+        status: campaignData.status || 'PAUSED',
+        special_ad_categories: JSON.stringify(campaignData.special_ad_categories || []),
+        access_token: this.accessToken
+      };
+
+      if (campaignData.daily_budget) {
+        params.daily_budget = campaignData.daily_budget;
+      }
+      if (campaignData.lifetime_budget) {
+        params.lifetime_budget = campaignData.lifetime_budget;
+      }
+
+      const response = await axios.post(url, null, { params });
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
 }
 
 module.exports = FacebookAPI;

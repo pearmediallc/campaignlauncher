@@ -26,9 +26,12 @@ exec('npx sequelize-cli db:migrate', {
     console.log(stdout);
   }
 
-  // Check if CampaignTemplates table exists and create if not
+  // Always ensure CampaignTemplates table exists
   const db = require('../models');
 
+  console.log('📦 Ensuring CampaignTemplates table exists...');
+
+  // Always try to create the table (IF NOT EXISTS prevents errors)
   db.sequelize.query(`
     SELECT EXISTS (
       SELECT FROM information_schema.tables
