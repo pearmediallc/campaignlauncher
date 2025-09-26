@@ -556,7 +556,7 @@ router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refresh
     const facebookApi = new FacebookAPI(accessToken);
 
     // Get original campaign details
-    const originalCampaign = await facebookApi.getCampaign(campaignId);
+    const originalCampaign = await facebookApi.getCampaignFullDetails(campaignId);
 
     // Create duplicate campaign data
     const duplicateData = {
@@ -740,7 +740,7 @@ router.post('/batch', authenticate, requireFacebookAuth, refreshFacebookToken, a
             break;
 
           case 'duplicate':
-            const originalCampaign = await facebookApi.getCampaign(campaignId);
+            const originalCampaign = await facebookApi.getCampaignFullDetails(campaignId);
             const duplicateData = {
               name: `${originalCampaign.name} - Copy`,
               objective: originalCampaign.objective,
