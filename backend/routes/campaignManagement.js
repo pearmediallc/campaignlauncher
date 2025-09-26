@@ -191,7 +191,7 @@ router.get('/all', authenticate, async (req, res) => {
   try {
     const userId = req.user?.id || req.userId;
     const {
-      date_preset = 'last_15d',  // Default to last 15 days
+      date_preset = 'last_14d',  // Default to last 14 days (Facebook doesn't have last_15d)
       limit = 50,
       after,  // Pagination cursor
     } = req.query;

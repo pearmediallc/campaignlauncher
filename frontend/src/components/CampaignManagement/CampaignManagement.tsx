@@ -47,7 +47,7 @@ const CampaignManagement: React.FC = () => {
   const [trackedCampaigns, setTrackedCampaigns] = useState<Campaign[]>([]);
   const [allCampaigns, setAllCampaigns] = useState<Campaign[]>([]);
   const [viewMode, setViewMode] = useState<'tracked' | 'all'>('tracked');
-  const [datePreset, setDatePreset] = useState('last_15d');
+  const [datePreset, setDatePreset] = useState('last_14d');
   const [manualCampaignId, setManualCampaignId] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [campaignDetails, setCampaignDetails] = useState<CampaignDetails | null>(null);
@@ -83,7 +83,7 @@ const CampaignManagement: React.FC = () => {
     }
   };
 
-  const fetchAllCampaigns = async (datePreset: string = 'last_15d', after?: string) => {
+  const fetchAllCampaigns = async (datePreset: string = 'last_14d', after?: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -265,9 +265,11 @@ const CampaignManagement: React.FC = () => {
               <option value="last_3d">Last 3 Days</option>
               <option value="last_7d">Last 7 Days</option>
               <option value="last_14d">Last 14 Days</option>
-              <option value="last_15d">Last 15 Days</option>
+              <option value="last_28d">Last 28 Days</option>
               <option value="last_30d">Last 30 Days</option>
               <option value="last_90d">Last 90 Days</option>
+              <option value="this_month">This Month</option>
+              <option value="last_month">Last Month</option>
               <option value="maximum">All Time</option>
             </select>
           </div>
