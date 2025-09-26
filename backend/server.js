@@ -140,6 +140,9 @@ app.use('/api/images', require('./routes/images'));
 // Data deletion endpoints (required for Facebook App Review)
 app.use('/api/data-deletion', dataDeletionRoutes);
 
+// Campaign templates routes
+app.use('/api/templates', require('./routes/templates'));
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Facebook Campaign Launcher API is running' });
 });

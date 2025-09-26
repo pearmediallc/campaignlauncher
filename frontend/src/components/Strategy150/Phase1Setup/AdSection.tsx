@@ -215,11 +215,16 @@ const AdSection: React.FC = () => {
                 }}
                 getOptionLabel={(option) => option.name || ''}
                 isOptionEqualToValue={(option, value) => option.id === value?.id}
-                renderOption={(props, option) => (
-                  <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {option.picture && (
-                      <Avatar src={option.picture} sx={{ width: 24, height: 24 }} />
-                    )}
+                renderOption={(props, option) => {
+                  const pictureUrl = typeof option.picture === 'string'
+                    ? option.picture
+                    : option.picture?.data?.url;
+
+                  return (
+                    <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {pictureUrl && (
+                        <Avatar src={pictureUrl} sx={{ width: 24, height: 24 }} />
+                      )}
                     <Box sx={{ flexGrow: 1 }}>
                       <Typography variant="body1">{option.name}</Typography>
                       {option.category && (
@@ -231,8 +236,9 @@ const AdSection: React.FC = () => {
                     {resources.selectedPage?.id === option.id && (
                       <Chip label="Saved" size="small" color="primary" />
                     )}
-                  </Box>
-                )}
+                    </Box>
+                  );
+                }}
                 renderInput={(params) => (
                   <TextField
                     {...params}

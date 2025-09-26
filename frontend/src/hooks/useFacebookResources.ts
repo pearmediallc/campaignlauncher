@@ -12,6 +12,7 @@ interface Page {
   id: string;
   name: string;
   category: string;
+  picture?: string | { data?: { url?: string } };
 }
 
 interface Pixel {

@@ -5,13 +5,17 @@ import {
   Alert,
   Stepper,
   Step,
-  StepLabel
+  StepLabel,
+  Paper,
+  Typography
 } from '@mui/material';
 import { FormProvider, useForm } from 'react-hook-form';
 import { Strategy150FormData } from '../../../types/strategy150';
 import CampaignSection from './CampaignSection';
 import AdSetSection from './AdSetSection';
 import AdSection from './AdSection';
+import TemplateManager from '../../Templates/TemplateManager';
+import { TemplateData } from '../../../services/templateApi';
 
 
 interface Phase1SetupProps {
@@ -101,6 +105,21 @@ const Phase1Setup: React.FC<Phase1SetupProps> = ({ onSubmit, error }) => {
     onSubmit(data);
   });
 
+  // Template management handlers
+  const handleLoadTemplate = (templateData: TemplateData) => {
+    // Load template data into form
+    Object.keys(templateData).forEach((key) => {
+      const value = templateData[key as keyof TemplateData];
+      if (value !== undefined && value !== null) {
+        methods.setValue(key as keyof Strategy150FormData, value);
+      }
+    });
+  };
+
+  const handleClearForm = () => {
+    methods.reset();
+  };
+
   // Form sections for better organization
   const formSections = [
     { label: 'Campaign', component: 'campaign' },
@@ -116,6 +135,18 @@ const Phase1Setup: React.FC<Phase1SetupProps> = ({ onSubmit, error }) => {
             {error}
           </Alert>
         )}
+
+        {/* Template Manager Section */}
+        <Paper elevation={2} sx={{ p: 3, mb: 3, backgroundColor: '#f8f9fa' }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+            📑 Campaign Templates
+          </Typography>
+          <TemplateManager
+            formData={methods.getValues()}
+            onLoadTemplate={handleLoadTemplate}
+            onClearForm={handleClearForm}
+          />
+        </Paper>
 
         {/* Optional: Add stepper for visual progress */}
         <Stepper activeStep={-1} sx={{ mb: 4 }}>
