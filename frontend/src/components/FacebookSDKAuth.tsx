@@ -14,6 +14,11 @@ declare global {
 const FacebookSDKAuth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [sdkLoaded, setSdkLoaded] = useState(false);
+  const [currentFacebookUser, setCurrentFacebookUser] = useState<{
+    name: string;
+    id: string;
+    email?: string;
+  } | null>(null);
 
   useEffect(() => {
     // Load Facebook SDK
@@ -26,7 +31,7 @@ const FacebookSDKAuth: React.FC = () => {
         // Use ngrok domain if available, otherwise localhost
         status: true
       });
-      
+
       window.FB.AppEvents.logPageView();
       setSdkLoaded(true);
     };
@@ -35,12 +40,30 @@ const FacebookSDKAuth: React.FC = () => {
     (function(d, s, id) {
       var js, fjs = d.getElementsByTagName(s)[0];
       if (d.getElementById(id)) return;
-      js = d.createElement(s) as HTMLScriptElement; 
+      js = d.createElement(s) as HTMLScriptElement;
       js.id = id;
       js.src = "https://connect.facebook.net/en_US/sdk.js";
       fjs.parentNode!.insertBefore(js, fjs);
     }(document, 'script', 'facebook-jssdk'));
   }, []);
+
+  // Check current Facebook login status when SDK loads
+  useEffect(() => {
+    if (sdkLoaded && window.FB) {
+      window.FB.getLoginStatus((response: any) => {
+        if (response.status === 'connected') {
+          // Fetch user info
+          window.FB.api('/me', { fields: 'id,name,email' }, (userInfo: any) => {
+            setCurrentFacebookUser({
+              id: userInfo.id,
+              name: userInfo.name,
+              email: userInfo.email
+            });
+          });
+        }
+      });
+    }
+  }, [sdkLoaded]);
 
   const processAuthResponse = async (authResponse: any) => {
     if (!authResponse) {
@@ -63,8 +86,17 @@ const FacebookSDKAuth: React.FC = () => {
       console.log('Backend response:', backendResponse.data);
 
       if (backendResponse.data.success) {
+        // Fetch and set user info after successful auth
+        window.FB.api('/me', { fields: 'id,name,email' }, (userInfo: any) => {
+          setCurrentFacebookUser({
+            id: userInfo.id,
+            name: userInfo.name,
+            email: userInfo.email
+          });
+        });
+
         toast.success('Facebook authentication successful!');
-        
+
         // Check if we need to select resources
         if (backendResponse.data.data?.resources) {
           const resources = backendResponse.data.data.resources;
@@ -124,11 +156,43 @@ const FacebookSDKAuth: React.FC = () => {
     });
   };
 
+  const handleSwitchAccount = () => {
+    if (!sdkLoaded) {
+      toast.error('Facebook SDK is still loading. Please try again.');
+      return;
+    }
+
+    setLoading(true);
+
+    // First logout from current Facebook session
+    window.FB.logout((response: any) => {
+      console.log('Logged out from current Facebook account');
+      setCurrentFacebookUser(null);
+
+      // Immediately trigger new login
+      window.FB.login((loginResponse: any) => {
+        if (loginResponse.authResponse) {
+          console.log('New Facebook login successful!');
+          processAuthResponse(loginResponse.authResponse);
+        } else {
+          console.log('User cancelled login or did not fully authorize.');
+          toast.warning('Facebook login was cancelled');
+          setLoading(false);
+        }
+      }, {
+        scope: 'public_profile,ads_management,ads_read,business_management,pages_show_list,pages_read_engagement,pages_manage_ads',
+        return_scopes: true,
+        auth_type: 'reauthorize' // Force re-authorization
+      });
+    });
+  };
+
   const handleLogout = () => {
     if (!sdkLoaded) return;
-    
+
     window.FB.logout((response: any) => {
       console.log('Logged out from Facebook');
+      setCurrentFacebookUser(null);
       toast.info('Logged out from Facebook');
     });
   };
@@ -138,19 +202,57 @@ const FacebookSDKAuth: React.FC = () => {
       <Alert severity="info" sx={{ mb: 2 }}>
         Using Facebook SDK for direct authentication (bypasses redirect URI issues)
       </Alert>
-      
-      <Button
-        variant="contained"
-        color="primary"
-        size="large"
-        startIcon={loading ? <CircularProgress size={20} /> : <Facebook />}
-        onClick={handleFacebookLogin}
-        disabled={loading || !sdkLoaded}
-        fullWidth
-      >
-        {loading ? 'Authenticating...' : 'Login with Facebook (SDK)'}
-      </Button>
-      
+
+      {/* Show current connected account if exists */}
+      {currentFacebookUser && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          <strong>Connected as:</strong> {currentFacebookUser.name}
+          <br />
+          <small>Facebook ID: {currentFacebookUser.id}</small>
+        </Alert>
+      )}
+
+      {/* Show appropriate buttons based on connection status */}
+      {currentFacebookUser ? (
+        <>
+          <Button
+            variant="contained"
+            color="primary"
+            size="large"
+            startIcon={loading ? <CircularProgress size={20} /> : <Facebook />}
+            onClick={handleSwitchAccount}
+            disabled={loading || !sdkLoaded}
+            fullWidth
+          >
+            {loading ? 'Switching Account...' : 'Switch Facebook Account'}
+          </Button>
+
+          <Button
+            variant="outlined"
+            color="primary"
+            size="large"
+            onClick={() => window.location.href = '/dashboard'}
+            disabled={loading}
+            fullWidth
+            sx={{ mt: 1 }}
+          >
+            Continue with Current Account
+          </Button>
+        </>
+      ) : (
+        <Button
+          variant="contained"
+          color="primary"
+          size="large"
+          startIcon={loading ? <CircularProgress size={20} /> : <Facebook />}
+          onClick={handleFacebookLogin}
+          disabled={loading || !sdkLoaded}
+          fullWidth
+        >
+          {loading ? 'Authenticating...' : 'Login with Facebook (SDK)'}
+        </Button>
+      )}
+
       <Button
         variant="outlined"
         color="secondary"
@@ -160,9 +262,9 @@ const FacebookSDKAuth: React.FC = () => {
         fullWidth
         sx={{ mt: 1 }}
       >
-        Logout from Facebook (if stuck)
+        Logout from Facebook (Clear Session)
       </Button>
-      
+
       {!sdkLoaded && (
         <Alert severity="warning" sx={{ mt: 2 }}>
           Loading Facebook SDK...
