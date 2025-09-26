@@ -744,32 +744,14 @@ router.get('/post-id/:adId', authenticate, requireFacebookAuth, async (req, res)
 });
 
 // Verify campaign for multiplication
-router.get('/verify/:campaignId', authenticate, requireFacebookAuth, async (req, res) => {
+router.get('/verify/:campaignId', authenticate, requireFacebookAuth, refreshFacebookToken, async (req, res) => {
   try {
     const { campaignId } = req.params;
     const { skipDetails } = req.query; // Add query param to skip fetching details
 
-    const facebookAuth = await db.FacebookAuth.findOne({
-      where: { userId: req.user.id, isActive: true }
-    });
-
-    if (!facebookAuth) {
-      return res.status(401).json({
-        success: false,
-        error: 'Facebook authentication required',
-        requiresReauth: true
-      });
-    }
-
-    let decryptedToken;
-    if (facebookAuth.accessToken.startsWith('{')) {
-      decryptedToken = decryptToken(facebookAuth.accessToken);
-    } else {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid access token format'
-      });
-    }
+    // Use token from middleware (already validated and decrypted)
+    const decryptedToken = req.facebookAuth.accessToken;
+    const facebookAuth = req.facebookAuth.authRecord;
 
     // If skipDetails is true, return minimal info for multiplication
     if (skipDetails === 'true') {
@@ -881,7 +863,7 @@ router.get('/verify-post/:postId', authenticate, requireFacebookAuth, async (req
 });
 
 // Duplicate ad sets (1-49-1)
-router.post('/duplicate', authenticate, requireFacebookAuth, async (req, res) => {
+router.post('/duplicate', authenticate, requireFacebookAuth, refreshFacebookToken, async (req, res) => {
   try {
     const {
       campaignId,
@@ -899,19 +881,9 @@ router.post('/duplicate', authenticate, requireFacebookAuth, async (req, res) =>
       });
     }
 
-    const facebookAuth = await db.FacebookAuth.findOne({
-      where: { userId: req.user.id, isActive: true }
-    });
-
-    let decryptedToken;
-    if (facebookAuth.accessToken.startsWith('{')) {
-      decryptedToken = decryptToken(facebookAuth.accessToken);
-    } else {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid access token format'
-      });
-    }
+    // Use token from middleware (already validated and decrypted)
+    const decryptedToken = req.facebookAuth.accessToken;
+    const facebookAuth = req.facebookAuth.authRecord;
 
     const userFacebookApi = new FacebookAPI({
       accessToken: decryptedToken,
