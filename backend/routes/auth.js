@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const { User, Role } = require('../models');
+const { User, Role, FacebookAuth } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const AuditService = require('../services/AuditService');
 const { body, validationResult } = require('express-validator');
@@ -218,6 +218,45 @@ router.post('/logout', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Logout error:', error);
     res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+// Get Facebook authentication status
+router.get('/facebook/status', authenticate, async (req, res) => {
+  try {
+    const facebookAuth = await FacebookAuth.findOne({
+      where: { userId: req.userId },
+      attributes: ['id', 'facebookUserId', 'facebookUserName', 'tokenExpiresAt', 'isValid']
+    });
+
+    if (!facebookAuth) {
+      return res.json({
+        success: true,
+        connected: false,
+        message: 'No Facebook account connected'
+      });
+    }
+
+    // Check if token is still valid
+    const isExpired = facebookAuth.tokenExpiresAt && new Date(facebookAuth.tokenExpiresAt) < new Date();
+    const isConnected = facebookAuth.isValid && !isExpired;
+
+    res.json({
+      success: true,
+      connected: isConnected,
+      facebookUser: isConnected ? {
+        id: facebookAuth.facebookUserId,
+        name: facebookAuth.facebookUserName
+      } : null,
+      expiresAt: facebookAuth.tokenExpiresAt,
+      message: isConnected ? 'Facebook account connected' : 'Facebook connection expired or invalid'
+    });
+  } catch (error) {
+    console.error('Facebook status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get Facebook status'
+    });
   }
 });
 

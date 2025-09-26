@@ -366,10 +366,21 @@ const Strategy150Container: React.FC = () => {
       }
 
       if (result.success) {
+        // Get resource details for display
+        const accountName = result.data?.adAccount?.name || 'Unknown Account';
+        const pageName = result.data?.page?.name || data.facebookPage || 'Unknown Page';
+        const pixelId = data.pixel || 'No Pixel';
+
+        // Enhanced message with creation details
+        const enhancedMessage = `✅ Campaign created successfully!\n
+📊 Account: ${accountName}
+📱 Page: ${pageName}
+🎯 Pixel: ${pixelId}`;
+
         // Transform CampaignResponse to Strategy150Response format
         const strategy150Result: Strategy150Response = {
           success: true,
-          message: result.message || 'Campaign created successfully',
+          message: enhancedMessage,
           data: {
             phase: 'waiting', // Set to waiting since we'll capture Post ID next
             campaign: result.data?.campaign || {

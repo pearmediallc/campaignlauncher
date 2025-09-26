@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useFacebookStatus } from '../hooks/useFacebookStatus';
 import {
   AppBar,
   Toolbar,
@@ -11,14 +12,17 @@ import {
   MenuItem,
   Divider,
   Chip,
-  Button
+  Button,
+  Tooltip,
+  Badge
 } from '@mui/material';
-import { AccountCircle, Dashboard, People, History, Person, Campaign, BarChart, AutoAwesome } from '@mui/icons-material';
+import { AccountCircle, Dashboard, People, History, Person, Campaign, BarChart, AutoAwesome, Facebook } from '@mui/icons-material';
 import ResourceSwitcher from './ResourceSwitcher';
 
 const Navigation: React.FC = () => {
   const { user, logout, hasPermission } = useAuth();
   const navigate = useNavigate();
+  const { connected: fbConnected, facebookUser, loading: fbLoading, refreshStatus } = useFacebookStatus();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -140,8 +144,28 @@ const Navigation: React.FC = () => {
               Analytics
             </Button>
 
+            {/* Facebook Status Indicator */}
+            <Tooltip title={fbConnected ? `Connected: ${facebookUser?.name}` : 'Facebook not connected'}>
+              <Chip
+                icon={<Facebook />}
+                label={fbConnected ? 'Connected' : 'Not Connected'}
+                color={fbConnected ? 'success' : 'error'}
+                size="small"
+                variant={fbConnected ? 'filled' : 'outlined'}
+                onClick={() => navigate('/')}
+                sx={{
+                  fontWeight: 500,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  '& .MuiChip-icon': {
+                    fontSize: '18px'
+                  }
+                }}
+              />
+            </Tooltip>
+
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Typography variant="body2" sx={{ 
+              <Typography variant="body2" sx={{
                 fontSize: '14px',
                 fontWeight: 500,
                 color: '#1c1e21'
@@ -198,6 +222,17 @@ const Navigation: React.FC = () => {
             >
               <MenuItem disabled>
                 <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{user.email}</Typography>
+              </MenuItem>
+              <Divider />
+
+              {/* Facebook Status Section */}
+              <MenuItem onClick={() => handleNavigate('/')}>
+                <Facebook sx={{
+                  mr: 1,
+                  fontSize: 20,
+                  color: fbConnected ? '#4CAF50' : '#f44336'
+                }} />
+                {fbConnected ? `FB: ${facebookUser?.name}` : 'Connect Facebook'}
               </MenuItem>
               <Divider />
               

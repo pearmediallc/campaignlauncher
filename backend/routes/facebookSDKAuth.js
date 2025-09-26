@@ -136,7 +136,7 @@ router.post('/sdk-callback', authenticate, async (req, res) => {
 
     // Get pages with pagination to fetch ALL pages
     let allPages = [];
-    let pagesUrl = `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token,category&limit=100&access_token=${accessToken}`;
+    let pagesUrl = `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token,category,picture{url}&limit=100&access_token=${accessToken}`;
 
     console.log('Fetching pages with pagination...');
 

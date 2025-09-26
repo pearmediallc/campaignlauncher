@@ -21,7 +21,9 @@ import {
   CardContent,
   CardActions,
   LinearProgress,
-  Chip
+  Chip,
+  Autocomplete,
+  Avatar
 } from '@mui/material';
 import { Controller, useFormContext } from 'react-hook-form';
 import { AdsClick, CloudUpload, Delete, Image, VideoLibrary, ViewCarousel } from '@mui/icons-material';
@@ -201,35 +203,50 @@ const AdSection: React.FC = () => {
             name="facebookPage"
             control={control}
             rules={{ required: 'Facebook Page is required' }}
-            render={({ field, fieldState: { error } }) => (
-              <FormControl fullWidth error={!!error} disabled={loadingResources}>
-                <InputLabel>Facebook Page</InputLabel>
-                {resources.pages.length > 0 ? (
-                  <Select {...field} label="Facebook Page">
-                    {resources.pages.map(page => (
-                      <MenuItem key={page.id} value={page.id}>
-                        {page.name}
-                        {resources.selectedPage?.id === page.id && (
-                          <Chip label="Saved" size="small" color="primary" sx={{ ml: 1 }} />
-                        )}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                ) : (
-                  <Select {...field} label="Facebook Page" disabled>
-                    <MenuItem value="">
-                      {loadingResources ? 'Loading pages...' : 'No pages available - Please configure Facebook resources first'}
-                    </MenuItem>
-                  </Select>
+            render={({ field: { onChange, value, ...field }, fieldState: { error } }) => (
+              <Autocomplete
+                {...field}
+                fullWidth
+                disabled={loadingResources || resources.pages.length === 0}
+                options={resources.pages}
+                value={resources.pages.find(page => page.id === value) || null}
+                onChange={(_, newValue) => {
+                  onChange(newValue?.id || '');
+                }}
+                getOptionLabel={(option) => option.name || ''}
+                isOptionEqualToValue={(option, value) => option.id === value?.id}
+                renderOption={(props, option) => (
+                  <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {option.picture && (
+                      <Avatar src={option.picture} sx={{ width: 24, height: 24 }} />
+                    )}
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography variant="body1">{option.name}</Typography>
+                      {option.category && (
+                        <Typography variant="caption" color="text.secondary">
+                          {option.category}
+                        </Typography>
+                      )}
+                    </Box>
+                    {resources.selectedPage?.id === option.id && (
+                      <Chip label="Saved" size="small" color="primary" />
+                    )}
+                  </Box>
                 )}
-                {error && <FormHelperText>{error.message}</FormHelperText>}
-                {!loadingResources && resources.pages.length === 0 && (
-                  <FormHelperText>Please connect a Facebook Page in your account settings</FormHelperText>
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Facebook Page"
+                    placeholder="Search and select a page..."
+                    error={!!error}
+                    helperText={
+                      error?.message ||
+                      (!loadingResources && resources.pages.length === 0 && 'Please connect a Facebook Page in your account settings') ||
+                      (resources.selectedPage && `Currently using saved page: ${resources.selectedPage.name}`)
+                    }
+                  />
                 )}
-                {resources.selectedPage && (
-                  <FormHelperText>Currently using saved page: {resources.selectedPage.name}</FormHelperText>
-                )}
-              </FormControl>
+              />
             )}
           />
         </Box>
