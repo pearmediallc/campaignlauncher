@@ -473,19 +473,8 @@ router.put('/:campaignId/edit', authenticate, requireFacebookAuth, refreshFacebo
     const { name, status, daily_budget, lifetime_budget } = req.body;
     const userId = req.user.id;
 
-    // Get Facebook auth
-    const facebookAuth = await db.FacebookAuth.findOne({
-      where: { userId, isActive: true }
-    });
-
-    if (!facebookAuth) {
-      return res.status(400).json({
-        success: false,
-        message: 'Facebook authentication not found'
-      });
-    }
-
-    const accessToken = decryptToken(facebookAuth.accessToken);
+    // Use token from middleware (already validated and decrypted)
+    const accessToken = req.facebookAuth.accessToken;
     const facebookApi = new FacebookAPI(accessToken);
 
     // Prepare update data
@@ -540,20 +529,10 @@ router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refresh
       });
     }
 
-    // Get Facebook auth
-    const facebookAuth = await db.FacebookAuth.findOne({
-      where: { userId, isActive: true }
-    });
-
-    if (!facebookAuth) {
-      return res.status(400).json({
-        success: false,
-        message: 'Facebook authentication not found'
-      });
-    }
-
-    const accessToken = decryptToken(facebookAuth.accessToken);
+    // Use token from middleware (already validated and decrypted)
+    const accessToken = req.facebookAuth.accessToken;
     const facebookApi = new FacebookAPI(accessToken);
+    const facebookAuth = req.facebookAuth.authRecord;
 
     // Get original campaign details
     const originalCampaign = await facebookApi.getCampaignFullDetails(campaignId);
@@ -631,19 +610,8 @@ router.put('/:campaignId/budget', authenticate, requireFacebookAuth, refreshFace
       });
     }
 
-    // Get Facebook auth
-    const facebookAuth = await db.FacebookAuth.findOne({
-      where: { userId, isActive: true }
-    });
-
-    if (!facebookAuth) {
-      return res.status(400).json({
-        success: false,
-        message: 'Facebook authentication not found'
-      });
-    }
-
-    const accessToken = decryptToken(facebookAuth.accessToken);
+    // Use token from middleware (already validated and decrypted)
+    const accessToken = req.facebookAuth.accessToken;
     const facebookApi = new FacebookAPI(accessToken);
 
     // Prepare budget update
@@ -707,20 +675,10 @@ router.post('/batch', authenticate, requireFacebookAuth, refreshFacebookToken, a
       });
     }
 
-    // Get Facebook auth
-    const facebookAuth = await db.FacebookAuth.findOne({
-      where: { userId, isActive: true }
-    });
-
-    if (!facebookAuth) {
-      return res.status(400).json({
-        success: false,
-        message: 'Facebook authentication not found'
-      });
-    }
-
-    const accessToken = decryptToken(facebookAuth.accessToken);
+    // Use token from middleware (already validated and decrypted)
+    const accessToken = req.facebookAuth.accessToken;
     const facebookApi = new FacebookAPI(accessToken);
+    const facebookAuth = req.facebookAuth.authRecord;
 
     const results = [];
     const errors = [];
