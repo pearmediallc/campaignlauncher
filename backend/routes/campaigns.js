@@ -519,7 +519,7 @@ router.put('/:campaignId/edit', authenticate, requireFacebookAuth, refreshFacebo
 router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refreshFacebookToken, async (req, res) => {
   try {
     const { campaignId } = req.params;
-    const { new_name, budget_multiplier = 1, status = 'PAUSED' } = req.body;
+    const { new_name } = req.body;
     const userId = req.user.id;
 
     if (!new_name) {
@@ -532,39 +532,10 @@ router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refresh
     // Use token from middleware (already validated and decrypted)
     const accessToken = req.facebookAuth.accessToken;
     const facebookApi = new FacebookAPI({ accessToken });
-    const facebookAuth = req.facebookAuth.authRecord;
 
-    // Get original campaign details
-    const originalCampaign = await facebookApi.getCampaignFullDetails(campaignId);
-
-    // Create duplicate campaign data
-    const duplicateData = {
-      name: new_name,
-      objective: originalCampaign.objective,
-      status: status,
-      special_ad_categories: originalCampaign.special_ad_categories || []
-    };
-
-    // Apply budget with multiplier
-    if (originalCampaign.daily_budget) {
-      duplicateData.daily_budget = Math.round(originalCampaign.daily_budget * budget_multiplier);
-    }
-    if (originalCampaign.lifetime_budget) {
-      duplicateData.lifetime_budget = Math.round(originalCampaign.lifetime_budget * budget_multiplier);
-    }
-
-    // Get ad account ID from selected account
-    const adAccountId = facebookAuth.selectedAdAccount?.id || facebookAuth.adAccounts?.[0]?.id;
-
-    if (!adAccountId) {
-      return res.status(400).json({
-        success: false,
-        message: 'No ad account selected'
-      });
-    }
-
-    // Create the duplicate campaign
-    const newCampaign = await facebookApi.createCampaignFromExisting(adAccountId, duplicateData);
+    // Use Facebook's official /copies endpoint to duplicate the campaign
+    // This will copy the campaign along with all its ad sets and ads
+    const newCampaign = await facebookApi.duplicateCampaign(campaignId, new_name);
 
     // Audit log
     await AuditService.log({
@@ -575,8 +546,7 @@ router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refresh
       details: {
         originalCampaignId: campaignId,
         newCampaignId: newCampaign.id,
-        newName: new_name,
-        budgetMultiplier: budget_multiplier
+        newName: new_name
       },
       ip: req.ip
     });

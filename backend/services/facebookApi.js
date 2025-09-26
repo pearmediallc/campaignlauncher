@@ -2491,6 +2491,40 @@ class FacebookAPI {
   }
 
   /**
+   * Duplicate a campaign using Facebook's official /copies endpoint
+   */
+  async duplicateCampaign(campaignId, newName) {
+    try {
+      const url = `${this.baseURL}/${campaignId}/copies`;
+      const params = {
+        access_token: this.accessToken,
+        deep_copy: true,  // Copy all child objects (ad sets, ads)
+        end_time: null,    // Remove end time for new campaign
+        start_time: null,  // Remove start time for new campaign
+        rename_options: JSON.stringify({
+          rename_suffix: ' - Copy',
+          rename_strategy: 'DEEP_RENAME'  // Rename campaign, ad sets, and ads
+        }),
+        status_option: 'PAUSED'  // Start new campaign as paused
+      };
+
+      // If a custom name is provided, use it
+      if (newName) {
+        params.name = newName;
+      }
+
+      console.log(`📝 Duplicating campaign ${campaignId} using Facebook /copies endpoint`);
+      const response = await axios.post(url, null, { params });
+      console.log(`✅ Campaign ${campaignId} duplicated successfully. New ID: ${response.data.id}`);
+
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Failed to duplicate campaign ${campaignId}:`, error.response?.data || error.message);
+      this.handleError(error);
+    }
+  }
+
+  /**
    * Create a new campaign (wrapper for existing method)
    */
   async createCampaignFromExisting(adAccountId, campaignData) {
