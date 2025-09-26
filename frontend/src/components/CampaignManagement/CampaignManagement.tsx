@@ -10,6 +10,12 @@ interface Campaign {
   strategy_type: string;
 }
 
+interface AdAccount {
+  id: string;
+  name: string;
+  isActive?: boolean;
+}
+
 interface AdSet {
   id: string;
   name: string;
@@ -57,6 +63,16 @@ const CampaignManagement: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [paging, setPaging] = useState<any>(null);
 
+  // New state for account and search functionality
+  const [accounts, setAccounts] = useState<AdAccount[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<string>('');
+  const [accountSearch, setAccountSearch] = useState('');
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [accountsOffset, setAccountsOffset] = useState(0);
+  const [hasMoreAccounts, setHasMoreAccounts] = useState(true);
+  const [currentAccountName, setCurrentAccountName] = useState<string>('');
+
   useEffect(() => {
     fetchTrackedCampaigns();
   }, []);
@@ -73,6 +89,30 @@ const CampaignManagement: React.FC = () => {
     };
   }, [autoRefresh, selectedCampaign]);
 
+  // Fetch accounts when switching to "all" mode
+  useEffect(() => {
+    if (viewMode === 'all' && accounts.length === 0) {
+      fetchAccounts();
+    }
+  }, [viewMode]);
+
+  // Debounced account search
+  useEffect(() => {
+    if (viewMode === 'all') {
+      const timer = setTimeout(() => {
+        fetchAccounts(accountSearch);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [accountSearch]);
+
+  // Fetch campaigns when account changes
+  useEffect(() => {
+    if (selectedAccount && viewMode === 'all') {
+      fetchAllCampaigns(datePreset, undefined, selectedAccount);
+    }
+  }, [selectedAccount, datePreset]);
+
   const fetchTrackedCampaigns = async () => {
     try {
       const response = await axios.get('/api/campaigns/manage/tracked');
@@ -83,12 +123,13 @@ const CampaignManagement: React.FC = () => {
     }
   };
 
-  const fetchAllCampaigns = async (datePreset: string = 'last_14d', after?: string) => {
+  const fetchAllCampaigns = async (datePreset: string = 'last_14d', after?: string, accountId?: string) => {
     setLoading(true);
     setError(null);
     try {
       const params: any = { date_preset: datePreset, limit: 50 };
       if (after) params.after = after;
+      if (accountId) params.ad_account_id = accountId;  // NEW: Pass specific account
 
       const response = await axios.get('/api/campaigns/manage/all', { params });
 
@@ -101,11 +142,47 @@ const CampaignManagement: React.FC = () => {
       }
 
       setPaging(response.data.paging);
+
+      // Store account info
+      if (response.data.accountInfo) {
+        setCurrentAccountName(response.data.accountInfo.adAccountName);
+      }
     } catch (error: any) {
       console.error('Error fetching all campaigns:', error);
       setError(error.response?.data?.message || 'Failed to fetch all campaigns');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAccounts = async (search: string = '', loadMore: boolean = false) => {
+    setLoadingAccounts(true);
+    const offset = loadMore ? accountsOffset : 0;
+
+    try {
+      const response = await axios.get('/api/campaigns/manage/accounts', {
+        params: { search, limit: 20, offset }
+      });
+
+      if (loadMore) {
+        setAccounts(prev => [...prev, ...response.data.accounts]);
+      } else {
+        setAccounts(response.data.accounts || []);
+        setAccountsOffset(0);
+      }
+
+      setHasMoreAccounts(response.data.hasMore);
+      setAccountsOffset(offset + 20);
+
+      // Set active account if not selected
+      if (!selectedAccount && response.data.activeAccountId) {
+        setSelectedAccount(response.data.activeAccountId);
+      }
+    } catch (error: any) {
+      console.error('Error fetching accounts:', error);
+      // Don't show error for accounts - graceful degradation
+    } finally {
+      setLoadingAccounts(false);
     }
   };
 
@@ -229,7 +306,7 @@ const CampaignManagement: React.FC = () => {
 
       {/* View Mode Toggle and Date Preset Selector */}
       <div className="row mb-3">
-        <div className="col-md-6">
+        <div className="col-md-4">
           <div className="btn-group" role="group">
             <button
               className={`btn ${viewMode === 'tracked' ? 'btn-primary' : 'btn-outline-primary'}`}
@@ -251,29 +328,80 @@ const CampaignManagement: React.FC = () => {
           </div>
         </div>
         {viewMode === 'all' && (
-          <div className="col-md-6">
-            <select
-              className="form-select"
-              value={datePreset}
-              onChange={(e) => {
-                setDatePreset(e.target.value);
-                fetchAllCampaigns(e.target.value);
-              }}
-            >
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="last_3d">Last 3 Days</option>
-              <option value="last_7d">Last 7 Days</option>
-              <option value="last_14d">Last 14 Days</option>
-              <option value="last_28d">Last 28 Days</option>
-              <option value="last_30d">Last 30 Days</option>
-              <option value="last_90d">Last 90 Days</option>
-              <option value="this_month">This Month</option>
-              <option value="last_month">Last Month</option>
-              <option value="maximum">All Time</option>
-            </select>
-          </div>
+          <>
+            <div className="col-md-4">
+              <select
+                className="form-select"
+                value={datePreset}
+                onChange={(e) => {
+                  setDatePreset(e.target.value);
+                  fetchAllCampaigns(e.target.value, undefined, selectedAccount);
+                }}
+              >
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="last_3d">Last 3 Days</option>
+                <option value="last_7d">Last 7 Days</option>
+                <option value="last_14d">Last 14 Days</option>
+                <option value="last_28d">Last 28 Days</option>
+                <option value="last_30d">Last 30 Days</option>
+                <option value="last_90d">Last 90 Days</option>
+                <option value="this_month">This Month</option>
+                <option value="last_month">Last Month</option>
+                <option value="maximum">All Time</option>
+              </select>
+            </div>
+            <div className="col-md-4">
+              <div className="position-relative">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search ad accounts..."
+                  value={accountSearch}
+                  onChange={(e) => setAccountSearch(e.target.value)}
+                  onFocus={() => accounts.length === 0 && fetchAccounts()}
+                />
+                {accountSearch && accounts.length > 0 && (
+                  <div className="position-absolute w-100 bg-white border rounded-bottom shadow-sm" style={{ top: '100%', zIndex: 1000, maxHeight: '300px', overflowY: 'auto' }}>
+                    {accounts
+                      .filter(acc => acc.name.toLowerCase().includes(accountSearch.toLowerCase()) || acc.id.includes(accountSearch))
+                      .slice(0, 10)
+                      .map(account => (
+                        <div
+                          key={account.id}
+                          className="p-2 border-bottom cursor-pointer"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            setSelectedAccount(account.id);
+                            setAccountSearch(account.name);
+                            fetchAllCampaigns(datePreset, undefined, account.id);
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f0f0'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                        >
+                          <div className="fw-bold">{account.name}</div>
+                          <small className="text-muted">{account.id}</small>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
         )}
+      </div>
+
+      {/* Campaign Search Row */}
+      <div className="row mb-3">
+        <div className="col-md-12">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Search campaigns by name..."
+            value={campaignSearch}
+            onChange={(e) => setCampaignSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="row mb-4">
@@ -292,17 +420,29 @@ const CampaignManagement: React.FC = () => {
                 >
                   <option value="">-- Select a campaign --</option>
                   {viewMode === 'tracked' ? (
-                    trackedCampaigns.map(campaign => (
-                      <option key={campaign.campaign_id} value={campaign.campaign_id}>
-                        {campaign.campaign_name} ({campaign.campaign_id})
-                      </option>
-                    ))
+                    trackedCampaigns
+                      .filter(campaign =>
+                        !campaignSearch ||
+                        campaign.campaign_name.toLowerCase().includes(campaignSearch.toLowerCase()) ||
+                        campaign.campaign_id.includes(campaignSearch)
+                      )
+                      .map(campaign => (
+                        <option key={campaign.campaign_id} value={campaign.campaign_id}>
+                          {campaign.campaign_name} ({campaign.campaign_id})
+                        </option>
+                      ))
                   ) : (
-                    allCampaigns.map((campaign: any) => (
-                      <option key={campaign.id} value={campaign.id}>
-                        {campaign.name} - {campaign.status} ({campaign.id})
-                      </option>
-                    ))
+                    allCampaigns
+                      .filter((campaign: any) =>
+                        !campaignSearch ||
+                        campaign.name.toLowerCase().includes(campaignSearch.toLowerCase()) ||
+                        campaign.id.includes(campaignSearch)
+                      )
+                      .map((campaign: any) => (
+                        <option key={campaign.id} value={campaign.id}>
+                          {campaign.name} - {campaign.status} ({campaign.id})
+                        </option>
+                      ))
                   )}
                 </select>
               </div>

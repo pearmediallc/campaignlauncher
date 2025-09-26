@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const axios = require('axios');
-const { CampaignTracking, FacebookAuth } = require('../models');
+const { Op } = require('sequelize');
+const { CampaignTracking, FacebookAuth, UserResource, UserResourceConfig } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { decryptToken } = require('./facebookSDKAuth');
 
@@ -29,6 +30,71 @@ router.get('/tracked', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch tracked campaigns',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route   GET /api/campaigns/manage/accounts
+ * @desc    Get all ad accounts available to the user with search
+ * @access  Private
+ */
+router.get('/accounts', authenticate, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.userId;
+    const { search, limit = 20, offset = 0 } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Build search condition
+    const whereCondition = {
+      userId: userId,
+      type: 'adAccount'
+    };
+
+    if (search) {
+      whereCondition[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { resourceId: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    // Get user's ad accounts
+    const { count, rows: accounts } = await UserResource.findAndCountAll({
+      where: whereCondition,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [['name', 'ASC']]
+    });
+
+    // Get active resource to mark it
+    const activeConfig = await UserResourceConfig.findOne({
+      where: { userId: userId, isActive: true }
+    });
+
+    // Format response
+    const formattedAccounts = accounts.map(account => ({
+      id: account.resourceId,
+      name: account.name,
+      isActive: activeConfig && activeConfig.adAccountId === account.resourceId
+    }));
+
+    res.json({
+      success: true,
+      accounts: formattedAccounts,
+      total: count,
+      hasMore: parseInt(offset) + parseInt(limit) < count,
+      activeAccountId: activeConfig?.adAccountId || null
+    });
+
+  } catch (error) {
+    console.error('Error fetching ad accounts:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch ad accounts',
       message: error.message
     });
   }
@@ -191,6 +257,7 @@ router.get('/all', authenticate, async (req, res) => {
   try {
     const userId = req.user?.id || req.userId;
     const {
+      ad_account_id,  // NEW: Optional specific ad account ID
       date_preset = 'last_14d',  // Default to last 14 days (Facebook doesn't have last_15d)
       limit = 50,
       after,  // Pagination cursor
@@ -213,8 +280,36 @@ router.get('/all', authenticate, async (req, res) => {
       });
     }
 
-    // Check if we have a selected ad account
-    const adAccountId = facebookAuth.selectedAdAccount?.id || facebookAuth.adAccountId;
+    // Determine which ad account to use
+    let adAccountId;
+    let accountName = 'Default Account';
+
+    if (ad_account_id) {
+      // 1. Use provided ad account ID if specified
+      adAccountId = ad_account_id;
+      // Try to get the account name
+      const account = await UserResource.findOne({
+        where: { userId: userId, resourceId: ad_account_id }
+      });
+      if (account) accountName = account.name;
+    } else {
+      // 2. Try to use active resource config
+      const activeConfig = await UserResourceConfig.findOne({
+        where: { userId: userId, isActive: true }
+      });
+
+      if (activeConfig && activeConfig.adAccountId) {
+        adAccountId = activeConfig.adAccountId;
+        accountName = activeConfig.adAccountName || 'Active Account';
+      } else {
+        // 3. Fallback to FacebookAuth (original behavior)
+        adAccountId = facebookAuth.selectedAdAccount?.id || facebookAuth.adAccountId;
+        if (facebookAuth.selectedAdAccount?.name) {
+          accountName = facebookAuth.selectedAdAccount.name;
+        }
+      }
+    }
+
     if (!adAccountId) {
       return res.status(400).json({
         error: 'No ad account selected. Please select an ad account first.',
@@ -300,6 +395,10 @@ router.get('/all', authenticate, async (req, res) => {
         active_campaigns: campaignsData.data?.filter(c => c.status === 'ACTIVE').length || 0,
         paused_campaigns: campaignsData.data?.filter(c => c.status === 'PAUSED').length || 0,
         date_range: date_preset
+      },
+      accountInfo: {
+        adAccountId: adAccountId,
+        adAccountName: accountName
       }
     });
 
