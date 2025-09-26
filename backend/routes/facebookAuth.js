@@ -976,7 +976,7 @@ router.get('/audiences', authenticate, async (req, res) => {
         {
           params: {
             access_token: accessToken,
-            fields: 'id,name,description,approximate_count,time_created',
+            fields: 'id,name,description,time_created',
             limit: 100
           }
         }

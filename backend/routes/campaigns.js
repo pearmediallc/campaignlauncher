@@ -475,7 +475,7 @@ router.put('/:campaignId/edit', authenticate, requireFacebookAuth, refreshFacebo
 
     // Use token from middleware (already validated and decrypted)
     const accessToken = req.facebookAuth.accessToken;
-    const facebookApi = new FacebookAPI(accessToken);
+    const facebookApi = new FacebookAPI({ accessToken });
 
     // Prepare update data
     const updateData = {};
@@ -531,7 +531,7 @@ router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refresh
 
     // Use token from middleware (already validated and decrypted)
     const accessToken = req.facebookAuth.accessToken;
-    const facebookApi = new FacebookAPI(accessToken);
+    const facebookApi = new FacebookAPI({ accessToken });
     const facebookAuth = req.facebookAuth.authRecord;
 
     // Get original campaign details
@@ -612,7 +612,7 @@ router.put('/:campaignId/budget', authenticate, requireFacebookAuth, refreshFace
 
     // Use token from middleware (already validated and decrypted)
     const accessToken = req.facebookAuth.accessToken;
-    const facebookApi = new FacebookAPI(accessToken);
+    const facebookApi = new FacebookAPI({ accessToken });
 
     // Prepare budget update
     const budgetUpdate = {};
@@ -677,7 +677,7 @@ router.post('/batch', authenticate, requireFacebookAuth, refreshFacebookToken, a
 
     // Use token from middleware (already validated and decrypted)
     const accessToken = req.facebookAuth.accessToken;
-    const facebookApi = new FacebookAPI(accessToken);
+    const facebookApi = new FacebookAPI({ accessToken });
     const facebookAuth = req.facebookAuth.authRecord;
 
     const results = [];

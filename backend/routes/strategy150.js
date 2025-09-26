@@ -671,7 +671,8 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
         phase: 'initial',
         campaign: result.campaign,
         adSet: result.adSet,
-        ads: result.ads
+        ads: result.ads,
+        adAccount: facebookAuth.selectedAdAccount // Add ad account info
       }
     });
   } catch (error) {
