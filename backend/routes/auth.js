@@ -226,7 +226,7 @@ router.get('/facebook/status', authenticate, async (req, res) => {
   try {
     const facebookAuth = await FacebookAuth.findOne({
       where: { userId: req.userId },
-      attributes: ['id', 'facebookUserId', 'facebookUserName', 'tokenExpiresAt', 'isValid']
+      attributes: ['id', 'facebookUserId', 'tokenExpiresAt', 'isActive', 'pages']
     });
 
     if (!facebookAuth) {
@@ -239,14 +239,20 @@ router.get('/facebook/status', authenticate, async (req, res) => {
 
     // Check if token is still valid
     const isExpired = facebookAuth.tokenExpiresAt && new Date(facebookAuth.tokenExpiresAt) < new Date();
-    const isConnected = facebookAuth.isValid && !isExpired;
+    const isConnected = facebookAuth.isActive && !isExpired;
+
+    // Get user name from pages data (first page name as fallback)
+    let userName = 'Facebook User';
+    if (facebookAuth.pages && facebookAuth.pages.length > 0) {
+      userName = facebookAuth.pages[0].name || 'Facebook User';
+    }
 
     res.json({
       success: true,
       connected: isConnected,
       facebookUser: isConnected ? {
         id: facebookAuth.facebookUserId,
-        name: facebookAuth.facebookUserName
+        name: userName
       } : null,
       expiresAt: facebookAuth.tokenExpiresAt,
       message: isConnected ? 'Facebook account connected' : 'Facebook connection expired or invalid'

@@ -26,7 +26,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Tooltip
+  Tooltip,
+  Autocomplete,
+  Avatar
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -246,81 +248,128 @@ const ResourcesManagement: React.FC = () => {
         </Typography>
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 2, mt: 2 }}>
           {/* Ad Account Selector */}
-          <FormControl fullWidth size="small">
-            <InputLabel>Ad Account</InputLabel>
-            <Select
-              value={selectedResources.adAccountId || currentConfig?.adAccountId || ''}
-              onChange={(e) => setSelectedResources({ ...selectedResources, adAccountId: e.target.value })}
-              label="Ad Account"
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {availableResources?.adAccounts?.map((acc: any) => (
-                <MenuItem key={acc.id} value={acc.id}>
-                  {acc.name} ({acc.id})
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            size="small"
+            options={availableResources?.adAccounts || []}
+            getOptionLabel={(option: any) => `${option.name} (${option.id})`}
+            value={availableResources?.adAccounts?.find((acc: any) => acc.id === (selectedResources.adAccountId || currentConfig?.adAccountId)) || null}
+            onChange={(event, newValue) => {
+              setSelectedResources({ ...selectedResources, adAccountId: newValue?.id || '' });
+            }}
+            isOptionEqualToValue={(option: any, value: any) => option.id === value?.id}
+            renderInput={(params) => (
+              <TextField {...params} label="Ad Account" placeholder="Search ad accounts..." />
+            )}
+            renderOption={(props, option: any) => (
+              <Box component="li" {...props}>
+                <CampaignIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography variant="body2">{option.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    ID: {option.id}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+          />
 
           {/* Page Selector */}
-          <FormControl fullWidth size="small">
-            <InputLabel>Page</InputLabel>
-            <Select
-              value={selectedResources.pageId || currentConfig?.pageId || ''}
-              onChange={(e) => setSelectedResources({ ...selectedResources, pageId: e.target.value })}
-              label="Page"
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {availableResources?.pages?.map((page: any) => (
-                <MenuItem key={page.id} value={page.id}>
-                  {page.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            size="small"
+            options={availableResources?.pages || []}
+            getOptionLabel={(option: any) => option.name || ''}
+            value={availableResources?.pages?.find((page: any) => page.id === (selectedResources.pageId || currentConfig?.pageId)) || null}
+            onChange={(event, newValue) => {
+              setSelectedResources({ ...selectedResources, pageId: newValue?.id || '' });
+            }}
+            isOptionEqualToValue={(option: any, value: any) => option.id === value?.id}
+            renderInput={(params) => (
+              <TextField {...params} label="Page" placeholder="Search pages..." />
+            )}
+            renderOption={(props, option: any) => {
+              const pictureUrl = typeof option.picture === 'string'
+                ? option.picture
+                : option.picture?.data?.url;
+
+              return (
+                <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {pictureUrl ? (
+                    <Avatar src={pictureUrl} sx={{ width: 32, height: 32 }} />
+                  ) : (
+                    <Avatar sx={{ width: 32, height: 32 }}>
+                      <PagesIcon fontSize="small" />
+                    </Avatar>
+                  )}
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="body2">{option.name}</Typography>
+                    {option.category && (
+                      <Typography variant="caption" color="text.secondary">
+                        {option.category}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              );
+            }}
+          />
 
           {/* Pixel Selector */}
-          <FormControl fullWidth size="small">
-            <InputLabel>Pixel</InputLabel>
-            <Select
-              value={selectedResources.pixelId || currentConfig?.pixelId || ''}
-              onChange={(e) => setSelectedResources({ ...selectedResources, pixelId: e.target.value })}
-              label="Pixel"
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {availableResources?.pixels?.map((pixel: any) => (
-                <MenuItem key={pixel.id} value={pixel.id}>
-                  {pixel.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            size="small"
+            options={availableResources?.pixels || []}
+            getOptionLabel={(option: any) => option.name || ''}
+            value={availableResources?.pixels?.find((pixel: any) => pixel.id === (selectedResources.pixelId || currentConfig?.pixelId)) || null}
+            onChange={(event, newValue) => {
+              setSelectedResources({ ...selectedResources, pixelId: newValue?.id || '' });
+            }}
+            isOptionEqualToValue={(option: any, value: any) => option.id === value?.id}
+            renderInput={(params) => (
+              <TextField {...params} label="Pixel" placeholder="Search pixels..." />
+            )}
+            renderOption={(props, option: any) => (
+              <Box component="li" {...props}>
+                <CodeIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography variant="body2">{option.name}</Typography>
+                  {option.id && (
+                    <Typography variant="caption" color="text.secondary">
+                      ID: {option.id}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            )}
+          />
 
           {/* Business Manager Selector (if available) */}
           {availableResources?.businessAccounts && availableResources.businessAccounts.length > 0 && (
-            <FormControl fullWidth size="small">
-              <InputLabel>Business Manager</InputLabel>
-              <Select
-                value={selectedResources.businessId || currentConfig?.businessId || ''}
-                onChange={(e) => setSelectedResources({ ...selectedResources, businessId: e.target.value })}
-                label="Business Manager"
-              >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {availableResources.businessAccounts.map((bm: any) => (
-                  <MenuItem key={bm.id} value={bm.id}>
-                    {bm.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              fullWidth
+              size="small"
+              options={availableResources.businessAccounts || []}
+              getOptionLabel={(option: any) => option.name || ''}
+              value={availableResources?.businessAccounts?.find((bm: any) => bm.id === (selectedResources.businessId || currentConfig?.businessId)) || null}
+              onChange={(event, newValue) => {
+                setSelectedResources({ ...selectedResources, businessId: newValue?.id || '' });
+              }}
+              isOptionEqualToValue={(option: any, value: any) => option.id === value?.id}
+              renderInput={(params) => (
+                <TextField {...params} label="Business Manager" placeholder="Search business managers..." />
+              )}
+              renderOption={(props, option: any) => (
+                <Box component="li" {...props}>
+                  <BusinessIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="body2">{option.name}</Typography>
+                    {option.id && (
+                      <Typography variant="caption" color="text.secondary">
+                        ID: {option.id}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              )}
+            />
           )}
         </Box>
 

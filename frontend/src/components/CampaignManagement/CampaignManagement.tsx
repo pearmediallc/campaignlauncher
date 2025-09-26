@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './CampaignManagement.css';
+import CampaignActions from './CampaignActions';
 
 interface Campaign {
   campaign_id: string;
@@ -518,16 +519,18 @@ const CampaignManagement: React.FC = () => {
                 </span>
                 <span className="badge bg-info">{campaignDetails.objective}</span>
               </div>
-              <div>
-                <button
-                  className={`btn ${campaignDetails.status === 'ACTIVE' ? 'btn-warning' : 'btn-success'} me-2`}
-                  onClick={() => updateCampaignStatus(
-                    campaignDetails.id,
-                    campaignDetails.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE'
-                  )}
-                >
-                  {campaignDetails.status === 'ACTIVE' ? '⏸ Pause' : '▶ Resume'}
-                </button>
+              <div className="d-flex align-items-center gap-2">
+                <CampaignActions
+                  campaign={{
+                    id: campaignDetails.id,
+                    name: campaignDetails.name,
+                    status: campaignDetails.status,
+                    daily_budget: campaignDetails.daily_budget,
+                    lifetime_budget: campaignDetails.lifetime_budget
+                  }}
+                  onRefresh={() => fetchCampaignDetails(campaignDetails.id)}
+                  variant="buttons"
+                />
                 <button
                   className="btn btn-outline-primary"
                   onClick={() => fetchCampaignDetails(campaignDetails.id)}

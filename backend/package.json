@@ -12,7 +12,9 @@
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
     "fix-db": "node scripts/fix-database.js",
-    "seed": "sequelize-cli db:seed:all"
+    "seed": "sequelize-cli db:seed:all",
+    "postinstall": "node scripts/run-migrations.js",
+    "build": "node scripts/run-migrations.js"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
