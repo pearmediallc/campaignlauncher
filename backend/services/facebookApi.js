@@ -1367,7 +1367,8 @@ class FacebookAPI {
       return {
         campaign,
         adSet,
-        ads: [ad]
+        ads: [ad],
+        postId: ad?.postId || null // Explicitly include postId in return
       };
     } catch (error) {
       console.error('\n❌ STRATEGY 1-50-1 FAILED');
@@ -1435,8 +1436,38 @@ class FacebookAPI {
       console.log(`🔄 Starting AdSet duplication using Facebook /copies endpoint`);
       console.log(`📋 Original AdSet ID: ${originalAdSetId}`);
       console.log(`📋 Target Campaign ID: ${campaignId}`);
-      console.log(`📋 Post ID: ${postId}`);
+      console.log(`📋 Post ID: ${postId || 'Will fetch from original ad'}`);
       console.log(`📋 Count: ${count}`);
+
+      // If no postId provided, try to get it from the original ad set's ads
+      let actualPostId = postId;
+      if (!actualPostId) {
+        console.log('📋 No post ID provided, fetching from original ad set ads...');
+        try {
+          const adsResponse = await axios.get(
+            `${this.baseURL}/${originalAdSetId}/ads`,
+            {
+              params: {
+                fields: 'creative{effective_object_story_id}',
+                access_token: this.accessToken,
+                limit: 1
+              }
+            }
+          );
+
+          if (adsResponse.data?.data?.[0]?.creative?.effective_object_story_id) {
+            actualPostId = adsResponse.data.data[0].creative.effective_object_story_id;
+            console.log(`✅ Found post ID from original ad: ${actualPostId}`);
+          }
+        } catch (error) {
+          console.log('⚠️ Could not fetch post ID from original ad:', error.message);
+        }
+      }
+
+      // If still no post ID, we cannot proceed
+      if (!actualPostId) {
+        throw new Error('Could not determine post ID for duplication');
+      }
 
       // Facebook's /copies endpoint for AD SETS - different from campaign copies
       console.log(`📋 Creating ${count} copies of ad set ${originalAdSetId} in campaign ${campaignId}...`);
@@ -1521,7 +1552,7 @@ class FacebookAPI {
               name: `${formData.campaignName} - Ad Copy ${i + 1}`,
               adset_id: newAdSetId,
               creative: JSON.stringify({
-                object_story_id: postId,
+                object_story_id: actualPostId,
                 page_id: this.pageId
               }),
               status: 'ACTIVE',

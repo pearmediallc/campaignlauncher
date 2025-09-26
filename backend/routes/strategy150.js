@@ -672,7 +672,8 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
         campaign: result.campaign,
         adSet: result.adSet,
         ads: result.ads,
-        adAccount: facebookAuth.selectedAdAccount // Add ad account info
+        adAccount: facebookAuth.selectedAdAccount, // Add ad account info
+        postId: result.postId // Include postId from result
       }
     });
   } catch (error) {
@@ -875,10 +876,10 @@ router.post('/duplicate', authenticate, requireFacebookAuth, refreshFacebookToke
       duplicateBudgets = [] // Array of custom budgets for each duplicate
     } = req.body;
 
-    if (!campaignId || !originalAdSetId || !postId) {
+    if (!campaignId || !originalAdSetId) {
       return res.status(400).json({
         success: false,
-        error: 'Campaign ID, Ad Set ID, and Post ID are required'
+        error: 'Campaign ID and Ad Set ID are required'
       });
     }
 
