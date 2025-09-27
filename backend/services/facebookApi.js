@@ -2588,6 +2588,12 @@ class FacebookAPI {
       console.log(`🔧 Using Strategy150DuplicationService - proven working pattern`);
 
       // Create the Strategy 1-50-1 based duplication service
+      console.log(`🔍 DEBUG: FacebookAPI parameters for Strategy150Service:`);
+      console.log(`  - accessToken: ${this.accessToken ? 'SET' : 'UNDEFINED'}`);
+      console.log(`  - adAccountId: ${this.adAccountId || 'UNDEFINED'}`);
+      console.log(`  - pageId: ${this.pageId || 'UNDEFINED'}`);
+      console.log(`  - pixelId: ${this.pixelId || 'UNDEFINED'}`);
+
       const strategy150Service = new Strategy150DuplicationService(
         this.accessToken,
         this.adAccountId,

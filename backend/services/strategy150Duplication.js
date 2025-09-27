@@ -9,6 +9,12 @@ const axios = require('axios');
  */
 class Strategy150DuplicationService {
   constructor(accessToken, adAccountId, pageId, pixelId) {
+    console.log(`🔍 DEBUG: Strategy150DuplicationService constructor parameters:`);
+    console.log(`  - accessToken: ${accessToken ? 'SET' : 'UNDEFINED'}`);
+    console.log(`  - adAccountId: ${adAccountId || 'UNDEFINED'}`);
+    console.log(`  - pageId: ${pageId || 'UNDEFINED'}`);
+    console.log(`  - pixelId: ${pixelId || 'UNDEFINED'}`);
+
     this.accessToken = accessToken;
     this.adAccountId = adAccountId;
     this.pageId = pageId;
