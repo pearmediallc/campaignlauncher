@@ -2859,6 +2859,15 @@ class FacebookAPI {
                                    ad.creative?.effective_object_story_id;
               const pageId = ad.creative?.page_id;
 
+              // DEBUG: Log what creative data we actually have
+              console.log(`      🔍 Creative fields available:`, {
+                id: ad.creative?.id,
+                object_story_id: ad.creative?.object_story_id,
+                effective_object_story_id: ad.creative?.effective_object_story_id,
+                page_id: ad.creative?.page_id,
+                allFields: Object.keys(ad.creative || {})
+              });
+
               let newAdData;
 
               if (objectStoryId) {
@@ -2886,12 +2895,14 @@ class FacebookAPI {
                   access_token: this.accessToken
                 };
               } else {
-                // Regular creative - copy the full creative
-                console.log(`      📋 Copying full creative structure`);
+                // Create basic ad with minimal creative reference - FIXED: avoid page_id issues
+                console.log(`      📋 Creating basic ad copy without problematic fields`);
                 newAdData = {
                   name: `${ad.name} - Copy`,
                   adset_id: newAdSetId,
-                  creative: typeof ad.creative === 'string' ? ad.creative : JSON.stringify(ad.creative),
+                  creative: JSON.stringify({
+                    creative_id: ad.creative?.id || 'temp_placeholder'
+                  }),
                   status: 'PAUSED',
                   access_token: this.accessToken
                 };
