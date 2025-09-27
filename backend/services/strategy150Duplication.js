@@ -81,7 +81,7 @@ class Strategy150DuplicationService {
         `${this.baseURL}/${campaignId}`,
         {
           params: {
-            fields: 'id,name,status,objective,special_ad_categories,special_ad_category_country,daily_budget,lifetime_budget,bid_strategy,account_id',
+            fields: 'id,name,status,objective,special_ad_categories,special_ad_category_country,daily_budget,lifetime_budget,bid_strategy,account_id,adsets.limit(1){promoted_object,optimization_goal,billing_event}',
             access_token: this.accessToken
           }
         }
@@ -162,10 +162,13 @@ class Strategy150DuplicationService {
       // Step 1: Create campaign using 1-50-1 pattern
       const newCampaign = await this.createCampaign(originalCampaign, newName);
 
-      // Step 2: Create 50 ad sets using 1-50-1 pattern
-      const adSets = await this.create50AdSets(newCampaign.id, postId);
+      // Step 2: Get original ad set configuration for promoted_object
+      const originalAdSetConfig = originalCampaign.adsets?.data?.[0];
 
-      // Step 3: Create ads in each ad set using 1-50-1 pattern
+      // Step 3: Create 50 ad sets using 1-50-1 pattern with original promoted_object
+      const adSets = await this.create50AdSets(newCampaign.id, postId, originalAdSetConfig);
+
+      // Step 4: Create ads in each ad set using 1-50-1 pattern
       const ads = await this.createAdsInAdSets(adSets, postId);
 
       return {
@@ -231,7 +234,7 @@ class Strategy150DuplicationService {
   /**
    * Create 50 ad sets using the exact same pattern as 1-50-1
    */
-  async create50AdSets(campaignId, postId) {
+  async create50AdSets(campaignId, postId, originalAdSetConfig) {
     console.log(`📋 Creating 50 ad sets using 1-50-1 pattern...`);
 
     const adSets = [];
@@ -244,8 +247,8 @@ class Strategy150DuplicationService {
         campaign_id: campaignId,
         status: 'ACTIVE', // Same as 1-50-1
         daily_budget: 100, // $1.00 in cents (same as 1-50-1)
-        billing_event: 'IMPRESSIONS',
-        optimization_goal: 'OFFSITE_CONVERSIONS',
+        billing_event: originalAdSetConfig?.billing_event || 'IMPRESSIONS',
+        optimization_goal: originalAdSetConfig?.optimization_goal || 'OFFSITE_CONVERSIONS',
         targeting: JSON.stringify({
           geo_locations: {
             countries: ['US']
@@ -256,12 +259,17 @@ class Strategy150DuplicationService {
         access_token: this.accessToken
       };
 
-      // Add promoted object if we have pixel (same as 1-50-1)
-      if (this.pixelId) {
+      // Use original campaign's promoted_object instead of hardcoding LEAD
+      if (originalAdSetConfig?.promoted_object) {
+        adSetData.promoted_object = JSON.stringify(originalAdSetConfig.promoted_object);
+        console.log(`✅ Using original promoted_object:`, originalAdSetConfig.promoted_object);
+      } else if (this.pixelId) {
+        // Fallback to generic conversion if no original promoted_object
         adSetData.promoted_object = JSON.stringify({
           pixel_id: this.pixelId,
-          custom_event_type: 'LEAD'
+          custom_event_type: 'PURCHASE'
         });
+        console.log(`⚠️ No original promoted_object found, using PURCHASE fallback`);
       }
 
       batchRequests.push({
