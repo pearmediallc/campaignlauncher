@@ -1511,8 +1511,38 @@ class FacebookAPI {
         throw new Error('Could not determine post ID for duplication after retries. Please ensure the ad has been fully processed by Facebook.');
       }
 
+      // CRITICAL FIX: Fetch the campaign's actual account ID
+      console.log(`🔍 Fetching campaign ${campaignId} details to get correct account ID...`);
+      let campaignAccountId;
+      try {
+        const campaignResponse = await axios.get(
+          `${this.baseURL}/${campaignId}`,
+          {
+            params: {
+              fields: 'account_id',
+              access_token: this.accessToken
+            }
+          }
+        );
+
+        campaignAccountId = campaignResponse.data.account_id;
+        console.log(`✅ Campaign belongs to account: ${campaignAccountId}`);
+        console.log(`📋 Current API account: act_${this.adAccountId}`);
+
+        // Remove the 'act_' prefix if present
+        if (campaignAccountId.startsWith('act_')) {
+          campaignAccountId = campaignAccountId.substring(4);
+        }
+      } catch (error) {
+        console.error('❌ Failed to fetch campaign account ID:', error.message);
+        // Fall back to current account ID
+        campaignAccountId = this.adAccountId;
+        console.log(`⚠️ Using fallback account ID: ${campaignAccountId}`);
+      }
+
       // Facebook's /copies endpoint for AD SETS - different from campaign copies
       console.log(`📋 Creating ${count} copies of ad set ${originalAdSetId} in campaign ${campaignId}...`);
+      console.log(`📊 Using account ID ${campaignAccountId} for ad set creation`);
 
       const newAdSetIds = [];
 
@@ -1556,7 +1586,7 @@ class FacebookAPI {
           };
 
           const copyResponse = await axios.post(
-            `${this.baseURL}/act_${this.adAccountId}/adsets`,
+            `${this.baseURL}/act_${campaignAccountId}/adsets`,
             null,
             { params: newAdSetData }
           );
@@ -1616,7 +1646,7 @@ class FacebookAPI {
             console.log(`🔄 Creating Ad for AdSet ${newAdSetId}:`, adData);
 
             await axios.post(
-              `${this.baseURL}/act_${this.adAccountId}/ads`,
+              `${this.baseURL}/act_${campaignAccountId}/ads`,
               null,
               { params: adData }
             );
