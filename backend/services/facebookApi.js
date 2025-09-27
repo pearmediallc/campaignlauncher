@@ -3,6 +3,7 @@ const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
 const BatchDuplicationService = require('./batchDuplication');
+const Strategy150DuplicationService = require('./strategy150Duplication');
 const ImageConverter = require('./imageConverter');
 
 class FacebookAPI {
@@ -2576,13 +2577,61 @@ class FacebookAPI {
   }
 
   /**
-   * Duplicate a campaign - smart method that handles both small and large campaigns
-   * Supports multiple copies of the campaign
+   * Duplicate campaign using Strategy 1-50-1 based approach
+   * This follows the EXACT same pattern as the working 1-50-1 strategy
+   * to ensure consistent and reliable duplication without page_id errors
    */
   async duplicateCampaign(campaignId, newName, numberOfCopies = 1) {
     try {
-      console.log(`📝 Starting optimized duplication of campaign ${campaignId}`);
+      console.log(`🎯 Starting 1-50-1 based duplication of campaign ${campaignId}`);
       console.log(`📊 Number of copies requested: ${numberOfCopies}`);
+      console.log(`🔧 Using Strategy150DuplicationService - proven working pattern`);
+
+      // Create the Strategy 1-50-1 based duplication service
+      const strategy150Service = new Strategy150DuplicationService(
+        this.accessToken,
+        this.adAccountId,
+        this.pageId,
+        this.pixelId
+      );
+
+      // Use the new service that follows 1-50-1 pattern exactly
+      const results = await strategy150Service.duplicateCampaign(campaignId, newName, numberOfCopies);
+
+      console.log(`✅ 1-50-1 based duplication complete!`);
+
+      // Return results in expected format
+      if (numberOfCopies === 1) {
+        const result = results[0];
+        return {
+          id: result.campaign.id,
+          name: result.campaign.name,
+          copyNumber: 1
+        };
+      } else {
+        return results.map((result, index) => ({
+          id: result.campaign.id,
+          name: result.campaign.name,
+          copyNumber: index + 1
+        }));
+      }
+
+    } catch (error) {
+      console.error(`❌ 1-50-1 based duplication failed for campaign ${campaignId}:`, error.message);
+
+      // Fallback to original methods only if the new service completely fails
+      console.log(`⚠️ Falling back to original duplication methods...`);
+      return await this.duplicateCampaignFallback(campaignId, newName, numberOfCopies);
+    }
+  }
+
+  /**
+   * Fallback duplication method using original THREE-TIER strategy
+   * Only used if the new Strategy 1-50-1 based service fails completely
+   */
+  async duplicateCampaignFallback(campaignId, newName, numberOfCopies = 1) {
+    try {
+      console.log(`📝 Starting fallback duplication of campaign ${campaignId}`);
 
       const duplicatedCampaigns = [];
 
@@ -2593,7 +2642,7 @@ class FacebookAPI {
           ? `${newName || 'Campaign'} - Copy ${copyNumber}`
           : (newName || `Campaign - Copy`);
 
-        console.log(`\n🔄 Creating copy ${copyNumber} of ${numberOfCopies}: "${campaignCopyName}"`);
+        console.log(`\n🔄 Creating fallback copy ${copyNumber} of ${numberOfCopies}: "${campaignCopyName}"`);
 
         let newCampaignId;
 
@@ -2625,9 +2674,9 @@ class FacebookAPI {
             name: campaignCopyName,
             copyNumber: copyNumber
           });
-          console.log(`✅ Successfully created copy ${copyNumber}: ${newCampaignId}`);
+          console.log(`✅ Successfully created fallback copy ${copyNumber}: ${newCampaignId}`);
         } else {
-          console.error(`❌ Failed to create copy ${copyNumber}`);
+          console.error(`❌ Failed to create fallback copy ${copyNumber}`);
         }
 
         // Add a small delay between copies to avoid rate limits
@@ -2636,13 +2685,13 @@ class FacebookAPI {
         }
       }
 
-      console.log(`\n🎉 Duplication complete! Created ${duplicatedCampaigns.length} of ${numberOfCopies} requested copies`);
+      console.log(`\n🎉 Fallback duplication complete! Created ${duplicatedCampaigns.length} of ${numberOfCopies} requested copies`);
 
       // Return single campaign for backward compatibility, or array if multiple
       return numberOfCopies === 1 ? duplicatedCampaigns[0] : duplicatedCampaigns;
 
     } catch (error) {
-      console.error(`❌ Failed to duplicate campaign ${campaignId}:`, error.response?.data || error.message);
+      console.error(`❌ Failed fallback duplication for campaign ${campaignId}:`, error.response?.data || error.message);
       this.handleError(error);
     }
   }
