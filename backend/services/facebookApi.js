@@ -2906,6 +2906,16 @@ class FacebookAPI {
 
         } catch (adSetError) {
           console.error(`    ⚠️ Failed to copy ad set:`, adSetError.message);
+          // Log detailed error for debugging
+          if (adSetError.response?.data?.error) {
+            const fbError = adSetError.response.data.error;
+            console.error(`    📛 Facebook API Error:`, {
+              message: fbError.message,
+              type: fbError.type,
+              code: fbError.code,
+              error_subcode: fbError.error_subcode
+            });
+          }
         }
 
         // Small delay to avoid rate limits

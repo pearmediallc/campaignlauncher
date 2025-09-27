@@ -24,11 +24,11 @@ module.exports = {
         allowNull: false
       },
       templateData: {
-        type: Sequelize.JSONB,
+        type: Sequelize.JSON,
         allowNull: false
       },
       mediaUrls: {
-        type: Sequelize.JSONB,
+        type: Sequelize.JSON,
         allowNull: true
       },
       isDefault: {

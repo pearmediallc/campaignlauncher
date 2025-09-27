@@ -115,6 +115,7 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
           helperText="Choose a unique name for the duplicate campaign"
         />
 
+        {/* Number of copies selector */}
         <TextField
           fullWidth
           label="Number of Copies"
