@@ -59,33 +59,29 @@ class BatchDuplicationService {
   async getCampaignFullData(campaignId) {
     console.log(`📊 Fetching complete campaign data in ONE call...`);
 
-    const fields = [
-      'id', 'name', 'status', 'objective', 'special_ad_categories',
-      'special_ad_category_country', 'daily_budget', 'lifetime_budget',
-      'bid_strategy', 'budget_remaining', 'campaign_budget_optimization',
-      'account_id',
-      // Nested ad sets with ALL their fields
-      'adsets.limit(200){',
-        'id,name,status,targeting,daily_budget,lifetime_budget,',
-        'optimization_goal,billing_event,bid_amount,bid_strategy,',
-        'promoted_object,attribution_spec,conversion_specs,',
-        'start_time,end_time,schedule,frequency_control_specs,',
-        'optimization_sub_event,min_spending_target,max_spending_target,',
-        'pacing_type,instagram_actor_id,destination_type,',
-        // Nested ads with ALL their fields
-        'ads.limit(100){',
-          'id,name,status,tracking_specs,conversion_specs,url_tags,',
-          'preview_shareable_link,pixel_id,pixel_rule,',
-          'creative{',
-            'id,name,object_story_spec,object_story_id,title,body,',
-            'link_url,link_caption,link_description,call_to_action_type,',
-            'object_type,object_url,product_set_id,video_id,image_url,',
-            'image_hash,actor_id,page_id,instagram_actor_id,',
-            'instagram_permalink_url,effective_object_story_id',
-          '}',
-        '}',
-      '}'
-    ].join('');
+    // PROPERLY format fields with commas
+    const fields = 'id,name,status,objective,special_ad_categories,' +
+      'special_ad_category_country,daily_budget,lifetime_budget,' +
+      'bid_strategy,budget_remaining,account_id,' +
+      'adsets.limit(200){' +
+        'id,name,status,targeting,daily_budget,lifetime_budget,' +
+        'optimization_goal,billing_event,bid_amount,bid_strategy,' +
+        'promoted_object,attribution_spec,conversion_specs,' +
+        'start_time,end_time,schedule,frequency_control_specs,' +
+        'optimization_sub_event,min_spending_target,max_spending_target,' +
+        'pacing_type,instagram_actor_id,destination_type,' +
+        'ads.limit(100){' +
+          'id,name,status,tracking_specs,conversion_specs,url_tags,' +
+          'preview_shareable_link,pixel_id,pixel_rule,' +
+          'creative{' +
+            'id,name,object_story_spec,object_story_id,title,body,' +
+            'link_url,link_caption,link_description,call_to_action_type,' +
+            'object_type,object_url,product_set_id,video_id,image_url,' +
+            'image_hash,actor_id,page_id,instagram_actor_id,' +
+            'instagram_permalink_url,effective_object_story_id' +
+          '}' +
+        '}' +
+      '}';
 
     try {
       const response = await axios.get(
@@ -183,9 +179,7 @@ class BatchDuplicationService {
     if (campaign.bid_strategy) {
       body.bid_strategy = campaign.bid_strategy;
     }
-    if (campaign.campaign_budget_optimization !== undefined) {
-      body.campaign_budget_optimization = campaign.campaign_budget_optimization;
-    }
+    // CBO is determined by having a campaign-level budget, not a separate field
 
     return this.encodeBody(body);
   }

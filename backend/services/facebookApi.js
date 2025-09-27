@@ -2739,7 +2739,7 @@ class FacebookAPI {
         `${this.baseURL}/${campaignId}`,
         {
           params: {
-            fields: 'name,objective,status,special_ad_categories,special_ad_category_country,daily_budget,lifetime_budget,bid_strategy,budget_remaining,campaign_budget_optimization,account_id',
+            fields: 'name,objective,status,special_ad_categories,special_ad_category_country,daily_budget,lifetime_budget,bid_strategy,budget_remaining,account_id',
             access_token: this.accessToken
           }
         }
