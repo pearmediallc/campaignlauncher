@@ -75,7 +75,7 @@ class BatchDuplicationService {
           'preview_shareable_link,pixel_id,pixel_rule,' +
           'creative{' +
             'id,name,object_story_spec,object_story_id,title,body,' +
-            'link_url,link_caption,link_description,call_to_action_type,' +
+            'link_url,call_to_action_type,' +
             'object_type,object_url,product_set_id,video_id,image_url,' +
             'image_hash,actor_id,page_id,instagram_actor_id,' +
             'instagram_permalink_url,effective_object_story_id' +

@@ -2581,12 +2581,8 @@ class FacebookAPI {
    */
   async duplicateCampaign(campaignId, newName, numberOfCopies = 1) {
     try {
-      console.log(`📝 Starting smart duplication of campaign ${campaignId}`);
+      console.log(`📝 Starting optimized duplication of campaign ${campaignId}`);
       console.log(`📊 Number of copies requested: ${numberOfCopies}`);
-
-      // First, check the size of the campaign
-      const campaignSize = await this.getCampaignSize(campaignId);
-      console.log(`📋 Campaign size: ${campaignSize.totalObjects} objects (${campaignSize.adSets} ad sets, ${campaignSize.ads} ads)`);
 
       const duplicatedCampaigns = [];
 
@@ -2601,22 +2597,24 @@ class FacebookAPI {
 
         let newCampaignId;
 
-        // If campaign is small enough (≤3 total objects), use deep copy
-        if (campaignSize.totalObjects <= 3) {
-          console.log(`✅ Using fast deep copy (campaign has ≤3 objects)`);
+        // STRATEGY 1: Try native Facebook /copies endpoint FIRST (optimal - 1 API call)
+        try {
+          console.log(`🚀 Using Facebook native /copies endpoint (1 API call for everything!)`);
           newCampaignId = await this.duplicateCampaignDeepCopy(campaignId, campaignCopyName);
-        } else {
-          // For large campaigns, use BATCH API (NEW - Much faster!)
-          console.log(`🚀 Using BATCH API copy (reduces API calls by 95%+)`);
+          console.log(`✅ Successfully duplicated using native endpoint!`);
+        } catch (deepCopyError) {
+          console.log(`⚠️ Native /copies failed (likely >51 children), trying alternatives...`);
 
-          // Try batch API first for maximum efficiency
+          // STRATEGY 2: Try batch API for large campaigns (2-3 API calls)
           try {
+            console.log(`📦 Using BATCH API (2-3 API calls total)`);
             const batchService = new BatchDuplicationService(this.accessToken, this.adAccountId);
             const results = await batchService.duplicateCampaignBatch(campaignId, campaignCopyName, 1);
             newCampaignId = this.extractCampaignIdFromBatchResult(results);
+            console.log(`✅ Successfully duplicated using batch API!`);
           } catch (batchError) {
-            console.log(`⚠️ Batch API failed, falling back to sequential copy:`, batchError.message);
-            // Fallback to sequential if batch fails
+            // STRATEGY 3: Last resort - sequential copy
+            console.log(`⚠️ Batch API failed, using sequential copy (last resort)...`);
             newCampaignId = await this.duplicateCampaignSequential(campaignId, campaignCopyName);
           }
         }
@@ -2718,9 +2716,12 @@ class FacebookAPI {
 
       console.log(`  📝 Using Facebook /copies endpoint for deep copy`);
       const response = await axios.post(url, null, { params });
-      console.log(`  ✅ Campaign duplicated via deep copy. New ID: ${response.data.id}`);
 
-      return response.data.id;
+      // Facebook returns copied_campaign_id, not id
+      const newCampaignId = response.data.copied_campaign_id || response.data.id;
+      console.log(`  ✅ Campaign duplicated via deep copy. New ID: ${newCampaignId}`);
+
+      return newCampaignId;
     } catch (error) {
       console.error(`  ❌ Deep copy failed:`, error.response?.data || error.message);
       throw error;
@@ -2840,7 +2841,7 @@ class FacebookAPI {
             `${this.baseURL}/${adSet.id}/ads`,
             {
               params: {
-                fields: 'id,name,status,creative{id,name,object_story_spec,object_story_id,title,body,link_url,link_caption,link_description,call_to_action_type,object_type,object_url,product_set_id,video_id,image_url,image_hash,actor_id,page_id,instagram_actor_id,instagram_permalink_url,instagram_story_id,asset_feed_spec,degrees_of_freedom_spec,recommender_settings,source_instagram_media_id,interactive_components_spec,playable_asset_id,dynamic_ad_voice,effective_object_story_id},tracking_specs,conversion_specs,url_tags,preview_shareable_link,pixel_id,pixel_rule,pixel_aggregation_rule,data_driven_convs',
+                fields: 'id,name,status,creative{id,name,object_story_spec,object_story_id,title,body,link_url,call_to_action_type,object_type,object_url,product_set_id,video_id,image_url,image_hash,actor_id,page_id,instagram_actor_id,instagram_permalink_url,instagram_story_id,asset_feed_spec,degrees_of_freedom_spec,recommender_settings,source_instagram_media_id,interactive_components_spec,playable_asset_id,dynamic_ad_voice,effective_object_story_id},tracking_specs,conversion_specs,url_tags,preview_shareable_link,pixel_id,pixel_rule,pixel_aggregation_rule,data_driven_convs',
                 limit: 100,
                 access_token: this.accessToken
               }
