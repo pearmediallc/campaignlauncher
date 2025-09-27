@@ -2860,12 +2860,19 @@ class FacebookAPI {
               const pageId = ad.creative?.page_id;
 
               // DEBUG: Log what creative data we actually have
-              console.log(`      🔍 Creative fields available:`, {
-                id: ad.creative?.id,
-                object_story_id: ad.creative?.object_story_id,
-                effective_object_story_id: ad.creative?.effective_object_story_id,
-                page_id: ad.creative?.page_id,
-                allFields: Object.keys(ad.creative || {})
+              console.log(`      🔍 Original ad data:`, {
+                adId: ad.id,
+                adName: ad.name,
+                creativeId: ad.creative?.id,
+                creativeKeys: Object.keys(ad.creative || {}),
+                fullCreative: ad.creative
+              });
+
+              console.log(`      🔍 Extracted values:`, {
+                objectStoryId: ad.creative?.object_story_id,
+                effectiveObjectStoryId: ad.creative?.effective_object_story_id,
+                pageId: ad.creative?.page_id,
+                servicePageId: this.pageId
               });
 
               let newAdData;
@@ -2921,6 +2928,13 @@ class FacebookAPI {
                 if (newAdData[key] === undefined || newAdData[key] === null) {
                   delete newAdData[key];
                 }
+              });
+
+              // DEBUG: Log exact API request data
+              console.log(`      🚀 About to make API call with data:`, {
+                url: `${this.baseURL}/act_${accountId}/ads`,
+                params: newAdData,
+                creativeString: newAdData.creative
               });
 
               await axios.post(
