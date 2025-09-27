@@ -118,7 +118,17 @@ app.use('/api/auth', authRoutes);
 app.use('/api/auth/facebook', require('./routes/facebookAuth'));
 app.use('/api/auth/facebook-sdk', require('./routes/facebookSDKAuth'));
 app.use('/api/users', userRoutes);
+
+// IMPORTANT: Specific routes must come BEFORE general routes to avoid pattern matching conflicts
+// Strategy 1-50-1 routes (must be before general campaigns route)
+app.use('/api/campaigns/strategy-150', require('./routes/strategy150'));
+
+// Campaign management routes (must be before general campaigns route)
+app.use('/api/campaigns/manage', require('./routes/campaignManagement'));
+
+// General campaign routes (must be AFTER specific campaign routes)
 app.use('/api/campaigns', campaignRoutes);
+
 app.use('/api/ads', adRoutes);
 app.use('/api/media', mediaRoutes);
 
@@ -127,12 +137,6 @@ app.use('/api/resources', require('./routes/resourceManager'));
 
 // Variations import routes for Ad Scraper integration
 app.use('/api/variations', variationsRoutes);
-
-// Strategy 1-50-1 routes
-app.use('/api/campaigns/strategy-150', require('./routes/strategy150'));
-
-// Campaign management routes (for tracking and managing launched campaigns)
-app.use('/api/campaigns/manage', require('./routes/campaignManagement'));
 
 // Image proxy routes for external image downloads
 app.use('/api/images', require('./routes/images'));
