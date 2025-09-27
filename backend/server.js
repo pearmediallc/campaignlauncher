@@ -147,6 +147,9 @@ app.use('/api/data-deletion', dataDeletionRoutes);
 // Campaign templates routes
 app.use('/api/templates', require('./routes/templates'));
 
+// Migration runner (temporary - remove after fixing production)
+app.use('/api/migrations', require('./routes/migrationRunner'));
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Facebook Campaign Launcher API is running' });
 });

@@ -2,6 +2,7 @@ const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
+const BatchDuplicationService = require('./batchDuplication');
 const ImageConverter = require('./imageConverter');
 
 class FacebookAPI {
@@ -2605,9 +2606,19 @@ class FacebookAPI {
           console.log(`✅ Using fast deep copy (campaign has ≤3 objects)`);
           newCampaignId = await this.duplicateCampaignDeepCopy(campaignId, campaignCopyName);
         } else {
-          // For large campaigns, use sequential copying
-          console.log(`📦 Using sequential copy (campaign has >${3} objects)`);
-          newCampaignId = await this.duplicateCampaignSequential(campaignId, campaignCopyName);
+          // For large campaigns, use BATCH API (NEW - Much faster!)
+          console.log(`🚀 Using BATCH API copy (reduces API calls by 95%+)`);
+
+          // Try batch API first for maximum efficiency
+          try {
+            const batchService = new BatchDuplicationService(this.accessToken, this.adAccountId);
+            const results = await batchService.duplicateCampaignBatch(campaignId, campaignCopyName, 1);
+            newCampaignId = this.extractCampaignIdFromBatchResult(results);
+          } catch (batchError) {
+            console.log(`⚠️ Batch API failed, falling back to sequential copy:`, batchError.message);
+            // Fallback to sequential if batch fails
+            newCampaignId = await this.duplicateCampaignSequential(campaignId, campaignCopyName);
+          }
         }
 
         if (newCampaignId) {
@@ -2728,7 +2739,7 @@ class FacebookAPI {
         `${this.baseURL}/${campaignId}`,
         {
           params: {
-            fields: 'name,objective,status,special_ad_categories,daily_budget,lifetime_budget,bid_strategy,account_id',
+            fields: 'name,objective,status,special_ad_categories,special_ad_category_country,daily_budget,lifetime_budget,bid_strategy,budget_remaining,campaign_budget_optimization,account_id',
             access_token: this.accessToken
           }
         }
@@ -2776,7 +2787,7 @@ class FacebookAPI {
         `${this.baseURL}/${campaignId}/adsets`,
         {
           params: {
-            fields: 'id,name,targeting,daily_budget,lifetime_budget,optimization_goal,billing_event,bid_strategy,promoted_object,attribution_spec,status',
+            fields: 'id,name,status,targeting,daily_budget,lifetime_budget,optimization_goal,billing_event,bid_amount,bid_strategy,promoted_object,attribution_spec,conversion_specs,start_time,end_time,schedule,frequency_control_specs,optimization_sub_event,min_spending_target,max_spending_target,pacing_type,instagram_actor_id,destination_type',
             limit: 100,
             access_token: this.accessToken
           }
@@ -2829,7 +2840,7 @@ class FacebookAPI {
             `${this.baseURL}/${adSet.id}/ads`,
             {
               params: {
-                fields: 'id,name,creative{object_story_id,page_id,effective_object_story_id},status,tracking_specs',
+                fields: 'id,name,status,creative{id,name,object_story_spec,object_story_id,title,body,link_url,link_caption,link_description,call_to_action_type,object_type,object_url,product_set_id,video_id,image_url,image_hash,actor_id,page_id,instagram_actor_id,instagram_permalink_url,instagram_story_id,asset_feed_spec,degrees_of_freedom_spec,recommender_settings,source_instagram_media_id,interactive_components_spec,playable_asset_id,dynamic_ad_voice,effective_object_story_id},tracking_specs,conversion_specs,url_tags,preview_shareable_link,pixel_id,pixel_rule,pixel_aggregation_rule,data_driven_convs',
                 limit: 100,
                 access_token: this.accessToken
               }
@@ -2931,6 +2942,28 @@ class FacebookAPI {
       console.error(`  ❌ Sequential copy failed:`, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Extract campaign ID from batch API results
+   */
+  extractCampaignIdFromBatchResult(results) {
+    if (!results || !results.length) return null;
+
+    // Find the campaign creation result (should be first)
+    for (const result of results) {
+      if (result && result[0] && result[0].code === 200) {
+        try {
+          const body = JSON.parse(result[0].body);
+          if (body.id) {
+            return body.id;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+    return null;
   }
 
   /**
