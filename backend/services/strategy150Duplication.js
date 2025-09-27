@@ -212,13 +212,9 @@ class Strategy150DuplicationService {
       campaignData.bid_strategy = originalCampaign.bid_strategy;
     }
 
-    // CRITICAL FIX: Handle undefined adAccountId
-    const accountId = this.adAccountId || originalCampaign.account_id?.replace('act_', '') || '245628241931442';
-    console.log(`🔧 FIXED: Using account ID: ${accountId} (original: ${this.adAccountId})`);
-
     try {
       const response = await axios.post(
-        `${this.baseURL}/act_${accountId}/campaigns`,
+        `${this.baseURL}/act_${this.adAccountId}/campaigns`,
         null,
         { params: campaignData }
       );
@@ -270,7 +266,7 @@ class Strategy150DuplicationService {
 
       batchRequests.push({
         method: 'POST',
-        relative_url: `act_${this.adAccountId || '245628241931442'}/adsets`,
+        relative_url: `act_${this.adAccountId}/adsets`,
         body: this.encodeBody(adSetData)
       });
     }
@@ -331,7 +327,7 @@ class Strategy150DuplicationService {
 
       batchRequests.push({
         method: 'POST',
-        relative_url: `act_${this.adAccountId || '245628241931442'}/ads`,
+        relative_url: `act_${this.adAccountId}/ads`,
         body: this.encodeBody(adData)
       });
     }

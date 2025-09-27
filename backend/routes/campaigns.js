@@ -535,7 +535,50 @@ router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refresh
 
     // Use token from middleware (already validated and decrypted)
     const accessToken = req.facebookAuth.accessToken;
-    const facebookApi = new FacebookAPI({ accessToken });
+    const facebookAuth = req.facebookAuth.authRecord;
+
+    // CRITICAL FIX: Get user's selected resources (same as strategy150.js)
+    let selectedAdAccountId, selectedPageId, selectedPixelId;
+
+    try {
+      const { UserResourceConfig } = require('../models');
+      const userId = req.user?.id || req.userId;
+
+      if (UserResourceConfig && typeof UserResourceConfig.getActiveConfig === 'function' && userId) {
+        const activeConfig = await UserResourceConfig.getActiveConfig(userId).catch(err => {
+          console.log('⚠️ Could not fetch active config for duplication:', err.message);
+          return null;
+        });
+
+        if (activeConfig && (activeConfig.adAccountId || activeConfig.pageId)) {
+          console.log('📋 Using switched resource configuration for duplication');
+          selectedAdAccountId = activeConfig.adAccountId || facebookAuth.selectedAdAccount?.id;
+          selectedPageId = activeConfig.pageId || facebookAuth.selectedPage?.id;
+          selectedPixelId = activeConfig.pixelId || facebookAuth.selectedPixel?.id;
+        }
+      }
+    } catch (error) {
+      console.log('⚠️ UserResourceConfig not available for duplication, using defaults');
+    }
+
+    // Fallback to original resources if not set
+    if (!selectedAdAccountId) {
+      selectedAdAccountId = facebookAuth.selectedAdAccount?.id;
+    }
+    if (!selectedPageId) {
+      selectedPageId = facebookAuth.selectedPage?.id;
+    }
+    if (!selectedPixelId) {
+      selectedPixelId = facebookAuth.selectedPixel?.id;
+    }
+
+    // Create FacebookAPI instance with ALL selected resources (same as strategy150.js)
+    const facebookApi = new FacebookAPI({
+      accessToken: accessToken,
+      adAccountId: (selectedAdAccountId || facebookAuth.selectedAdAccount.id).replace('act_', ''),
+      pageId: selectedPageId || facebookAuth.selectedPage.id,
+      pixelId: selectedPixelId
+    });
 
     // Use smart duplication that handles both small and large campaigns
     // Supports multiple copies as requested
