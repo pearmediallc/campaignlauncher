@@ -165,10 +165,14 @@ class Strategy150DuplicationService {
       // Step 2: Get original ad set configuration for promoted_object
       const originalAdSetConfig = originalCampaign.adsets?.data?.[0];
 
-      // Step 3: Create 50 ad sets using 1-50-1 pattern with original promoted_object
-      const adSets = await this.create50AdSets(newCampaign.id, postId, originalAdSetConfig);
+      // Step 3: Check if campaign uses CBO (Campaign Budget Optimization)
+      const usesCBO = !!(originalCampaign.daily_budget || originalCampaign.lifetime_budget);
+      console.log(`📊 Campaign uses CBO: ${usesCBO}`);
 
-      // Step 4: Create ads in each ad set using 1-50-1 pattern
+      // Step 4: Create 50 ad sets using 1-50-1 pattern with original promoted_object
+      const adSets = await this.create50AdSets(newCampaign.id, postId, originalAdSetConfig, usesCBO);
+
+      // Step 5: Create ads in each ad set using 1-50-1 pattern
       const ads = await this.createAdsInAdSets(adSets, postId);
 
       return {
@@ -234,8 +238,9 @@ class Strategy150DuplicationService {
   /**
    * Create 50 ad sets using the exact same pattern as 1-50-1
    */
-  async create50AdSets(campaignId, postId, originalAdSetConfig) {
+  async create50AdSets(campaignId, postId, originalAdSetConfig, usesCBO) {
     console.log(`📋 Creating 50 ad sets using 1-50-1 pattern...`);
+    console.log(`💰 Budget configuration: ${usesCBO ? 'Campaign-level (CBO)' : 'Ad Set-level'}`);
 
     const adSets = [];
     const batchRequests = [];
@@ -246,7 +251,6 @@ class Strategy150DuplicationService {
         name: `AdSet ${i}`,
         campaign_id: campaignId,
         status: 'ACTIVE', // Same as 1-50-1
-        daily_budget: 100, // $1.00 in cents (same as 1-50-1)
         billing_event: originalAdSetConfig?.billing_event || 'IMPRESSIONS',
         optimization_goal: originalAdSetConfig?.optimization_goal || 'OFFSITE_CONVERSIONS',
         targeting: JSON.stringify({
@@ -259,17 +263,21 @@ class Strategy150DuplicationService {
         access_token: this.accessToken
       };
 
+      // Only set ad set budget if campaign doesn't use CBO
+      if (!usesCBO) {
+        adSetData.daily_budget = 100; // $1.00 in cents
+        console.log(`💵 Setting ad set budget: $1.00 for AdSet ${i}`);
+      }
+
       // Use original campaign's promoted_object instead of hardcoding LEAD
       if (originalAdSetConfig?.promoted_object) {
         adSetData.promoted_object = JSON.stringify(originalAdSetConfig.promoted_object);
-        console.log(`✅ Using original promoted_object:`, originalAdSetConfig.promoted_object);
       } else if (this.pixelId) {
         // Fallback to generic conversion if no original promoted_object
         adSetData.promoted_object = JSON.stringify({
           pixel_id: this.pixelId,
           custom_event_type: 'PURCHASE'
         });
-        console.log(`⚠️ No original promoted_object found, using PURCHASE fallback`);
       }
 
       batchRequests.push({
