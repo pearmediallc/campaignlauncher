@@ -1571,10 +1571,22 @@ class FacebookAPI {
             await this.delay(500); // 0.5 second delay
           }
         } catch (error) {
-          console.error(`  ❌ Failed to create copy ${i + 1}:`, error.message);
+          // Get the actual Facebook API error details
+          const fbError = error.response?.data?.error || error;
+          const errorMessage = fbError.error_user_msg || fbError.message || error.message;
+          const errorCode = fbError.code;
+          const errorSubcode = fbError.error_subcode;
+
+          console.error(`  ❌ Failed to create copy ${i + 1}:`);
+          console.error(`     Error Message: ${errorMessage}`);
+          if (errorCode) console.error(`     Error Code: ${errorCode}`);
+          if (errorSubcode) console.error(`     Error Subcode: ${errorSubcode}`);
+          if (fbError.error_data) console.error(`     Error Data:`, fbError.error_data);
+
           results.errors.push({
             copyNumber: i + 1,
-            error: error.message
+            error: errorMessage,
+            fullError: fbError
           });
         }
       }
