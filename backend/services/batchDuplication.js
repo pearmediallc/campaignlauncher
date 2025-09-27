@@ -59,7 +59,7 @@ class BatchDuplicationService {
   async getCampaignFullData(campaignId) {
     console.log(`📊 Fetching complete campaign data in ONE call...`);
 
-    // PROPERLY format fields with commas
+    // SIMPLIFIED field expansion - only get essential data and creative IDs
     const fields = 'id,name,status,objective,special_ad_categories,' +
       'special_ad_category_country,daily_budget,lifetime_budget,' +
       'bid_strategy,budget_remaining,account_id,' +
@@ -72,14 +72,7 @@ class BatchDuplicationService {
         'pacing_type,instagram_actor_id,destination_type,' +
         'ads.limit(100){' +
           'id,name,status,tracking_specs,conversion_specs,url_tags,' +
-          'preview_shareable_link,pixel_id,pixel_rule,' +
-          'creative{' +
-            'id,name,object_story_spec,object_story_id,title,body,' +
-            'link_url,call_to_action_type,' +
-            'object_type,object_url,product_set_id,video_id,image_url,' +
-            'image_hash,actor_id,page_id,instagram_actor_id,' +
-            'instagram_permalink_url,effective_object_story_id' +
-          '}' +
+          'creative{id,object_story_id,effective_object_story_id}' +
         '}' +
       '}';
 
@@ -241,15 +234,19 @@ class BatchDuplicationService {
 
       // Check if this uses an existing post
       if (creative.object_story_id || creative.effective_object_story_id) {
-        // Use existing post
+        // Use existing post - FIXED: removed page_id that was causing error
         body.creative = JSON.stringify({
-          object_story_id: creative.object_story_id || creative.effective_object_story_id,
-          page_id: creative.page_id
+          object_story_id: creative.object_story_id || creative.effective_object_story_id
         });
       } else if (creative.object_story_spec) {
         // Use story spec
         body.creative = JSON.stringify({
           object_story_spec: creative.object_story_spec
+        });
+      } else if (creative.id) {
+        // Reference existing creative by ID - ADDED: new fallback option
+        body.creative = JSON.stringify({
+          creative_id: creative.id
         });
       } else {
         // Full creative

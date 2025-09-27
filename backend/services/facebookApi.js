@@ -2861,15 +2861,26 @@ class FacebookAPI {
 
               let newAdData;
 
-              if (objectStoryId && pageId) {
-                // This is an existing post ad - use object_story_id directly
+              if (objectStoryId) {
+                // This is an existing post ad - use object_story_id directly (FIXED: removed page_id requirement)
                 console.log(`      🔗 Using existing post: ${objectStoryId}`);
                 newAdData = {
                   name: `${ad.name} - Copy`,
                   adset_id: newAdSetId,
                   creative: JSON.stringify({
-                    object_story_id: objectStoryId,
-                    page_id: pageId
+                    object_story_id: objectStoryId
+                  }),
+                  status: 'PAUSED',
+                  access_token: this.accessToken
+                };
+              } else if (ad.creative?.id) {
+                // Reference existing creative by ID - ADDED: new fallback option
+                console.log(`      🎨 Using existing creative ID: ${ad.creative.id}`);
+                newAdData = {
+                  name: `${ad.name} - Copy`,
+                  adset_id: newAdSetId,
+                  creative: JSON.stringify({
+                    creative_id: ad.creative.id
                   }),
                   status: 'PAUSED',
                   access_token: this.accessToken
