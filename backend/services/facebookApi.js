@@ -2608,7 +2608,7 @@ class FacebookAPI {
           // STRATEGY 2: Try batch API for large campaigns (2-3 API calls)
           try {
             console.log(`📦 Using BATCH API (2-3 API calls total)`);
-            const batchService = new BatchDuplicationService(this.accessToken, this.adAccountId);
+            const batchService = new BatchDuplicationService(this.accessToken, this.adAccountId, this.pageId);
             const results = await batchService.duplicateCampaignBatch(campaignId, campaignCopyName, 1);
             newCampaignId = this.extractCampaignIdFromBatchResult(results);
             console.log(`✅ Successfully duplicated using batch API!`);
@@ -2871,13 +2871,14 @@ class FacebookAPI {
               let newAdData;
 
               if (objectStoryId) {
-                // This is an existing post ad - use object_story_id directly (FIXED: removed page_id requirement)
+                // This is an existing post ad - use SAME pattern as 1-50-1 strategy
                 console.log(`      🔗 Using existing post: ${objectStoryId}`);
                 newAdData = {
                   name: `${ad.name} - Copy`,
                   adset_id: newAdSetId,
                   creative: JSON.stringify({
-                    object_story_id: objectStoryId
+                    object_story_id: objectStoryId,
+                    page_id: this.pageId  // FIXED: Use service pageId like 1-50-1 does
                   }),
                   status: 'PAUSED',
                   access_token: this.accessToken

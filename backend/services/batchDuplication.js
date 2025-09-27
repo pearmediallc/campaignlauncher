@@ -5,9 +5,10 @@ const axios = require('axios');
  * Reduces API calls from 200+ to just 2-3 by using Facebook's Batch API
  */
 class BatchDuplicationService {
-  constructor(accessToken, adAccountId) {
+  constructor(accessToken, adAccountId, pageId) {
     this.accessToken = accessToken;
     this.adAccountId = adAccountId;
+    this.pageId = pageId; // ADDED: Store pageId to match 1-50-1 pattern
     this.baseURL = 'https://graph.facebook.com/v18.0';
     this.maxBatchSize = 50; // Facebook allows 50 requests per batch
   }
@@ -234,9 +235,10 @@ class BatchDuplicationService {
 
       // Check if this uses an existing post
       if (creative.object_story_id || creative.effective_object_story_id) {
-        // Use existing post - FIXED: removed page_id that was causing error
+        // Use existing post - FIXED: Use same pattern as 1-50-1 strategy
         body.creative = JSON.stringify({
-          object_story_id: creative.object_story_id || creative.effective_object_story_id
+          object_story_id: creative.object_story_id || creative.effective_object_story_id,
+          page_id: this.pageId  // ADDED: Include pageId like 1-50-1 does
         });
       } else if (creative.object_story_spec) {
         // Use story spec
