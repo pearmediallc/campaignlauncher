@@ -132,7 +132,7 @@ router.get('/details/:campaignId', authenticate, async (req, res) => {
     // Fetch campaign details with ad sets and learning info from Facebook
     const url = `https://graph.facebook.com/v19.0/${campaignId}`;
     const params = {
-      fields: 'id,name,status,objective,created_time,daily_budget,lifetime_budget,spend_cap,bid_strategy,adsets{id,name,status,daily_budget,lifetime_budget,optimization_goal,billing_event,learning_stage_info,targeting,attribution_spec,insights.date_preset(maximum){impressions,clicks,spend,conversions,cost_per_conversion,ctr,cpm,actions,cost_per_action_type,frequency,reach}}',
+      fields: 'id,name,status,objective,created_time,daily_budget,lifetime_budget,spend_cap,bid_strategy,adsets.limit(200){id,name,status,daily_budget,lifetime_budget,optimization_goal,billing_event,learning_stage_info,targeting,attribution_spec,insights.date_preset(maximum){impressions,clicks,spend,conversions,cost_per_conversion,ctr,cpm,actions,cost_per_action_type,frequency,reach}}',
       access_token: accessToken
     };
 

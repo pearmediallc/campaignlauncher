@@ -38,6 +38,7 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
   onSuccess
 }) => {
   const [newName, setNewName] = useState('');
+  const [numberOfCopies, setNumberOfCopies] = useState(1);
   const [budgetMultiplier, setBudgetMultiplier] = useState(1);
   const [status, setStatus] = useState('PAUSED');
   const [loading, setLoading] = useState(false);
@@ -58,16 +59,21 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
 
       const response = await axios.post(`/api/campaigns/${campaign.id}/duplicate`, {
         new_name: newName,
+        number_of_copies: numberOfCopies,
         budget_multiplier: budgetMultiplier,
         status
       });
 
       if (response.data.success) {
-        toast.success('Campaign duplicated successfully');
+        const message = numberOfCopies > 1
+          ? `Successfully created ${response.data.copiesCreated} campaign copies`
+          : 'Campaign duplicated successfully';
+        toast.success(message);
         onSuccess();
         onClose();
         // Reset form
         setNewName('');
+        setNumberOfCopies(1);
         setBudgetMultiplier(1);
         setStatus('PAUSED');
       }
@@ -109,6 +115,20 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
           helperText="Choose a unique name for the duplicate campaign"
         />
 
+        <TextField
+          fullWidth
+          label="Number of Copies"
+          type="number"
+          value={numberOfCopies}
+          onChange={(e) => setNumberOfCopies(Math.min(Math.max(parseInt(e.target.value) || 1, 1), 10))}
+          margin="normal"
+          InputProps={{
+            inputProps: { min: 1, max: 10 },
+            endAdornment: <InputAdornment position="end">copies</InputAdornment>
+          }}
+          helperText="Create 1-10 copies of this campaign (each will have a numbered suffix)"
+        />
+
         <Box sx={{ mt: 3 }}>
           <Typography gutterBottom>
             Budget Multiplier: {budgetMultiplier}x
@@ -146,7 +166,9 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
 
         <Alert severity="warning" sx={{ mt: 2 }}>
           <Typography variant="caption">
-            The duplicate will be created in PAUSED status by default to allow you to review before activating.
+            {numberOfCopies > 1
+              ? `All ${numberOfCopies} duplicates will be created in ${status} status. Each copy will have a numbered suffix added to the name.`
+              : `The duplicate will be created in ${status} status to allow you to review before activating.`}
           </Typography>
         </Alert>
       </DialogContent>
@@ -160,7 +182,7 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
           color="success"
           disabled={loading || !newName.trim()}
         >
-          Create Duplicate
+          {numberOfCopies > 1 ? `Create ${numberOfCopies} Duplicates` : 'Create Duplicate'}
         </Button>
       </DialogActions>
     </Dialog>

@@ -2829,7 +2829,7 @@ class FacebookAPI {
             `${this.baseURL}/${adSet.id}/ads`,
             {
               params: {
-                fields: 'id,name,creative,status,tracking_specs',
+                fields: 'id,name,creative{object_story_id,page_id,effective_object_story_id},status,tracking_specs',
                 limit: 100,
                 access_token: this.accessToken
               }
@@ -2842,14 +2842,44 @@ class FacebookAPI {
           for (let j = 0; j < ads.length; j++) {
             const ad = ads[j];
             try {
-              const newAdData = {
-                name: `${ad.name} - Copy`,
-                adset_id: newAdSetId,
-                creative: typeof ad.creative === 'string' ? ad.creative : JSON.stringify(ad.creative),
-                tracking_specs: typeof ad.tracking_specs === 'string' ? ad.tracking_specs : JSON.stringify(ad.tracking_specs),
-                status: 'PAUSED',
-                access_token: this.accessToken
-              };
+              // Check if this ad uses an existing post (object_story_id)
+              const objectStoryId = ad.creative?.object_story_id ||
+                                   ad.creative?.effective_object_story_id;
+              const pageId = ad.creative?.page_id;
+
+              let newAdData;
+
+              if (objectStoryId && pageId) {
+                // This is an existing post ad - use object_story_id directly
+                console.log(`      🔗 Using existing post: ${objectStoryId}`);
+                newAdData = {
+                  name: `${ad.name} - Copy`,
+                  adset_id: newAdSetId,
+                  creative: JSON.stringify({
+                    object_story_id: objectStoryId,
+                    page_id: pageId
+                  }),
+                  status: 'PAUSED',
+                  access_token: this.accessToken
+                };
+              } else {
+                // Regular creative - copy the full creative
+                console.log(`      📋 Copying full creative structure`);
+                newAdData = {
+                  name: `${ad.name} - Copy`,
+                  adset_id: newAdSetId,
+                  creative: typeof ad.creative === 'string' ? ad.creative : JSON.stringify(ad.creative),
+                  status: 'PAUSED',
+                  access_token: this.accessToken
+                };
+              }
+
+              // Add tracking specs if they exist
+              if (ad.tracking_specs) {
+                newAdData.tracking_specs = typeof ad.tracking_specs === 'string'
+                  ? ad.tracking_specs
+                  : JSON.stringify(ad.tracking_specs);
+              }
 
               // Remove undefined fields
               Object.keys(newAdData).forEach(key => {
@@ -2867,6 +2897,10 @@ class FacebookAPI {
               console.log(`      ✅ Ad ${j + 1}/${ads.length} copied`);
             } catch (adError) {
               console.error(`      ⚠️ Failed to copy ad ${j + 1}:`, adError.message);
+              // Log more details for debugging
+              if (adError.response?.data?.error) {
+                console.error(`      📛 Facebook error:`, adError.response.data.error.message);
+              }
             }
           }
 
