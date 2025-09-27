@@ -519,7 +519,7 @@ router.put('/:campaignId/edit', authenticate, requireFacebookAuth, refreshFacebo
 router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refreshFacebookToken, async (req, res) => {
   try {
     const { campaignId } = req.params;
-    const { new_name } = req.body;
+    const { new_name, number_of_copies } = req.body;
     const userId = req.user.id;
 
     if (!new_name) {
@@ -529,32 +529,47 @@ router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refresh
       });
     }
 
+    // Validate and parse number of copies (default to 1, max 10)
+    const numberOfCopies = Math.min(Math.max(parseInt(number_of_copies) || 1, 1), 10);
+    console.log(`📋 Campaign duplication request: ${numberOfCopies} copies of campaign ${campaignId}`);
+
     // Use token from middleware (already validated and decrypted)
     const accessToken = req.facebookAuth.accessToken;
     const facebookApi = new FacebookAPI({ accessToken });
 
-    // Use Facebook's official /copies endpoint to duplicate the campaign
-    // This will copy the campaign along with all its ad sets and ads
-    const newCampaign = await facebookApi.duplicateCampaign(campaignId, new_name);
+    // Use smart duplication that handles both small and large campaigns
+    // Supports multiple copies as requested
+    const newCampaigns = await facebookApi.duplicateCampaign(campaignId, new_name, numberOfCopies);
 
-    // Audit log
-    await AuditService.log({
-      userId,
-      action: 'campaign_duplicate',
-      resource: 'campaign',
-      resourceId: newCampaign.id,
-      details: {
-        originalCampaignId: campaignId,
-        newCampaignId: newCampaign.id,
-        newName: new_name
-      },
-      ip: req.ip
-    });
+    // Handle both single and multiple campaign results
+    const campaigns = Array.isArray(newCampaigns) ? newCampaigns : [newCampaigns];
+
+    // Audit log for each created campaign
+    for (const campaign of campaigns) {
+      await AuditService.log({
+        userId,
+        action: 'campaign_duplicate',
+        resource: 'campaign',
+        resourceId: campaign.id,
+        details: {
+          originalCampaignId: campaignId,
+          newCampaignId: campaign.id,
+          newName: campaign.name,
+          copyNumber: campaign.copyNumber || 1,
+          totalCopies: numberOfCopies
+        },
+        ip: req.ip
+      });
+    }
 
     res.json({
       success: true,
-      message: 'Campaign duplicated successfully',
-      data: newCampaign
+      message: numberOfCopies > 1
+        ? `Successfully created ${campaigns.length} campaign copies`
+        : 'Campaign duplicated successfully',
+      data: numberOfCopies === 1 ? campaigns[0] : campaigns,
+      copiesCreated: campaigns.length,
+      copiesRequested: numberOfCopies
     });
   } catch (error) {
     console.error('Campaign duplicate error:', error);

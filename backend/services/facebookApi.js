@@ -2575,9 +2575,117 @@ class FacebookAPI {
   }
 
   /**
-   * Duplicate a campaign using Facebook's official /copies endpoint
+   * Duplicate a campaign - smart method that handles both small and large campaigns
+   * Supports multiple copies of the campaign
    */
-  async duplicateCampaign(campaignId, newName) {
+  async duplicateCampaign(campaignId, newName, numberOfCopies = 1) {
+    try {
+      console.log(`📝 Starting smart duplication of campaign ${campaignId}`);
+      console.log(`📊 Number of copies requested: ${numberOfCopies}`);
+
+      // First, check the size of the campaign
+      const campaignSize = await this.getCampaignSize(campaignId);
+      console.log(`📋 Campaign size: ${campaignSize.totalObjects} objects (${campaignSize.adSets} ad sets, ${campaignSize.ads} ads)`);
+
+      const duplicatedCampaigns = [];
+
+      // Create the requested number of copies
+      for (let copyIndex = 0; copyIndex < numberOfCopies; copyIndex++) {
+        const copyNumber = copyIndex + 1;
+        const campaignCopyName = numberOfCopies > 1
+          ? `${newName || 'Campaign'} - Copy ${copyNumber}`
+          : (newName || `Campaign - Copy`);
+
+        console.log(`\n🔄 Creating copy ${copyNumber} of ${numberOfCopies}: "${campaignCopyName}"`);
+
+        let newCampaignId;
+
+        // If campaign is small enough (≤3 total objects), use deep copy
+        if (campaignSize.totalObjects <= 3) {
+          console.log(`✅ Using fast deep copy (campaign has ≤3 objects)`);
+          newCampaignId = await this.duplicateCampaignDeepCopy(campaignId, campaignCopyName);
+        } else {
+          // For large campaigns, use sequential copying
+          console.log(`📦 Using sequential copy (campaign has >${3} objects)`);
+          newCampaignId = await this.duplicateCampaignSequential(campaignId, campaignCopyName);
+        }
+
+        if (newCampaignId) {
+          duplicatedCampaigns.push({
+            id: newCampaignId,
+            name: campaignCopyName,
+            copyNumber: copyNumber
+          });
+          console.log(`✅ Successfully created copy ${copyNumber}: ${newCampaignId}`);
+        } else {
+          console.error(`❌ Failed to create copy ${copyNumber}`);
+        }
+
+        // Add a small delay between copies to avoid rate limits
+        if (copyIndex < numberOfCopies - 1) {
+          await this.delay(1000);
+        }
+      }
+
+      console.log(`\n🎉 Duplication complete! Created ${duplicatedCampaigns.length} of ${numberOfCopies} requested copies`);
+
+      // Return single campaign for backward compatibility, or array if multiple
+      return numberOfCopies === 1 ? duplicatedCampaigns[0] : duplicatedCampaigns;
+
+    } catch (error) {
+      console.error(`❌ Failed to duplicate campaign ${campaignId}:`, error.response?.data || error.message);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get the size of a campaign (number of ad sets and ads)
+   */
+  async getCampaignSize(campaignId) {
+    try {
+      // Fetch ad sets count
+      const adSetsResponse = await axios.get(
+        `${this.baseURL}/${campaignId}/adsets`,
+        {
+          params: {
+            fields: 'id',
+            limit: 100,
+            access_token: this.accessToken
+          }
+        }
+      );
+
+      // Fetch ads count
+      const adsResponse = await axios.get(
+        `${this.baseURL}/${campaignId}/ads`,
+        {
+          params: {
+            fields: 'id',
+            limit: 100,
+            access_token: this.accessToken
+          }
+        }
+      );
+
+      const adSetsCount = adSetsResponse.data?.data?.length || 0;
+      const adsCount = adsResponse.data?.data?.length || 0;
+
+      return {
+        adSets: adSetsCount,
+        ads: adsCount,
+        totalObjects: 1 + adSetsCount + adsCount // 1 campaign + ad sets + ads
+      };
+    } catch (error) {
+      console.error('Failed to get campaign size:', error.message);
+      // Default to sequential copy if we can't determine size
+      return { adSets: 999, ads: 999, totalObjects: 999 };
+    }
+  }
+
+  /**
+   * Original deep copy method for small campaigns
+   */
+  async duplicateCampaignDeepCopy(campaignId, newName) {
     try {
       const url = `${this.baseURL}/${campaignId}/copies`;
       const params = {
@@ -2597,14 +2705,187 @@ class FacebookAPI {
         params.name = newName;
       }
 
-      console.log(`📝 Duplicating campaign ${campaignId} using Facebook /copies endpoint`);
+      console.log(`  📝 Using Facebook /copies endpoint for deep copy`);
       const response = await axios.post(url, null, { params });
-      console.log(`✅ Campaign ${campaignId} duplicated successfully. New ID: ${response.data.id}`);
+      console.log(`  ✅ Campaign duplicated via deep copy. New ID: ${response.data.id}`);
 
-      return response.data;
+      return response.data.id;
     } catch (error) {
-      console.error(`❌ Failed to duplicate campaign ${campaignId}:`, error.response?.data || error.message);
-      this.handleError(error);
+      console.error(`  ❌ Deep copy failed:`, error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Sequential copy method for large campaigns
+   */
+  async duplicateCampaignSequential(campaignId, newName) {
+    try {
+      console.log(`  📋 Starting sequential copy process...`);
+
+      // Step 1: Get original campaign details
+      const originalCampaign = await axios.get(
+        `${this.baseURL}/${campaignId}`,
+        {
+          params: {
+            fields: 'name,objective,status,special_ad_categories,daily_budget,lifetime_budget,bid_strategy,account_id',
+            access_token: this.accessToken
+          }
+        }
+      );
+
+      // Get the correct account ID
+      let accountId = originalCampaign.data.account_id;
+      if (accountId && accountId.startsWith('act_')) {
+        accountId = accountId.substring(4);
+      }
+
+      console.log(`  📊 Using account ID: ${accountId}`);
+
+      // Step 2: Create new campaign
+      const newCampaignData = {
+        name: newName || `${originalCampaign.data.name} - Copy`,
+        objective: originalCampaign.data.objective,
+        status: 'PAUSED',
+        special_ad_categories: JSON.stringify(originalCampaign.data.special_ad_categories || []),
+        access_token: this.accessToken
+      };
+
+      if (originalCampaign.data.daily_budget) {
+        newCampaignData.daily_budget = originalCampaign.data.daily_budget;
+      }
+      if (originalCampaign.data.lifetime_budget) {
+        newCampaignData.lifetime_budget = originalCampaign.data.lifetime_budget;
+      }
+      if (originalCampaign.data.bid_strategy) {
+        newCampaignData.bid_strategy = originalCampaign.data.bid_strategy;
+      }
+
+      console.log(`  🚀 Creating new campaign...`);
+      const newCampaignResponse = await axios.post(
+        `${this.baseURL}/act_${accountId}/campaigns`,
+        null,
+        { params: newCampaignData }
+      );
+
+      const newCampaignId = newCampaignResponse.data.id;
+      console.log(`  ✅ New campaign created: ${newCampaignId}`);
+
+      // Step 3: Get all ad sets from original campaign
+      const adSetsResponse = await axios.get(
+        `${this.baseURL}/${campaignId}/adsets`,
+        {
+          params: {
+            fields: 'id,name,targeting,daily_budget,lifetime_budget,optimization_goal,billing_event,bid_strategy,promoted_object,attribution_spec,status',
+            limit: 100,
+            access_token: this.accessToken
+          }
+        }
+      );
+
+      const originalAdSets = adSetsResponse.data?.data || [];
+      console.log(`  📦 Found ${originalAdSets.length} ad sets to copy`);
+
+      // Step 4: Copy each ad set
+      for (let i = 0; i < originalAdSets.length; i++) {
+        const adSet = originalAdSets[i];
+        console.log(`  📄 Copying ad set ${i + 1}/${originalAdSets.length}: ${adSet.name}`);
+
+        try {
+          // Create new ad set - properly stringify JSON fields
+          const newAdSetData = {
+            name: `${adSet.name} - Copy`,
+            campaign_id: newCampaignId,
+            targeting: typeof adSet.targeting === 'string' ? adSet.targeting : JSON.stringify(adSet.targeting),
+            daily_budget: adSet.daily_budget,
+            lifetime_budget: adSet.lifetime_budget,
+            optimization_goal: adSet.optimization_goal,
+            billing_event: adSet.billing_event,
+            bid_strategy: adSet.bid_strategy,
+            promoted_object: typeof adSet.promoted_object === 'string' ? adSet.promoted_object : JSON.stringify(adSet.promoted_object),
+            attribution_spec: typeof adSet.attribution_spec === 'string' ? adSet.attribution_spec : JSON.stringify(adSet.attribution_spec),
+            status: 'PAUSED',
+            access_token: this.accessToken
+          };
+
+          // Remove undefined fields
+          Object.keys(newAdSetData).forEach(key => {
+            if (newAdSetData[key] === undefined || newAdSetData[key] === null) {
+              delete newAdSetData[key];
+            }
+          });
+
+          const newAdSetResponse = await axios.post(
+            `${this.baseURL}/act_${accountId}/adsets`,
+            null,
+            { params: newAdSetData }
+          );
+
+          const newAdSetId = newAdSetResponse.data.id;
+          console.log(`    ✅ Ad set copied: ${newAdSetId}`);
+
+          // Step 5: Get and copy all ads for this ad set
+          const adsResponse = await axios.get(
+            `${this.baseURL}/${adSet.id}/ads`,
+            {
+              params: {
+                fields: 'id,name,creative,status,tracking_specs',
+                limit: 100,
+                access_token: this.accessToken
+              }
+            }
+          );
+
+          const ads = adsResponse.data?.data || [];
+          console.log(`    📎 Found ${ads.length} ads to copy`);
+
+          for (let j = 0; j < ads.length; j++) {
+            const ad = ads[j];
+            try {
+              const newAdData = {
+                name: `${ad.name} - Copy`,
+                adset_id: newAdSetId,
+                creative: typeof ad.creative === 'string' ? ad.creative : JSON.stringify(ad.creative),
+                tracking_specs: typeof ad.tracking_specs === 'string' ? ad.tracking_specs : JSON.stringify(ad.tracking_specs),
+                status: 'PAUSED',
+                access_token: this.accessToken
+              };
+
+              // Remove undefined fields
+              Object.keys(newAdData).forEach(key => {
+                if (newAdData[key] === undefined || newAdData[key] === null) {
+                  delete newAdData[key];
+                }
+              });
+
+              await axios.post(
+                `${this.baseURL}/act_${accountId}/ads`,
+                null,
+                { params: newAdData }
+              );
+
+              console.log(`      ✅ Ad ${j + 1}/${ads.length} copied`);
+            } catch (adError) {
+              console.error(`      ⚠️ Failed to copy ad ${j + 1}:`, adError.message);
+            }
+          }
+
+        } catch (adSetError) {
+          console.error(`    ⚠️ Failed to copy ad set:`, adSetError.message);
+        }
+
+        // Small delay to avoid rate limits
+        if (i < originalAdSets.length - 1) {
+          await this.delay(500);
+        }
+      }
+
+      console.log(`  🎉 Sequential copy complete for campaign ${newCampaignId}`);
+      return newCampaignId;
+
+    } catch (error) {
+      console.error(`  ❌ Sequential copy failed:`, error.message);
+      throw error;
     }
   }
 
