@@ -673,6 +673,8 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
         adSet: result.adSet,
         ads: result.ads,
         adAccount: facebookAuth.selectedAdAccount, // Add ad account info
+        page: facebookAuth.selectedPage || { id: selectedPageId, name: 'Page' }, // Add page info
+        pixel: pixelId ? { id: pixelId, name: facebookAuth.selectedPixel?.name || 'Pixel' } : null, // Add pixel info if used
         postId: result.postId // Include postId from result
       }
     });
@@ -920,7 +922,9 @@ router.post('/duplicate', authenticate, requireFacebookAuth, refreshFacebookToke
       data: {
         campaignId,
         count,
-        status: 'in_progress'
+        status: 'in_progress',
+        adAccount: facebookAuth.selectedAdAccount, // Add ad account info
+        postId: postId || 'Will be fetched from original ad' // Include postId status
       }
     });
   } catch (error) {

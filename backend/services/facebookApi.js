@@ -1336,21 +1336,37 @@ class FacebookAPI {
       } else {
         console.log('✅ Ad created successfully with ID:', ad.id);
 
-        // Try to automatically capture post ID
+        // Try to automatically capture post ID with improved retry logic
         console.log('🔍 Attempting to capture post ID automatically...');
         try {
-          // Wait a moment for Facebook to process the ad
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          // Wait longer for Facebook to fully process the ad and make the creative available
+          console.log('  ⏳ Waiting 5 seconds for Facebook to process the ad...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
 
-          const postId = await this.getPostIdFromAd(ad.id);
+          // Try to get post ID with retries
+          let postId = null;
+          let retries = 3;
+
+          for (let i = 0; i < retries; i++) {
+            postId = await this.getPostIdFromAd(ad.id);
+            if (postId) {
+              break;
+            }
+            if (i < retries - 1) {
+              console.log(`  🔄 Retry ${i + 1}/${retries - 1} - waiting 2 more seconds...`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+          }
+
           if (postId) {
             console.log('✅ Post ID captured successfully:', postId);
             ad.postId = postId; // Add to response
           } else {
-            console.log('⚠️ Could not auto-capture post ID - may need manual entry');
+            console.log('⚠️ Could not auto-capture post ID after retries - will fetch during duplication');
           }
         } catch (postError) {
           console.log('⚠️ Post ID capture failed:', postError.message);
+          console.log('  📝 Note: Post ID will be fetched during duplication phase');
         }
       }
 
@@ -1464,9 +1480,35 @@ class FacebookAPI {
         }
       }
 
-      // If still no post ID, we cannot proceed
+      // If still no post ID, try one more time with a delay
       if (!actualPostId) {
-        throw new Error('Could not determine post ID for duplication');
+        console.log('⏳ Waiting 3 seconds and retrying to fetch post ID...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        try {
+          const adsResponse = await axios.get(
+            `${this.baseURL}/${originalAdSetId}/ads`,
+            {
+              params: {
+                fields: 'creative{effective_object_story_id}',
+                access_token: this.accessToken,
+                limit: 1
+              }
+            }
+          );
+
+          if (adsResponse.data?.data?.[0]?.creative?.effective_object_story_id) {
+            actualPostId = adsResponse.data.data[0].creative.effective_object_story_id;
+            console.log(`✅ Found post ID on retry: ${actualPostId}`);
+          }
+        } catch (error) {
+          console.log('⚠️ Still could not fetch post ID:', error.message);
+        }
+      }
+
+      // Final check - if still no post ID, we cannot proceed
+      if (!actualPostId) {
+        throw new Error('Could not determine post ID for duplication after retries. Please ensure the ad has been fully processed by Facebook.');
       }
 
       // Facebook's /copies endpoint for AD SETS - different from campaign copies
