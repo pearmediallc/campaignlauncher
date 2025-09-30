@@ -605,14 +605,51 @@ router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refresh
       });
     }
 
+    // Check for errors in the results
+    const failedCampaigns = campaigns.filter(c => !c.success && !c.partialSuccess);
+    const partialSuccessCampaigns = campaigns.filter(c => c.partialSuccess);
+    const successfulCampaigns = campaigns.filter(c => c.success);
+
+    // Format error details for UI display
+    const errorDetails = [];
+    campaigns.forEach(campaign => {
+      if (campaign.errors && campaign.errors.length > 0) {
+        errorDetails.push({
+          campaignId: campaign.originalCampaignId,
+          campaignName: campaign.originalCampaignName,
+          newCampaignId: campaign.campaign?.id || null,
+          newCampaignName: campaign.campaign?.name || campaign.newName || 'Failed to create',
+          errors: campaign.errors.map(err => ({
+            stage: err.stage,
+            message: err.message,
+            details: err.details?.error_user_msg || err.details?.message || null
+          })),
+          stats: {
+            adSetsCreated: campaign.totalAdSets,
+            adSetsExpected: 50,
+            adsCreated: campaign.totalAds,
+            adsExpected: campaign.totalAdSets
+          }
+        });
+      }
+    });
+
+    const overallSuccess = failedCampaigns.length === 0 && partialSuccessCampaigns.length === 0;
+
     res.json({
-      success: true,
-      message: numberOfCopies > 1
-        ? `Successfully created ${campaigns.length} campaign copies`
-        : 'Campaign duplicated successfully',
+      success: overallSuccess,
+      message: overallSuccess
+        ? (numberOfCopies > 1
+            ? `Successfully created ${campaigns.length} campaign copies`
+            : 'Campaign duplicated successfully')
+        : `Duplication completed with ${errorDetails.length} issues`,
       data: numberOfCopies === 1 ? campaigns[0] : campaigns,
-      copiesCreated: campaigns.length,
-      copiesRequested: numberOfCopies
+      copiesCreated: successfulCampaigns.length,
+      copiesPartial: partialSuccessCampaigns.length,
+      copiesFailed: failedCampaigns.length,
+      copiesRequested: numberOfCopies,
+      errorDetails: errorDetails.length > 0 ? errorDetails : undefined,
+      requiresAttention: errorDetails.length > 0
     });
   } catch (error) {
     console.error('Campaign duplicate error:', error);

@@ -30,10 +30,11 @@ class Strategy150DuplicationService {
     console.log(`📊 Creating ${copies} copies using proven working pattern`);
 
     const results = [];
+    let campaignData = null;
 
     try {
       // Step 1: Get campaign data using the same approach as 1-50-1
-      const campaignData = await this.getCampaignData(campaignId);
+      campaignData = await this.getCampaignData(campaignId);
 
       // Step 2: Get the post ID from the campaign using 1-50-1 pattern
       const postId = await this.getPostIdFromCampaign(campaignId);
@@ -53,6 +54,11 @@ class Strategy150DuplicationService {
         console.log(`🔄 Creating copy ${copyIndex + 1}/${copies}: "${copyName}"`);
 
         const copyResult = await this.createCampaignCopy(campaignData, copyName, postId);
+
+        // Add original campaign info to result for error reporting
+        copyResult.originalCampaignId = campaignId;
+        copyResult.originalCampaignName = campaignData.name;
+
         results.push(copyResult);
 
         // Delay between copies to avoid rate limits
@@ -66,7 +72,24 @@ class Strategy150DuplicationService {
 
     } catch (error) {
       console.error('❌ 1-50-1 based duplication failed:', error.message);
-      throw error;
+
+      // Return error result with campaign info
+      return [{
+        originalCampaignId: campaignId,
+        originalCampaignName: campaignData?.name || 'Unknown',
+        campaign: null,
+        adSets: [],
+        ads: [],
+        totalAdSets: 0,
+        totalAds: 0,
+        errors: [{
+          stage: 'initialization',
+          message: error.message,
+          details: error.response?.data
+        }],
+        success: false,
+        partialSuccess: false
+      }];
     }
   }
 
@@ -158,9 +181,14 @@ class Strategy150DuplicationService {
   async createCampaignCopy(originalCampaign, newName, postId) {
     console.log(`📋 Creating campaign copy using 1-50-1 structure...`);
 
+    const errors = [];
+    let newCampaign = null;
+    let adSets = [];
+    let ads = [];
+
     try {
       // Step 1: Create campaign using 1-50-1 pattern
-      const newCampaign = await this.createCampaign(originalCampaign, newName);
+      newCampaign = await this.createCampaign(originalCampaign, newName);
 
       // Step 2: Get original ad set configuration for promoted_object
       const originalAdSetConfig = originalCampaign.adsets?.data?.[0];
@@ -170,23 +198,38 @@ class Strategy150DuplicationService {
       console.log(`📊 Campaign uses CBO: ${usesCBO}`);
 
       // Step 4: Create 50 ad sets using 1-50-1 pattern with original promoted_object
-      const adSets = await this.create50AdSets(newCampaign.id, postId, originalAdSetConfig, usesCBO);
+      const adSetResult = await this.create50AdSets(newCampaign.id, postId, originalAdSetConfig, usesCBO);
+      adSets = adSetResult.adSets;
+      if (adSetResult.errors && adSetResult.errors.length > 0) {
+        errors.push(...adSetResult.errors);
+      }
 
       // Step 5: Create ads in each ad set using 1-50-1 pattern
-      const ads = await this.createAdsInAdSets(adSets, postId);
-
-      return {
-        campaign: newCampaign,
-        adSets: adSets,
-        ads: ads,
-        totalAdSets: adSets.length,
-        totalAds: ads.length
-      };
+      const adsResult = await this.createAdsInAdSets(adSets, postId);
+      ads = adsResult.ads;
+      if (adsResult.errors && adsResult.errors.length > 0) {
+        errors.push(...adsResult.errors);
+      }
 
     } catch (error) {
       console.error('Failed to create campaign copy:', error.message);
-      throw error;
+      errors.push({
+        stage: 'campaign_creation',
+        message: error.message,
+        details: error.response?.data
+      });
     }
+
+    return {
+      campaign: newCampaign,
+      adSets: adSets,
+      ads: ads,
+      totalAdSets: adSets.length,
+      totalAds: ads.length,
+      errors: errors,
+      success: errors.length === 0,
+      partialSuccess: errors.length > 0 && (adSets.length > 0 || ads.length > 0)
+    };
   }
 
   /**
@@ -243,6 +286,7 @@ class Strategy150DuplicationService {
     console.log(`💰 Budget configuration: ${usesCBO ? 'Campaign-level (CBO)' : 'Ad Set-level'}`);
 
     const adSets = [];
+    const errors = [];
     let failedCount = 0;
 
     // Create ad sets sequentially with delays to avoid rate limits
@@ -297,7 +341,17 @@ class Strategy150DuplicationService {
         }
 
       } catch (error) {
-        console.error(`❌ Failed to create AdSet ${i}:`, error.response?.data?.error?.message || error.message);
+        const errorMessage = error.response?.data?.error?.message || error.message;
+        console.error(`❌ Failed to create AdSet ${i}:`, errorMessage);
+
+        errors.push({
+          stage: 'ad_set_creation',
+          index: i,
+          name: `AdSet ${i}`,
+          message: errorMessage,
+          details: error.response?.data?.error
+        });
+
         failedCount++;
 
         // If too many failures, stop trying
@@ -312,7 +366,11 @@ class Strategy150DuplicationService {
     }
 
     console.log(`✅ Created ${adSets.length}/50 ad sets successfully`);
-    return adSets;
+    if (errors.length > 0) {
+      console.log(`⚠️ Failed to create ${errors.length} ad sets`);
+    }
+
+    return { adSets, errors };
   }
 
   /**
@@ -323,6 +381,7 @@ class Strategy150DuplicationService {
     console.log(`📍 Using existing post ID: ${postId}`);
 
     const ads = [];
+    const errors = [];
     let failedCount = 0;
 
     // Create one ad per ad set sequentially
@@ -359,7 +418,18 @@ class Strategy150DuplicationService {
         }
 
       } catch (error) {
-        console.error(`❌ Failed to create Ad ${i + 1}:`, error.response?.data?.error?.message || error.message);
+        const errorMessage = error.response?.data?.error?.message || error.message;
+        console.error(`❌ Failed to create Ad ${i + 1}:`, errorMessage);
+
+        errors.push({
+          stage: 'ad_creation',
+          index: i + 1,
+          name: `Ad ${i + 1}`,
+          adSetId: adSet.id,
+          message: errorMessage,
+          details: error.response?.data?.error
+        });
+
         failedCount++;
 
         // If too many failures, stop trying
@@ -374,7 +444,11 @@ class Strategy150DuplicationService {
     }
 
     console.log(`✅ Created ${ads.length}/${adSets.length} ads successfully`);
-    return ads;
+    if (errors.length > 0) {
+      console.log(`⚠️ Failed to create ${errors.length} ads`);
+    }
+
+    return { ads, errors };
   }
 
   /**
