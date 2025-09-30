@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const { CampaignTracking, FacebookAuth, UserResource, UserResourceConfig } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { decryptToken } = require('./facebookSDKAuth');
+const AuditService = require('../services/AuditService');
 
 /**
  * @route   GET /api/campaigns/manage/tracked
@@ -456,11 +457,28 @@ router.post('/status', authenticate, async (req, res) => {
 
     await axios.post(url, null, { params });
 
+    // Get campaign details for ad account info
+    const campaignDetailsUrl = `https://graph.facebook.com/v19.0/${campaignId}`;
+    const campaignDetailsParams = {
+      fields: 'id,name,account_id',
+      access_token: accessToken
+    };
+    const campaignDetails = await axios.get(campaignDetailsUrl, { params: campaignDetailsParams });
+
     // Update local tracking
     await CampaignTracking.update(
       { status },
       { where: { campaign_id: campaignId } }
     );
+
+    // Audit log
+    await AuditService.logRequest(req, status === 'ACTIVE' ? 'campaign.resume' : 'campaign.pause', 'campaign', campaignId, 'success', null, {
+      campaignId: campaignId,
+      campaignName: campaignDetails.data.name,
+      adAccountId: campaignDetails.data.account_id,
+      previousStatus: status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE',
+      newStatus: status
+    });
 
     console.log(`✅ Campaign ${campaignId} status updated to ${status}`);
 
@@ -529,14 +547,25 @@ router.post('/track', authenticate, async (req, res) => {
     const response = await axios.get(url, { params });
     const campaignData = response.data;
 
+    // Get ad account ID from campaign
+    const adAccountId = facebookAuth.selectedAdAccount?.id || 'unknown';
+
     // Add to tracking
     const tracking = await CampaignTracking.create({
       campaign_id: campaignId,
       campaign_name: campaignData.name || 'Unknown Campaign',
       user_id: userId,
-      ad_account_id: facebookAuth.selectedAdAccount?.id || 'unknown',
+      ad_account_id: adAccountId,
       strategy_type: 'manual',
       status: campaignData.status
+    });
+
+    // Audit log
+    await AuditService.logRequest(req, 'campaign.track', 'campaign', campaignId, 'success', null, {
+      campaignId: campaignId,
+      campaignName: campaignData.name,
+      adAccountId: adAccountId,
+      objective: campaignData.objective
     });
 
     res.json({
@@ -565,6 +594,14 @@ router.delete('/track/:campaignId', authenticate, async (req, res) => {
     const { campaignId } = req.params;
     const userId = req.user?.id || req.userId;
 
+    // Get campaign info before deleting for audit log
+    const tracking = await CampaignTracking.findOne({
+      where: {
+        campaign_id: campaignId,
+        user_id: userId
+      }
+    });
+
     const deleted = await CampaignTracking.destroy({
       where: {
         campaign_id: campaignId,
@@ -573,6 +610,13 @@ router.delete('/track/:campaignId', authenticate, async (req, res) => {
     });
 
     if (deleted) {
+      // Audit log
+      await AuditService.logRequest(req, 'campaign.untrack', 'campaign', campaignId, 'success', null, {
+        campaignId: campaignId,
+        campaignName: tracking?.campaign_name,
+        adAccountId: tracking?.ad_account_id
+      });
+
       res.json({
         success: true,
         message: 'Campaign removed from tracking'

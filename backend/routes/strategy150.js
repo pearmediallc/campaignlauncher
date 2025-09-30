@@ -643,7 +643,15 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       throw error;
     }
 
-    await AuditService.logRequest(req, 'strategy150.create', 'campaign', result.campaign?.id);
+    await AuditService.logRequest(req, 'strategy150.create', 'campaign', result.campaign?.id, 'success', null, {
+      campaignId: result.campaign?.id,
+      campaignName: campaignData.campaignName,
+      adAccountId: selectedAdAccountId,
+      strategyType: '1-50-1',
+      objective: campaignData.objective,
+      budget: campaignData.dailyBudget || campaignData.lifetimeBudget,
+      adSetsCreated: 1
+    });
 
     // Store campaign in tracking table for management
     try {
@@ -680,7 +688,10 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
     });
   } catch (error) {
     console.error('Strategy 1-50-1 creation error:', error);
-    await AuditService.logRequest(req, 'strategy150.create', null, null, 'failure', error.message);
+    await AuditService.logRequest(req, 'strategy150.create', null, null, 'failure', error.message, {
+      adAccountId: selectedAdAccountId,
+      strategyType: '1-50-1'
+    });
     res.status(error.status || 500).json({
       success: false,
       error: error.message
@@ -1180,7 +1191,12 @@ router.post('/multiply', authenticate, requireFacebookAuth, refreshFacebookToken
       'campaign',
       req.body.sourceCampaignId,
       'failure',
-      error.message
+      error.message,
+      {
+        adAccountId: selectedAdAccountId,
+        strategyType: '1-50-1',
+        targetCopies: multiplyCount
+      }
     );
 
     res.status(error.status || 500).json({
@@ -1237,6 +1253,25 @@ async function processMultiplicationAsync(jobId, campaignStructure, multiplyCoun
       console.log(`  - Successful: ${batchResult.summary.successful}`);
       console.log(`  - Failed: ${batchResult.summary.failed}`);
       console.log(`  - API calls used: ${batchResult.summary.apiCallsUsed}`);
+
+      // Audit log for successful multiplication
+      await AuditService.log({
+        userId,
+        action: 'strategy150.multiply',
+        resource: 'campaign',
+        resourceId: campaignStructure.campaign.id,
+        details: {
+          campaignId: campaignStructure.campaign.id,
+          campaignName: campaignStructure.campaign.name,
+          adAccountId: userFacebookApi.config.adAccountId,
+          strategyType: '1-50-1',
+          targetCopies: multiplyCount,
+          successfulCopies: batchResult.summary.successful,
+          failedCopies: batchResult.summary.failed,
+          method: 'batch'
+        },
+        status: 'success'
+      });
     } else {
       throw new Error('Batch multiplication failed');
     }
@@ -1351,6 +1386,25 @@ async function processMultiplicationAsync(jobId, campaignStructure, multiplyCoun
     });
 
     console.log(`✅ Job ${jobId} completed: ${results.length} successful, ${errors.length} failed`);
+
+    // Audit log for successful multiplication (sequential fallback)
+    await AuditService.log({
+      userId,
+      action: 'strategy150.multiply',
+      resource: 'campaign',
+      resourceId: campaignStructure.campaign.id,
+      details: {
+        campaignId: campaignStructure.campaign.id,
+        campaignName: campaignStructure.campaign.name,
+        adAccountId: userFacebookApi.config.adAccountId,
+        strategyType: '1-50-1',
+        targetCopies: multiplyCount,
+        successfulCopies: results.length,
+        failedCopies: errors.length,
+        method: 'sequential-fallback'
+      },
+      status: 'success'
+    });
 
     } catch (fallbackError) {
       console.error(`❌ Job ${jobId} fallback also failed:`, fallbackError);

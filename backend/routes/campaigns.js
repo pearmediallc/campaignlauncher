@@ -311,8 +311,14 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       }
     }
 
-    await AuditService.logRequest(req, 'campaign.create', 'campaign', result.campaign?.id);
-    
+    await AuditService.logRequest(req, 'campaign.create', 'campaign', result.campaign?.id, 'success', null, {
+      campaignId: result.campaign?.id,
+      campaignName: campaignData.campaignName,
+      adAccountId: selectedAdAccountId,
+      objective: campaignData.objective,
+      budget: campaignData.dailyBudget || campaignData.lifetimeBudget
+    });
+
     res.json({
       success: true,
       message: 'Campaign created successfully',
@@ -320,7 +326,9 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
     });
   } catch (error) {
     console.error('Campaign creation error:', error);
-    await AuditService.logRequest(req, 'campaign.create', null, null, 'failure', error.message);
+    await AuditService.logRequest(req, 'campaign.create', null, null, 'failure', error.message, {
+      adAccountId: selectedAdAccountId
+    });
     res.status(error.status || 500).json({
       success: false,
       error: error.message
@@ -598,6 +606,7 @@ router.post('/:campaignId/duplicate', authenticate, requireFacebookAuth, refresh
           originalCampaignId: campaignId,
           newCampaignId: campaign.id,
           newName: campaign.name,
+          adAccountId: selectedAdAccountId,
           copyNumber: campaign.copyNumber || 1,
           totalCopies: numberOfCopies
         },
@@ -688,6 +697,11 @@ router.put('/:campaignId/budget', authenticate, requireFacebookAuth, refreshFace
     // Update campaign budget
     const updatedCampaign = await facebookApi.updateCampaign(campaignId, budgetUpdate);
 
+    // Get campaign details for ad account
+    const facebookAuth = req.facebookAuth.authRecord;
+    const activeConfig = await UserResourceConfig.getActiveConfig(userId).catch(() => null);
+    const selectedAdAccountId = activeConfig?.adAccountId || facebookAuth.selectedAdAccount?.id;
+
     // Audit log
     await AuditService.log({
       userId,
@@ -696,6 +710,7 @@ router.put('/:campaignId/budget', authenticate, requireFacebookAuth, refreshFace
       resourceId: campaignId,
       details: {
         campaignId,
+        adAccountId: selectedAdAccountId,
         budgetChanges: {
           daily_budget,
           lifetime_budget,
