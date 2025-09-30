@@ -33,10 +33,10 @@ router.post('/register', [
       lastName
     });
 
-    // Assign default role (viewer)
-    const viewerRole = await Role.findOne({ where: { name: 'viewer' } });
-    if (viewerRole) {
-      await user.addRole(viewerRole);
+    // Assign default role (media_buyer)
+    const mediaBuyerRole = await Role.findOne({ where: { name: 'media_buyer' } });
+    if (mediaBuyerRole) {
+      await user.addRole(mediaBuyerRole);
     }
 
     const token = jwt.sign(

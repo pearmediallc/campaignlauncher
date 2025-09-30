@@ -87,7 +87,7 @@ export const UserManagement: React.FC = () => {
 
   const handleCreateUser = async () => {
     try {
-      await api.post('/users/create', formData);
+      await api.post('/users/', formData);
       toast.success('User created successfully');
       setDialogOpen(false);
       fetchUsers();
