@@ -14,8 +14,13 @@ import {
   Typography,
   Alert,
   Slider,
-  InputAdornment
+  InputAdornment,
+  AlertTitle,
+  Divider,
+  Collapse,
+  IconButton
 } from '@mui/material';
+import { ExpandMore, ExpandLess } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -43,6 +48,8 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
   const [status, setStatus] = useState('PAUSED');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [duplicationResult, setDuplicationResult] = useState<any>(null);
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
 
   React.useEffect(() => {
     if (campaign) {
@@ -56,6 +63,7 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
     try {
       setLoading(true);
       setError('');
+      setDuplicationResult(null);
 
       const response = await axios.post(`/api/campaigns/${campaign.id}/duplicate`, {
         new_name: newName,
@@ -64,18 +72,28 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
         status
       });
 
+      // Store the complete result for error display
+      setDuplicationResult(response.data);
+
       if (response.data.success) {
         const message = numberOfCopies > 1
           ? `Successfully created ${response.data.copiesCreated} campaign copies`
           : 'Campaign duplicated successfully';
         toast.success(message);
         onSuccess();
-        onClose();
-        // Reset form
-        setNewName('');
-        setNumberOfCopies(1);
-        setBudgetMultiplier(1);
-        setStatus('PAUSED');
+
+        // Only close if there are no errors to show
+        if (!response.data.errorDetails || response.data.errorDetails.length === 0) {
+          onClose();
+          // Reset form
+          setNewName('');
+          setNumberOfCopies(1);
+          setBudgetMultiplier(1);
+          setStatus('PAUSED');
+        }
+      } else if (response.data.requiresAttention) {
+        // Partial success - show warning
+        toast.warning(`Duplication completed with ${response.data.errorDetails?.length || 0} issues. Please review.`);
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to duplicate campaign');
@@ -92,7 +110,7 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Duplicate Campaign</DialogTitle>
       <DialogContent>
         {error && (
@@ -101,9 +119,94 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
           </Alert>
         )}
 
-        <Alert severity="info" sx={{ mb: 2 }}>
-          This will create a copy of the campaign with all its settings, ad sets, and ads.
-        </Alert>
+        {/* Display detailed error information if duplication had issues */}
+        {duplicationResult && duplicationResult.errorDetails && duplicationResult.errorDetails.length > 0 && (
+          <Alert
+            severity="warning"
+            sx={{ mb: 2 }}
+            action={
+              <IconButton
+                aria-label="toggle error details"
+                size="small"
+                onClick={() => setShowErrorDetails(!showErrorDetails)}
+              >
+                {showErrorDetails ? <ExpandLess /> : <ExpandMore />}
+              </IconButton>
+            }
+          >
+            <AlertTitle>
+              ⚠️ Duplication Completed with Issues
+            </AlertTitle>
+
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              <strong>{duplicationResult.copiesCreated || 0}</strong> of <strong>{duplicationResult.copiesRequested || 0}</strong> campaigns created
+            </Typography>
+
+            <Collapse in={showErrorDetails}>
+              <Divider sx={{ my: 1 }} />
+
+              {duplicationResult.errorDetails.map((errorDetail: any, index: number) => (
+                <Box key={index} sx={{ mb: 2, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    Campaign: {errorDetail.newCampaignName || errorDetail.campaignName || 'Unknown'}
+                  </Typography>
+
+                  {errorDetail.newCampaignId && (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Campaign ID: {errorDetail.newCampaignId}
+                    </Typography>
+                  )}
+
+                  {errorDetail.stats && (
+                    <Box sx={{ mt: 1, mb: 1 }}>
+                      <Typography variant="body2">
+                        Created: <strong>{errorDetail.stats.adSetsCreated}/{errorDetail.stats.adSetsExpected}</strong> ad sets,
+                        <strong> {errorDetail.stats.adsCreated}/{errorDetail.stats.adsExpected}</strong> ads
+                      </Typography>
+                    </Box>
+                  )}
+
+                  <Divider sx={{ my: 1 }} />
+
+                  <Typography variant="subtitle2" color="error" sx={{ mb: 1 }}>
+                    Failed Items ({errorDetail.errors?.length || 0}):
+                  </Typography>
+
+                  {errorDetail.errors && errorDetail.errors.map((err: any, errIdx: number) => (
+                    <Box key={errIdx} sx={{ ml: 2, mb: 1 }}>
+                      <Typography variant="body2" color="error">
+                        • {err.stage === 'ad_set_creation' ? 'Ad Set' : 'Ad'}: {err.name || `Item ${err.index}`}
+                        {err.adSetId && ` (Ad Set ID: ${err.adSetId})`}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ ml: 2, display: 'block' }}>
+                        Reason: {err.message || err.details || 'Unknown error'}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              ))}
+
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="caption">
+                  The campaigns were created but some ad sets or ads failed.
+                  You can try recreating the failed items manually or contact support if the issue persists.
+                </Typography>
+              </Alert>
+            </Collapse>
+
+            {!showErrorDetails && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Click to view details
+              </Typography>
+            )}
+          </Alert>
+        )}
+
+        {!duplicationResult && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            This will create a copy of the campaign with all its settings, ad sets, and ads.
+          </Alert>
+        )}
 
         <TextField
           fullWidth
@@ -175,16 +278,18 @@ const DuplicateCampaignModal: React.FC<DuplicateCampaignModalProps> = ({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={loading}>
-          Cancel
+          {duplicationResult?.errorDetails?.length > 0 ? 'Close' : 'Cancel'}
         </Button>
-        <Button
-          onClick={handleDuplicate}
-          variant="contained"
-          color="success"
-          disabled={loading || !newName.trim()}
-        >
-          {numberOfCopies > 1 ? `Create ${numberOfCopies} Duplicates` : 'Create Duplicate'}
-        </Button>
+        {!duplicationResult && (
+          <Button
+            onClick={handleDuplicate}
+            variant="contained"
+            color="success"
+            disabled={loading || !newName.trim()}
+          >
+            {numberOfCopies > 1 ? `Create ${numberOfCopies} Duplicates` : 'Create Duplicate'}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
