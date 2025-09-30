@@ -29,10 +29,10 @@ const Phase1Setup: React.FC<Phase1SetupProps> = ({ onSubmit, error }) => {
       // Campaign Level Defaults
       campaignName: '',
       buyingType: 'AUCTION',
-      objective: 'OUTCOME_LEADS',
-      budgetLevel: 'adset',
+      objective: 'OUTCOME_SALES',
+      budgetLevel: 'campaign',
       specialAdCategories: [],
-      campaignBudgetOptimization: false,
+      campaignBudgetOptimization: true,
       bidStrategy: 'LOWEST_COST_WITHOUT_CAP',
 
       // Campaign Budget
@@ -44,8 +44,8 @@ const Phase1Setup: React.FC<Phase1SetupProps> = ({ onSubmit, error }) => {
       // Ad Set Level Defaults
       performanceGoal: 'maximize_conversions',
       pixel: '',
-      conversionEvent: 'Lead',
-      attributionSetting: 'standard',
+      conversionEvent: 'Purchase',
+      attributionSetting: '1_day_click_1_day_view',
       attributionWindow: '1_day',
 
       // Ad Set Budget & Schedule
