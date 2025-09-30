@@ -118,6 +118,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/auth/facebook', require('./routes/facebookAuth'));
 app.use('/api/auth/facebook-sdk', require('./routes/facebookSDKAuth'));
 app.use('/api/users', userRoutes);
+app.use('/api/rbac', require('./routes/rbac'));
 
 // IMPORTANT: Specific routes must come BEFORE general routes to avoid pattern matching conflicts
 // Strategy 1-50-1 routes (must be before general campaigns route)
