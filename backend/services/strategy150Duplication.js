@@ -236,21 +236,21 @@ class Strategy150DuplicationService {
   }
 
   /**
-   * Create 50 ad sets using the exact same pattern as 1-50-1
+   * Create 50 ad sets using sequential API calls (proven to work)
    */
   async create50AdSets(campaignId, postId, originalAdSetConfig, usesCBO) {
-    console.log(`📋 Creating 50 ad sets using 1-50-1 pattern...`);
+    console.log(`📋 Creating 50 ad sets using sequential API calls...`);
     console.log(`💰 Budget configuration: ${usesCBO ? 'Campaign-level (CBO)' : 'Ad Set-level'}`);
 
     const adSets = [];
-    const batchRequests = [];
+    let failedCount = 0;
 
-    // Create batch requests for all 50 ad sets (same as 1-50-1)
+    // Create ad sets sequentially with delays to avoid rate limits
     for (let i = 1; i <= 50; i++) {
       const adSetData = {
         name: `AdSet ${i}`,
         campaign_id: campaignId,
-        status: 'ACTIVE', // Same as 1-50-1
+        status: 'ACTIVE',
         billing_event: originalAdSetConfig?.billing_event || 'IMPRESSIONS',
         optimization_goal: originalAdSetConfig?.optimization_goal || 'OFFSITE_CONVERSIONS',
         targeting: JSON.stringify({
@@ -266,126 +266,114 @@ class Strategy150DuplicationService {
       // Only set ad set budget if campaign doesn't use CBO
       if (!usesCBO) {
         adSetData.daily_budget = 100; // $1.00 in cents
-        console.log(`💵 Setting ad set budget: $1.00 for AdSet ${i}`);
       }
 
-      // Use original campaign's promoted_object instead of hardcoding LEAD
+      // Use original campaign's promoted_object
       if (originalAdSetConfig?.promoted_object) {
         adSetData.promoted_object = JSON.stringify(originalAdSetConfig.promoted_object);
       } else if (this.pixelId) {
-        // Fallback to generic conversion if no original promoted_object
         adSetData.promoted_object = JSON.stringify({
           pixel_id: this.pixelId,
           custom_event_type: 'PURCHASE'
         });
       }
 
-      batchRequests.push({
-        method: 'POST',
-        relative_url: `act_${this.adAccountId}/adsets`,
-        body: this.encodeBody(adSetData)
-      });
-    }
+      // Create single ad set with retry logic
+      try {
+        console.log(`⏳ Creating AdSet ${i}/50...`);
 
-    // Execute batch requests (same pattern as 1-50-1)
-    try {
-      const response = await axios.post(
-        this.baseURL,
-        {
-          batch: JSON.stringify(batchRequests),
-          access_token: this.accessToken
-        }
-      );
+        const response = await axios.post(
+          `${this.baseURL}/act_${this.adAccountId}/adsets`,
+          null,
+          { params: adSetData }
+        );
 
-      // Process batch results
-      for (const result of response.data) {
-        if (result.code === 200) {
-          const adSetData = JSON.parse(result.body);
-          adSets.push(adSetData);
-        } else {
-          console.error('Ad set creation failed:', result);
+        adSets.push(response.data);
+        console.log(`✅ AdSet ${i} created: ${response.data.id}`);
+
+        // Add delay to avoid rate limits (500ms between ad sets)
+        if (i < 50) {
+          await this.delay(500);
         }
+
+      } catch (error) {
+        console.error(`❌ Failed to create AdSet ${i}:`, error.response?.data?.error?.message || error.message);
+        failedCount++;
+
+        // If too many failures, stop trying
+        if (failedCount > 5) {
+          console.error('Too many failures, stopping ad set creation');
+          break;
+        }
+
+        // Wait longer before retrying after a failure
+        await this.delay(2000);
       }
-
-      console.log(`✅ Created ${adSets.length}/50 ad sets`);
-      return adSets;
-
-    } catch (error) {
-      console.error('Failed to create ad sets:', error.response?.data || error.message);
-      throw error;
     }
+
+    console.log(`✅ Created ${adSets.length}/50 ad sets successfully`);
+    return adSets;
   }
 
   /**
-   * Create ads in ad sets using the EXACT same pattern as working 1-50-1
+   * Create ads in ad sets using sequential API calls (proven to work)
    */
   async createAdsInAdSets(adSets, postId) {
-    console.log(`📋 Creating ads using EXACT 1-50-1 pattern...`);
+    console.log(`📋 Creating ads using sequential API calls...`);
+    console.log(`📍 Using existing post ID: ${postId}`);
 
     const ads = [];
-    const batchRequests = [];
+    let failedCount = 0;
 
-    // Create one ad per ad set using the EXACT 1-50-1 creative pattern
+    // Create one ad per ad set sequentially
     for (let i = 0; i < adSets.length; i++) {
       const adSet = adSets[i];
 
       const adData = {
         name: `Ad ${i + 1}`,
         adset_id: adSet.id,
-        // THIS IS THE EXACT SAME CREATIVE PATTERN AS WORKING 1-50-1 (lines 1640-1641)
+        // Use existing post (same as 1-50-1 working pattern)
         creative: JSON.stringify({
           object_story_id: postId,
-          page_id: this.pageId  // Use this.pageId exactly like working 1-50-1 does
+          page_id: this.pageId
         }),
         status: 'ACTIVE',
         access_token: this.accessToken
       };
 
-      batchRequests.push({
-        method: 'POST',
-        relative_url: `act_${this.adAccountId}/ads`,
-        body: this.encodeBody(adData)
-      });
-    }
-
-    // Execute in batches of 50 (Facebook limit)
-    const batchSize = 50;
-    for (let i = 0; i < batchRequests.length; i += batchSize) {
-      const batch = batchRequests.slice(i, i + batchSize);
-
       try {
+        console.log(`⏳ Creating Ad ${i + 1}/${adSets.length} for AdSet ${adSet.id}...`);
+
         const response = await axios.post(
-          this.baseURL,
-          {
-            batch: JSON.stringify(batch),
-            access_token: this.accessToken
-          }
+          `${this.baseURL}/act_${this.adAccountId}/ads`,
+          null,
+          { params: adData }
         );
 
-        // Process batch results
-        for (const result of response.data) {
-          if (result.code === 200) {
-            const adData = JSON.parse(result.body);
-            ads.push(adData);
-          } else {
-            console.error('Ad creation failed:', result);
-          }
-        }
+        ads.push(response.data);
+        console.log(`✅ Ad ${i + 1} created: ${response.data.id}`);
 
-        console.log(`✅ Created ads batch ${Math.floor(i/batchSize) + 1}, total ads: ${ads.length}`);
-
-        // Small delay between batches
-        if (i + batchSize < batchRequests.length) {
-          await this.delay(1000);
+        // Add small delay to avoid rate limits (300ms between ads)
+        if (i < adSets.length - 1) {
+          await this.delay(300);
         }
 
       } catch (error) {
-        console.error('Failed to create ads batch:', error.response?.data || error.message);
-        throw error;
+        console.error(`❌ Failed to create Ad ${i + 1}:`, error.response?.data?.error?.message || error.message);
+        failedCount++;
+
+        // If too many failures, stop trying
+        if (failedCount > 10) {
+          console.error('Too many failures, stopping ad creation');
+          break;
+        }
+
+        // Wait before continuing after a failure
+        await this.delay(1000);
       }
     }
 
-    console.log(`✅ Created ${ads.length} ads total`);
+    console.log(`✅ Created ${ads.length}/${adSets.length} ads successfully`);
     return ads;
   }
 
