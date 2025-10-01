@@ -35,7 +35,7 @@ router.get('/', authenticate, requirePermission('user', 'read'), async (req, res
 
     res.json({
       success: true,
-      data: users.rows,
+      users: users.rows,
       total: users.count,
       page: parseInt(page),
       totalPages: Math.ceil(users.count / limit)
