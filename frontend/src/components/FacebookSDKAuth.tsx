@@ -164,36 +164,60 @@ const FacebookSDKAuth: React.FC = () => {
 
     setLoading(true);
 
-    // First logout from current Facebook session
-    window.FB.logout((response: any) => {
-      console.log('Logged out from current Facebook account');
-      setCurrentFacebookUser(null);
+    // SAFE LOGOUT: Check status before logout to prevent errors
+    window.FB.getLoginStatus((statusResponse: any) => {
+      const doLogin = () => {
+        // Trigger new login
+        window.FB.login((loginResponse: any) => {
+          if (loginResponse.authResponse) {
+            console.log('New Facebook login successful!');
+            processAuthResponse(loginResponse.authResponse);
+          } else {
+            console.log('User cancelled login or did not fully authorize.');
+            toast.warning('Facebook login was cancelled');
+            setLoading(false);
+          }
+        }, {
+          scope: 'public_profile,ads_management,ads_read,business_management,pages_show_list,pages_read_engagement,pages_manage_ads',
+          return_scopes: true,
+          auth_type: 'reauthorize' // Force re-authorization
+        });
+      };
 
-      // Immediately trigger new login
-      window.FB.login((loginResponse: any) => {
-        if (loginResponse.authResponse) {
-          console.log('New Facebook login successful!');
-          processAuthResponse(loginResponse.authResponse);
-        } else {
-          console.log('User cancelled login or did not fully authorize.');
-          toast.warning('Facebook login was cancelled');
-          setLoading(false);
-        }
-      }, {
-        scope: 'public_profile,ads_management,ads_read,business_management,pages_show_list,pages_read_engagement,pages_manage_ads',
-        return_scopes: true,
-        auth_type: 'reauthorize' // Force re-authorization
-      });
+      if (statusResponse.status === 'connected') {
+        // Only logout if actually connected
+        window.FB.logout((response: any) => {
+          console.log('Logged out from current Facebook account');
+          setCurrentFacebookUser(null);
+          doLogin();
+        });
+      } else {
+        // Not connected, just proceed with login
+        console.log('Not connected to Facebook, proceeding directly to login');
+        setCurrentFacebookUser(null);
+        doLogin();
+      }
     });
   };
 
   const handleLogout = () => {
     if (!sdkLoaded) return;
 
-    window.FB.logout((response: any) => {
-      console.log('Logged out from Facebook');
-      setCurrentFacebookUser(null);
-      toast.info('Logged out from Facebook');
+    // SAFE LOGOUT: Check status before logout to prevent errors
+    window.FB.getLoginStatus((statusResponse: any) => {
+      if (statusResponse.status === 'connected') {
+        // Only logout if actually connected
+        window.FB.logout((response: any) => {
+          console.log('Logged out from Facebook');
+          setCurrentFacebookUser(null);
+          toast.info('Logged out from Facebook');
+        });
+      } else {
+        // Not connected, just clear state
+        console.log('Not connected to Facebook, clearing local state');
+        setCurrentFacebookUser(null);
+        toast.info('Cleared Facebook session');
+      }
     });
   };
 

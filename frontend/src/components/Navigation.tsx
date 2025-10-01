@@ -69,11 +69,24 @@ const Navigation: React.FC = () => {
       const response = await facebookAuthApi.disconnect();
 
       if (response.success) {
-        // Logout from Facebook SDK to clear browser session
+        // SAFE LOGOUT: Check status before logout to prevent errors
+        // This ensures we can always login again even if session expired
         if (window.FB) {
-          window.FB.logout(() => {
-            console.log('Facebook SDK logout completed');
-          });
+          try {
+            window.FB.getLoginStatus((statusResponse: any) => {
+              if (statusResponse.status === 'connected') {
+                // Only logout if actually connected
+                window.FB.logout(() => {
+                  console.log('Facebook SDK logout completed');
+                });
+              } else {
+                console.log('Not connected to Facebook, skipping FB.logout()');
+              }
+            });
+          } catch (fbError) {
+            // If FB SDK fails, just log and continue - don't block disconnect
+            console.warn('Facebook SDK error during logout:', fbError);
+          }
         }
 
         // Clear all storage

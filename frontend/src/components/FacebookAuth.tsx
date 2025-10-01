@@ -163,14 +163,24 @@ const FacebookAuth: React.FC = () => {
   const handleFacebookLogin = async () => {
     setLoading(true);
     try {
-      // CRITICAL: Logout from Facebook SDK first to clear cached session
+      // CRITICAL: SAFE LOGOUT from Facebook SDK first to clear cached session
       // This ensures users see the Facebook login screen (email/password)
       // instead of auto-logging into the previously connected account
+      // BUT only logout if actually connected to prevent errors
       if (window.FB) {
         await new Promise<void>((resolve) => {
-          window.FB.logout(() => {
-            console.log('Facebook SDK logout completed before new login');
-            resolve();
+          window.FB.getLoginStatus((statusResponse: any) => {
+            if (statusResponse.status === 'connected') {
+              // Only logout if actually connected
+              window.FB.logout(() => {
+                console.log('Facebook SDK logout completed before new login');
+                resolve();
+              });
+            } else {
+              // Not connected, skip logout and continue
+              console.log('Not connected to Facebook, skipping pre-login logout');
+              resolve();
+            }
           });
         });
       }
@@ -204,6 +214,7 @@ const FacebookAuth: React.FC = () => {
         }
       }
     } catch (error: any) {
+      console.error('Login error:', error);
       toast.error(error.response?.data?.error || 'Failed to initiate login');
     } finally {
       setLoading(false);
