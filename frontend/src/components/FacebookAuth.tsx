@@ -163,6 +163,25 @@ const FacebookAuth: React.FC = () => {
   const handleFacebookLogin = async () => {
     setLoading(true);
     try {
+      // CRITICAL: Logout from Facebook SDK first to clear cached session
+      // This ensures users see the Facebook login screen (email/password)
+      // instead of auto-logging into the previously connected account
+      if (window.FB) {
+        await new Promise<void>((resolve) => {
+          window.FB.logout(() => {
+            console.log('Facebook SDK logout completed before new login');
+            resolve();
+          });
+        });
+      }
+
+      // Clear any cached session data
+      sessionStorage.clear();
+      localStorage.removeItem('fb_auth_status');
+
+      // Small delay to ensure Facebook SDK logout is fully processed
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const response = await facebookAuthApi.login();
       if (response.success && response.data.authUrl) {
         // Open Facebook OAuth in popup window
@@ -170,15 +189,15 @@ const FacebookAuth: React.FC = () => {
         const height = 700;
         const left = window.screen.width / 2 - width / 2;
         const top = window.screen.height / 2 - height / 2;
-        
+
         const popup = window.open(
           response.data.authUrl,
           'facebook-auth',
           `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
         );
-        
+
         setAuthWindow(popup);
-        
+
         // Check if popup was blocked
         if (!popup || popup.closed) {
           toast.error('Please allow popups for Facebook authentication');

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useFacebookStatus } from '../hooks/useFacebookStatus';
@@ -14,16 +14,25 @@ import {
   Chip,
   Button,
   Tooltip,
-  Badge
+  Badge,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions
 } from '@mui/material';
-import { AccountCircle, Dashboard, People, History, Person, Campaign, BarChart, AutoAwesome, Facebook } from '@mui/icons-material';
+import { AccountCircle, Dashboard, People, History, Person, Campaign, BarChart, AutoAwesome, Facebook, LinkOff } from '@mui/icons-material';
 import ResourceSwitcher from './ResourceSwitcher';
+import { facebookAuthApi } from '../services/api';
+import { toast } from 'react-toastify';
 
 const Navigation: React.FC = () => {
   const { user, logout, hasPermission } = useAuth();
   const navigate = useNavigate();
   const { connected: fbConnected, facebookUser, loading: fbLoading, refreshStatus } = useFacebookStatus();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -41,6 +50,52 @@ const Navigation: React.FC = () => {
   const handleNavigate = (path: string) => {
     handleClose();
     navigate(path);
+  };
+
+  const handleOpenDisconnectDialog = () => {
+    handleClose();
+    setDisconnectDialogOpen(true);
+  };
+
+  const handleCloseDisconnectDialog = () => {
+    setDisconnectDialogOpen(false);
+  };
+
+  const handleDisconnectFacebook = async () => {
+    try {
+      setDisconnecting(true);
+
+      // Call backend to disconnect
+      const response = await facebookAuthApi.disconnect();
+
+      if (response.success) {
+        // Logout from Facebook SDK to clear browser session
+        if (window.FB) {
+          window.FB.logout(() => {
+            console.log('Facebook SDK logout completed');
+          });
+        }
+
+        // Clear all storage
+        localStorage.removeItem('fb_auth_status');
+        sessionStorage.clear();
+
+        toast.success('Facebook account disconnected successfully. Page will reload...');
+
+        // Close dialog and reload page after short delay
+        setDisconnectDialogOpen(false);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        toast.error('Failed to disconnect Facebook account');
+        setDisconnecting(false);
+      }
+    } catch (error: any) {
+      console.error('Disconnect error:', error);
+      toast.error(error.response?.data?.error || 'Failed to disconnect Facebook account');
+      setDisconnecting(false);
+    }
   };
 
   return (
@@ -260,10 +315,72 @@ const Navigation: React.FC = () => {
                 <Person sx={{ mr: 1, fontSize: 20 }} />
                 My Profile
               </MenuItem>
-              
+
               <Divider />
+
+              {/* Disconnect Facebook Button - Only show if connected */}
+              {fbConnected && (
+                <>
+                  <MenuItem
+                    onClick={handleOpenDisconnectDialog}
+                    sx={{
+                      color: 'error.main',
+                      '&:hover': {
+                        backgroundColor: 'error.lighter'
+                      }
+                    }}
+                  >
+                    <LinkOff sx={{ mr: 1, fontSize: 20 }} />
+                    Disconnect Facebook
+                  </MenuItem>
+                  <Divider />
+                </>
+              )}
+
               <MenuItem onClick={handleLogout}>Logout</MenuItem>
             </Menu>
+
+            {/* Disconnect Confirmation Dialog */}
+            <Dialog
+              open={disconnectDialogOpen}
+              onClose={handleCloseDisconnectDialog}
+              maxWidth="sm"
+              fullWidth
+            >
+              <DialogTitle>Disconnect Facebook Account?</DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  Are you sure you want to disconnect your Facebook account?
+                  <br /><br />
+                  <strong>This will:</strong>
+                  <ul style={{ marginTop: 8 }}>
+                    <li>Log you out of Facebook in this browser</li>
+                    <li>Remove all saved Facebook data</li>
+                    <li>Clear your selected ad account, page, and pixel</li>
+                    <li>Require you to log in again with email and password</li>
+                  </ul>
+                  <br />
+                  You'll be able to connect a different Facebook account after disconnecting.
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions>
+                <Button
+                  onClick={handleCloseDisconnectDialog}
+                  disabled={disconnecting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleDisconnectFacebook}
+                  color="error"
+                  variant="contained"
+                  disabled={disconnecting}
+                  startIcon={<LinkOff />}
+                >
+                  {disconnecting ? 'Disconnecting...' : 'Disconnect Facebook'}
+                </Button>
+              </DialogActions>
+            </Dialog>
           </Box>
         )}
       </Toolbar>

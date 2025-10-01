@@ -52,6 +52,10 @@ export const UserManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<number | null>(null);
+  const [resetPasswordUserEmail, setResetPasswordUserEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     firstName: '',
@@ -127,15 +131,34 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const handleResetPassword = async (userId: number) => {
-    const newPassword = prompt('Enter new password:');
-    if (!newPassword) return;
-    
+  const handleOpenResetPasswordDialog = (user: User) => {
+    setResetPasswordUserId(user.id);
+    setResetPasswordUserEmail(user.email);
+    setNewPassword('');
+    setResetPasswordDialogOpen(true);
+  };
+
+  const handleCloseResetPasswordDialog = () => {
+    setResetPasswordDialogOpen(false);
+    setResetPasswordUserId(null);
+    setResetPasswordUserEmail('');
+    setNewPassword('');
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordUserId || newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+
     try {
-      await api.post(`/users/${userId}/reset-password`, { password: newPassword });
+      await api.put(`/users/${resetPasswordUserId}/reset-password`, {
+        newPassword: newPassword
+      });
       toast.success('Password reset successfully');
-    } catch (error) {
-      toast.error('Failed to reset password');
+      handleCloseResetPasswordDialog();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to reset password');
     }
   };
 
@@ -229,7 +252,7 @@ export const UserManagement: React.FC = () => {
                         <IconButton onClick={() => openDialog(user)} size="small">
                           <Edit />
                         </IconButton>
-                        <IconButton onClick={() => handleResetPassword(user.id)} size="small">
+                        <IconButton onClick={() => handleOpenResetPasswordDialog(user)} size="small" title="Reset Password">
                           <LockReset />
                         </IconButton>
                       </>
@@ -308,6 +331,44 @@ export const UserManagement: React.FC = () => {
             variant="contained"
           >
             {editingUser ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog
+        open={resetPasswordDialogOpen}
+        onClose={handleCloseResetPasswordDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Reset Password</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              You are resetting the password for: <strong>{resetPasswordUserEmail}</strong>
+            </Alert>
+            <TextField
+              label="New Password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              fullWidth
+              helperText="Minimum 8 characters"
+              error={newPassword.length > 0 && newPassword.length < 8}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseResetPasswordDialog}>Cancel</Button>
+          <Button
+            onClick={handleResetPassword}
+            variant="contained"
+            color="primary"
+            disabled={newPassword.length < 8}
+            startIcon={<LockReset />}
+          >
+            Reset Password
           </Button>
         </DialogActions>
       </Dialog>

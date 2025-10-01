@@ -1338,33 +1338,38 @@ class FacebookAPI {
       } else {
         console.log('✅ Ad created successfully with ID:', ad.id);
 
-        // Try to automatically capture post ID with improved retry logic
+        // Try to automatically capture post ID with aggressive retry logic
         console.log('🔍 Attempting to capture post ID automatically...');
         try {
           // Wait longer for Facebook to fully process the ad and make the creative available
-          console.log('  ⏳ Waiting 5 seconds for Facebook to process the ad...');
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          console.log('  ⏳ Waiting 8 seconds for Facebook to process the ad...');
+          await new Promise(resolve => setTimeout(resolve, 8000));
 
-          // Try to get post ID with retries
+          // Try to get post ID with more retries and exponential backoff
           let postId = null;
-          let retries = 3;
+          const maxRetries = 6;
+          const retryDelays = [0, 3000, 4000, 5000, 6000, 8000]; // Progressive delays in ms
 
-          for (let i = 0; i < retries; i++) {
+          for (let i = 0; i < maxRetries; i++) {
+            console.log(`  🔄 Attempt ${i + 1}/${maxRetries}...`);
             postId = await this.getPostIdFromAd(ad.id);
+
             if (postId) {
+              console.log(`✅ Post ID captured successfully on attempt ${i + 1}: ${postId}`);
               break;
             }
-            if (i < retries - 1) {
-              console.log(`  🔄 Retry ${i + 1}/${retries - 1} - waiting 2 more seconds...`);
-              await new Promise(resolve => setTimeout(resolve, 2000));
+
+            if (i < maxRetries - 1) {
+              const delay = retryDelays[i + 1];
+              console.log(`  ⏳ Waiting ${delay/1000}s before next attempt...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
             }
           }
 
           if (postId) {
-            console.log('✅ Post ID captured successfully:', postId);
             ad.postId = postId; // Add to response
           } else {
-            console.log('⚠️ Could not auto-capture post ID after retries - will fetch during duplication');
+            console.log('⚠️ Could not auto-capture post ID after all retries - will fetch during duplication');
           }
         } catch (postError) {
           console.log('⚠️ Post ID capture failed:', postError.message);
@@ -1397,49 +1402,98 @@ class FacebookAPI {
   }
 
   async getPostIdFromAd(adId) {
-    try {
-      // Method 1: Get creative from ad and extract post ID
-      const adResponse = await axios.get(`${this.baseURL}/${adId}`, {
-        params: {
-          fields: 'creative',
-          access_token: this.accessToken
-        }
-      });
+    console.log(`🔍 Attempting to fetch post ID from ad ${adId}...`);
 
-      if (adResponse.data.creative && adResponse.data.creative.id) {
-        const creativeResponse = await axios.get(`${this.baseURL}/${adResponse.data.creative.id}`, {
+    try {
+      // Method 1: Direct ad query with expanded creative fields
+      console.log('  📋 Method 1: Querying ad with expanded creative fields...');
+      try {
+        const adResponse = await axios.get(`${this.baseURL}/${adId}`, {
           params: {
-            fields: 'effective_object_story_id',
+            fields: 'creative{effective_object_story_id,object_story_id,object_story_spec}',
             access_token: this.accessToken
           }
         });
 
-        if (creativeResponse.data.effective_object_story_id) {
-          // Keep the original format with underscore as Facebook provides it
-          return creativeResponse.data.effective_object_story_id;
+        const creative = adResponse.data.creative;
+        if (creative) {
+          console.log('  ✅ Creative data retrieved:', JSON.stringify(creative, null, 2));
+
+          // Try multiple possible fields
+          const postId = creative.effective_object_story_id ||
+                        creative.object_story_id ||
+                        creative.object_story_spec?.page_id;
+
+          if (postId) {
+            console.log(`  ✅ Post ID found via Method 1: ${postId}`);
+            return postId;
+          }
         }
+        console.log('  ⚠️ Method 1: No post ID in creative data');
+      } catch (method1Error) {
+        console.log('  ❌ Method 1 failed:', method1Error.response?.data?.error?.message || method1Error.message);
       }
 
-      // Method 2: Fallback - search recent page posts
-      const now = new Date();
-      const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+      // Method 2: Get creative separately with more fields
+      console.log('  📋 Method 2: Fetching creative separately...');
+      try {
+        const adResponse = await axios.get(`${this.baseURL}/${adId}`, {
+          params: {
+            fields: 'creative',
+            access_token: this.accessToken
+          }
+        });
 
-      const postsResponse = await axios.get(`${this.baseURL}/${this.pageId}/posts`, {
-        params: {
-          fields: 'id,created_time,message',
-          since: Math.floor(fifteenMinutesAgo.getTime() / 1000),
-          access_token: this.accessToken
+        if (adResponse.data.creative && adResponse.data.creative.id) {
+          const creativeId = adResponse.data.creative.id;
+          console.log(`  📋 Creative ID: ${creativeId}`);
+
+          const creativeResponse = await axios.get(`${this.baseURL}/${creativeId}`, {
+            params: {
+              fields: 'effective_object_story_id,object_story_id,object_story_spec',
+              access_token: this.accessToken
+            }
+          });
+
+          console.log('  📋 Creative details:', JSON.stringify(creativeResponse.data, null, 2));
+
+          const postId = creativeResponse.data.effective_object_story_id ||
+                        creativeResponse.data.object_story_id;
+
+          if (postId) {
+            console.log(`  ✅ Post ID found via Method 2: ${postId}`);
+            return postId;
+          }
         }
-      });
-
-      if (postsResponse.data.data && postsResponse.data.data.length > 0) {
-        // Return the most recent post ID in original Facebook format with underscore
-        return postsResponse.data.data[0].id;
+        console.log('  ⚠️ Method 2: No post ID found in creative');
+      } catch (method2Error) {
+        console.log('  ❌ Method 2 failed:', method2Error.response?.data?.error?.message || method2Error.message);
       }
 
+      // Method 3: Query ad with preview_shareable_link (alternative approach)
+      console.log('  📋 Method 3: Trying ad preview link method...');
+      try {
+        const adPreviewResponse = await axios.get(`${this.baseURL}/${adId}`, {
+          params: {
+            fields: 'preview_shareable_link,creative{effective_object_story_id}',
+            access_token: this.accessToken
+          }
+        });
+
+        if (adPreviewResponse.data.creative?.effective_object_story_id) {
+          const postId = adPreviewResponse.data.creative.effective_object_story_id;
+          console.log(`  ✅ Post ID found via Method 3: ${postId}`);
+          return postId;
+        }
+        console.log('  ⚠️ Method 3: No post ID found');
+      } catch (method3Error) {
+        console.log('  ❌ Method 3 failed:', method3Error.response?.data?.error?.message || method3Error.message);
+      }
+
+      console.log('  ❌ All methods failed to retrieve post ID');
       return null;
     } catch (error) {
-      console.error('Error getting post ID from ad:', error);
+      console.error('❌ Fatal error getting post ID from ad:', error.response?.data?.error || error.message);
       return null;
     }
   }

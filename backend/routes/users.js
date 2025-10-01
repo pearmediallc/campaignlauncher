@@ -237,6 +237,54 @@ router.put('/:id', authenticate, requirePermission('user', 'update'), [
   }
 });
 
+// Admin reset user password (no current password required)
+router.put('/:id/reset-password', authenticate, requirePermission('user', 'update'), [
+  param('id').isInt(),
+  body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    // Prevent admin from resetting their own password this way
+    if (id == req.userId) {
+      return res.status(400).json({
+        error: 'Use the change password endpoint to update your own password'
+      });
+    }
+
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Set new password (will be hashed by User model beforeSave hook)
+    user.password = newPassword;
+    await user.save();
+
+    // Audit log
+    await AuditService.logRequest(req, 'user.resetPassword', 'user', id, 'success', null, {
+      adminUserId: req.userId,
+      targetUserId: id,
+      targetEmail: user.email
+    });
+
+    res.json({
+      success: true,
+      message: `Password reset successfully for ${user.email}`
+    });
+  } catch (error) {
+    console.error('Admin password reset error:', error);
+    await AuditService.logRequest(req, 'user.resetPassword', 'user', req.params.id, 'failure', error.message);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
 // Delete user
 router.delete('/:id', authenticate, requirePermission('user', 'delete'), async (req, res) => {
   try {
@@ -250,8 +298,76 @@ router.delete('/:id', authenticate, requirePermission('user', 'delete'), async (
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    await AuditService.logRequest(req, 'user.delete', 'user', user.id);
+    // Clean up related records before deleting user
+    const {
+      FacebookAuth,
+      EligibilityCheck,
+      CampaignTemplate,
+      CampaignTracking,
+      AuditLog
+    } = require('../models');
+
+    console.log(`🗑️ Deleting user ${user.email} (ID: ${user.id})`);
+
+    // 1. Delete eligibility checks (child of FacebookAuth)
+    const eligibilityDeleted = await EligibilityCheck.destroy({
+      where: { userId: user.id }
+    });
+    console.log(`  ✅ Deleted ${eligibilityDeleted} eligibility check(s)`);
+
+    // 2. Delete Facebook auth records
+    const facebookAuthDeleted = await FacebookAuth.destroy({
+      where: { userId: user.id }
+    });
+    console.log(`  ✅ Deleted ${facebookAuthDeleted} Facebook auth record(s)`);
+
+    // 3. Delete user resource configs (if exists)
+    try {
+      const { UserResourceConfig } = require('../models');
+      const resourceConfigDeleted = await UserResourceConfig.destroy({
+        where: { userId: user.id }
+      });
+      console.log(`  ✅ Deleted ${resourceConfigDeleted} resource config(s)`);
+    } catch (e) {
+      // UserResourceConfig might not exist in all deployments
+      console.log('  ⚠️ UserResourceConfig not found or error:', e.message);
+    }
+
+    // 4. Delete user's templates
+    const templatesDeleted = await CampaignTemplate.destroy({
+      where: { userId: user.id }
+    });
+    console.log(`  ✅ Deleted ${templatesDeleted} template(s)`);
+
+    // 5. Delete campaign tracking records
+    const trackingDeleted = await CampaignTracking.destroy({
+      where: { user_id: user.id }
+    });
+    console.log(`  ✅ Deleted ${trackingDeleted} campaign tracking record(s)`);
+
+    // 6. Keep audit logs but nullify userId (for compliance/history)
+    const auditLogsUpdated = await AuditLog.update(
+      {
+        userId: null,
+        metadata: db.sequelize.literal(
+          `COALESCE(metadata, '{}')::jsonb || '{"deletedUser": "${user.email}"}'::jsonb`
+        )
+      },
+      { where: { userId: user.id } }
+    );
+    console.log(`  ✅ Anonymized ${auditLogsUpdated[0]} audit log(s)`);
+
+    // 7. Log the deletion before deleting user
+    await AuditService.logRequest(req, 'user.delete', 'user', user.id, 'success', null, {
+      deletedEmail: user.email,
+      deletedBy: req.userId,
+      deletedFirstName: user.firstName,
+      deletedLastName: user.lastName
+    });
+
+    // 8. Now delete the user
     await user.destroy();
+    console.log(`  ✅ User ${user.email} deleted successfully`);
 
     res.json({
       success: true,
@@ -260,7 +376,10 @@ router.delete('/:id', authenticate, requirePermission('user', 'delete'), async (
   } catch (error) {
     console.error('Delete user error:', error);
     await AuditService.logRequest(req, 'user.delete', 'user', req.params.id, 'failure', error.message);
-    res.status(500).json({ error: 'Failed to delete user' });
+    res.status(500).json({
+      error: 'Failed to delete user',
+      details: error.message
+    });
   }
 });
 
