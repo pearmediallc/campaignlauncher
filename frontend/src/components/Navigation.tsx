@@ -124,7 +124,7 @@ const Navigation: React.FC = () => {
               Manage Campaigns
             </Button>
 
-            {/* Temporary Analytics Button - Remove when no longer needed */}
+            {/* Temporary Analytics Button - Commented out per user request
             <Button
               variant="contained"
               startIcon={<BarChart />}
@@ -143,6 +143,7 @@ const Navigation: React.FC = () => {
             >
               Analytics
             </Button>
+            */}
 
             {/* Facebook Status Indicator */}
             <Tooltip title={fbConnected ? `Connected: ${facebookUser?.name}` : 'Facebook not connected'}>
