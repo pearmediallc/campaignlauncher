@@ -91,7 +91,16 @@ export const UserManagement: React.FC = () => {
 
   const handleCreateUser = async () => {
     try {
-      await api.post('/users/', formData);
+      // Backend expects roleIds as an array, convert roleId to roleIds
+      const userData = {
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        roleIds: formData.roleId ? [formData.roleId] : [] // Convert single roleId to array
+      };
+
+      await api.post('/users/', userData);
       toast.success('User created successfully');
       setDialogOpen(false);
       fetchUsers();
