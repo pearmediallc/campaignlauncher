@@ -140,7 +140,9 @@ router.put('/:id', authenticate, requirePermission('user', 'update'), [
   param('id').isInt(),
   body('firstName').optional().trim(),
   body('lastName').optional().trim(),
-  body('isActive').optional().isBoolean()
+  body('isActive').optional().isBoolean(),
+  body('roleId').optional().isInt(),
+  body('roleIds').optional().isArray()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -148,30 +150,84 @@ router.put('/:id', authenticate, requirePermission('user', 'update'), [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const user = await User.findByPk(req.params.id);
+    const user = await User.findByPk(req.params.id, {
+      include: [{
+        model: Role,
+        as: 'roles',
+        attributes: ['id', 'name']
+      }]
+    });
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const { firstName, lastName, isActive } = req.body;
-    
+    const { firstName, lastName, isActive, roleId, roleIds } = req.body;
+
+    // Update basic user info
     if (firstName !== undefined) user.firstName = firstName;
     if (lastName !== undefined) user.lastName = lastName;
     if (isActive !== undefined) user.isActive = isActive;
-    
+
     await user.save();
 
-    await AuditService.logRequest(req, 'user.update', 'user', user.id);
+    // Handle role assignment (supports both single roleId and multiple roleIds)
+    let rolesUpdated = false;
+    if (roleId !== undefined) {
+      // Single role assignment (from frontend)
+      const role = await Role.findByPk(roleId);
+      if (!role) {
+        return res.status(400).json({ error: 'Role not found' });
+      }
+      await user.setRoles([role]);
+      rolesUpdated = true;
+    } else if (roleIds !== undefined && Array.isArray(roleIds)) {
+      // Multiple roles assignment
+      const roles = await Role.findAll({ where: { id: roleIds } });
+      if (roles.length !== roleIds.length) {
+        return res.status(400).json({ error: 'Some roles not found' });
+      }
+      await user.setRoles(roles);
+      rolesUpdated = true;
+    }
+
+    // Invalidate user cache if roles were updated
+    if (rolesUpdated) {
+      await PermissionService.invalidateUserCache(user.id);
+    }
+
+    // Fetch updated user with roles
+    const updatedUser = await User.findByPk(user.id, {
+      attributes: ['id', 'email', 'firstName', 'lastName', 'isActive'],
+      include: [{
+        model: Role,
+        as: 'roles',
+        attributes: ['id', 'name']
+      }]
+    });
+
+    await AuditService.logRequest(req, 'user.update', 'user', user.id, 'success', null, {
+      userId: user.id,
+      email: user.email,
+      fieldsUpdated: {
+        firstName: firstName !== undefined,
+        lastName: lastName !== undefined,
+        isActive: isActive !== undefined,
+        roles: rolesUpdated
+      },
+      newRoles: rolesUpdated ? updatedUser.roles.map(r => r.name) : undefined
+    });
 
     res.json({
       success: true,
       message: 'User updated successfully',
       user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        isActive: user.isActive
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        isActive: updatedUser.isActive,
+        roles: updatedUser.roles
       }
     });
   } catch (error) {
