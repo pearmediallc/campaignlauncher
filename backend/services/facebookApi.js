@@ -1687,13 +1687,20 @@ class FacebookAPI {
           try {
             const newAdSetId = newAdSetIds[i];
 
-            // Create ad using existing post
+            // Ensure post ID is in correct format (page_id_post_id)
+            let formattedPostId = actualPostId;
+            if (actualPostId && !actualPostId.includes('_')) {
+              // If post ID doesn't have page prefix, add it
+              formattedPostId = `${this.pageId}_${actualPostId}`;
+              console.log(`  📝 Formatted post ID: ${formattedPostId}`);
+            }
+
+            // Create ad using existing post - MUST use object_story_id only
             const adData = {
               name: `${formData.campaignName} - Ad Copy ${i + 1}`,
               adset_id: newAdSetId,
               creative: JSON.stringify({
-                object_story_id: actualPostId,
-                page_id: this.pageId
+                object_story_id: formattedPostId
               }),
               status: 'ACTIVE',
               access_token: this.accessToken
