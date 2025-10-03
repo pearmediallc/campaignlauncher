@@ -45,14 +45,15 @@ router.get('/current', authenticate, async (req, res) => {
     }
     
     // Return the originally selected resources (current behavior)
+    // Extract IDs from the JSON objects
     res.json({
       success: true,
       source: 'original',
       data: {
-        adAccountId: facebookAuth.selectedAdAccountId,
-        pageId: facebookAuth.selectedPageId,
-        pixelId: facebookAuth.selectedPixelId,
-        businessId: facebookAuth.selectedBusinessId
+        adAccountId: facebookAuth.selectedAdAccount?.id || null,
+        pageId: facebookAuth.selectedPage?.id || null,
+        pixelId: facebookAuth.selectedPixel?.id || null,
+        businessId: facebookAuth.businessAccounts?.[0]?.id || null
       }
     });
   } catch (error) {
@@ -127,10 +128,10 @@ router.post('/switch', authenticate, async (req, res) => {
       pixelId: currentConfig.pixelId,
       businessId: currentConfig.businessId
     } : {
-      adAccountId: facebookAuth.selectedAdAccountId,
-      pageId: facebookAuth.selectedPageId,
-      pixelId: facebookAuth.selectedPixelId,
-      businessId: facebookAuth.selectedBusinessId
+      adAccountId: facebookAuth.selectedAdAccount?.id || null,
+      pageId: facebookAuth.selectedPage?.id || null,
+      pixelId: facebookAuth.selectedPixel?.id || null,
+      businessId: facebookAuth.businessAccounts?.[0]?.id || null
     };
     
     // Create or update the configuration
@@ -160,11 +161,15 @@ router.post('/switch', authenticate, async (req, res) => {
     await config.activate();
     
     // IMPORTANT: Also update the FacebookAuth table so campaigns use the new resources
+    // We need to store complete resource objects (not just IDs) for backward compatibility
+    const selectedAdAccount = adAccountId ? resources.adAccounts.find(acc => acc.id === adAccountId) : facebookAuth.selectedAdAccount;
+    const selectedPage = pageId ? resources.pages.find(page => page.id === pageId) : facebookAuth.selectedPage;
+    const selectedPixel = pixelId ? resources.pixels.find(pixel => pixel.id === pixelId) : facebookAuth.selectedPixel;
+
     await FacebookAuth.update({
-      selectedAdAccountId: adAccountId || facebookAuth.selectedAdAccountId,
-      selectedPageId: pageId || facebookAuth.selectedPageId,
-      selectedPixelId: pixelId || facebookAuth.selectedPixelId,
-      selectedBusinessId: businessId || facebookAuth.selectedBusinessId
+      selectedAdAccount: selectedAdAccount || null,
+      selectedPage: selectedPage || null,
+      selectedPixel: selectedPixel || null
     }, {
       where: { userId }
     });
