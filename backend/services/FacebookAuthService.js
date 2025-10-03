@@ -649,7 +649,6 @@ class FacebookAuthService {
 
       if (existingFbAuth && existingFbAuth.userId !== userId) {
         // Another user already owns this Facebook account
-        await transaction.rollback();
         const error = new Error('This Facebook account is already linked to another user. Please disconnect it from the other account first.');
         error.code = 'FACEBOOK_ACCOUNT_ALREADY_LINKED';
         error.statusCode = 409;
