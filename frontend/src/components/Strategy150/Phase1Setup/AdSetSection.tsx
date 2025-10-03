@@ -392,101 +392,101 @@ const AdSetSection: React.FC = () => {
                 )}
               />
             </Box>
+          </>
+        )}
 
-            {/* Ad Set Spending Limits - Enhanced */}
-            <Box sx={{ width: "100%" }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Ad Set Spending Limits (Optional)
-              </Typography>
+        {/* Ad Set Spending Limits - Always Visible */}
+        <Box sx={{ width: "100%" }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Ad Set Spending Limits (Optional)
+          </Typography>
+        </Box>
+
+        {/* Enable/Disable Toggle */}
+        <Box sx={{ width: "100%" }}>
+          <Controller
+            name="adSetBudget.spendingLimits.enabled"
+            control={control}
+            defaultValue={false}
+            render={({ field }) => (
+              <FormControlLabel
+                control={<Checkbox {...field} checked={field.value || false} />}
+                label="Set a minimum or maximum spend limit for this ad set"
+              />
+            )}
+          />
+        </Box>
+
+        {watch('adSetBudget.spendingLimits.enabled') && (
+          <>
+            {/* Value Type Toggle (% or $) */}
+            <Box sx={{ width: "100%", display: "flex", justifyContent: "flex-end" }}>
+              <Controller
+                name="adSetBudget.spendingLimits.valueType"
+                control={control}
+                defaultValue="percentage"
+                render={({ field }) => (
+                  <FormControl size="small">
+                    <Select
+                      {...field}
+                      displayEmpty
+                      sx={{ minWidth: 150 }}
+                    >
+                      <MenuItem value="percentage">Use % value</MenuItem>
+                      <MenuItem value="dollar">Use $ value</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
+              />
             </Box>
 
-            {/* Enable/Disable Toggle */}
+            {/* Daily Minimum */}
             <Box sx={{ width: "100%" }}>
               <Controller
-                name="adSetBudget.spendingLimits.enabled"
+                name="adSetBudget.spendingLimits.dailyMin"
                 control={control}
-                defaultValue={false}
                 render={({ field }) => (
-                  <FormControlLabel
-                    control={<Checkbox {...field} checked={field.value || false} />}
-                    label="Set a minimum or maximum spend limit for this ad set"
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Daily minimum"
+                    type="number"
+                    InputProps={{
+                      startAdornment: watch('adSetBudget.spendingLimits.valueType') === 'dollar' ? (
+                        <InputAdornment position="start">$</InputAdornment>
+                      ) : null,
+                      endAdornment: watch('adSetBudget.spendingLimits.valueType') === 'percentage' ? (
+                        <InputAdornment position="end">%</InputAdornment>
+                      ) : null
+                    }}
                   />
                 )}
               />
             </Box>
 
-            {watch('adSetBudget.spendingLimits.enabled') && (
-              <>
-                {/* Value Type Toggle (% or $) */}
-                <Box sx={{ width: "100%", display: "flex", justifyContent: "flex-end" }}>
-                  <Controller
-                    name="adSetBudget.spendingLimits.valueType"
-                    control={control}
-                    defaultValue="percentage"
-                    render={({ field }) => (
-                      <FormControl size="small">
-                        <Select
-                          {...field}
-                          displayEmpty
-                          sx={{ minWidth: 150 }}
-                        >
-                          <MenuItem value="percentage">Use % value</MenuItem>
-                          <MenuItem value="dollar">Use $ value</MenuItem>
-                        </Select>
-                      </FormControl>
-                    )}
+            {/* Daily Maximum */}
+            <Box sx={{ width: "100%" }}>
+              <Controller
+                name="adSetBudget.spendingLimits.dailyMax"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Daily maximum"
+                    type="number"
+                    InputProps={{
+                      startAdornment: watch('adSetBudget.spendingLimits.valueType') === 'dollar' ? (
+                        <InputAdornment position="start">$</InputAdornment>
+                      ) : null,
+                      endAdornment: watch('adSetBudget.spendingLimits.valueType') === 'percentage' ? (
+                        <InputAdornment position="end">%</InputAdornment>
+                      ) : null
+                    }}
                   />
-                </Box>
-
-                {/* Daily Minimum */}
-                <Box sx={{ width: "100%" }}>
-                  <Controller
-                    name="adSetBudget.spendingLimits.dailyMin"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        fullWidth
-                        label="Daily minimum"
-                        type="number"
-                        InputProps={{
-                          startAdornment: watch('adSetBudget.spendingLimits.valueType') === 'dollar' ? (
-                            <InputAdornment position="start">$</InputAdornment>
-                          ) : null,
-                          endAdornment: watch('adSetBudget.spendingLimits.valueType') === 'percentage' ? (
-                            <InputAdornment position="end">%</InputAdornment>
-                          ) : null
-                        }}
-                      />
-                    )}
-                  />
-                </Box>
-
-                {/* Daily Maximum */}
-                <Box sx={{ width: "100%" }}>
-                  <Controller
-                    name="adSetBudget.spendingLimits.dailyMax"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        fullWidth
-                        label="Daily maximum"
-                        type="number"
-                        InputProps={{
-                          startAdornment: watch('adSetBudget.spendingLimits.valueType') === 'dollar' ? (
-                            <InputAdornment position="start">$</InputAdornment>
-                          ) : null,
-                          endAdornment: watch('adSetBudget.spendingLimits.valueType') === 'percentage' ? (
-                            <InputAdornment position="end">%</InputAdornment>
-                          ) : null
-                        }}
-                      />
-                    )}
-                  />
-                </Box>
-              </>
-            )}
+                )}
+              />
+            </Box>
           </>
         )}
 
