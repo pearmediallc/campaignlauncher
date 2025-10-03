@@ -1,50 +1,121 @@
 import axios from 'axios';
 
-// Template data structure matching Strategy 1-50-1 form
+// Template data structure - matches Strategy150FormData for complete field coverage
 export interface TemplateData {
-  // Campaign section
+  // Campaign Level
   campaignName?: string;
-  objective?: string;
+  buyingType?: 'AUCTION' | 'RESERVED';
+  objective?: 'OUTCOME_LEADS' | 'PHONE_CALL' | 'OUTCOME_SALES';
+  budgetLevel?: 'campaign' | 'adset';
+  specialAdCategories?: string[];
   campaignBudgetOptimization?: boolean;
-  specialAdCategory?: string;
-
-  // AdSet section
-  adSetName?: string;
-  startDate?: string;
-  endDate?: string;
   bidStrategy?: string;
-  billingEvent?: string;
-  budgetType?: string;
-  dailyBudget?: number;
-  lifetimeBudget?: number;
+  budgetType?: 'daily' | 'lifetime';
 
-  // Targeting
-  locations?: any[];
-  ageMin?: number;
-  ageMax?: number;
-  genders?: string;
-  detailedTargeting?: any;
-  customAudiences?: string[];
-  placements?: string[];
+  // Campaign Budget
+  campaignBudget?: {
+    dailyBudget?: number;
+    lifetimeBudget?: number;
+  };
 
-  // Ad section
-  adName?: string;
+  // Ad Set Level
+  performanceGoal?: string;
+  pixel?: string;
+  conversionEvent?: 'Lead' | 'Contact' | 'Purchase';
+  attributionSetting?: string;
+  attributionWindow?: string;
+
+  // Ad Set Budget & Schedule
+  adSetBudget?: {
+    dailyBudget?: number;
+    lifetimeBudget?: number;
+    startDate?: string;
+    endDate?: string;
+    scheduleType?: 'run_continuously' | 'scheduled';
+    dayparting?: Array<{
+      days: string[];
+      startTime: string;
+      endTime: string;
+    }>;
+    spendingLimits?: {
+      daily?: number;
+      lifetime?: number;
+    };
+  };
+
+  // Enhanced Targeting
+  targeting?: {
+    locations?: {
+      countries?: string[];
+      regions?: string[];
+      cities?: string[];
+      zips?: string[];
+      addressRadius?: Array<{
+        address: string;
+        radius: number;
+        distanceUnit: 'mile' | 'kilometer';
+      }>;
+    };
+    ageMin?: number;
+    ageMax?: number;
+    ageRange?: number[];
+    genders?: string[];
+    languages?: string[];
+    detailedTargeting?: {
+      interests?: string[];
+      behaviors?: string[];
+      demographics?: string[];
+    };
+    customAudiences?: string[];
+    lookalikeAudiences?: string[];
+    connections?: {
+      include?: string[];
+      exclude?: string[];
+    };
+  };
+
+  // Enhanced Placements
+  placementType?: 'automatic' | 'manual';
+  placements?: {
+    facebook?: string[];
+    instagram?: string[];
+    messenger?: string[];
+    audienceNetwork?: string[];
+    devices?: string[];
+    platforms?: string[];
+    publisherPlatforms?: string[];
+  };
+
+  // Ad Level
   facebookPage?: string;
   instagramAccount?: string;
+  urlType?: string;
+  url?: string;
   primaryText?: string;
   headline?: string;
   description?: string;
-  websiteUrl?: string;
-  displayLink?: string;
-  urlParameters?: string;
   callToAction?: string;
-  pixelId?: string;
+  displayLink?: string;
+  mediaType?: 'single_image' | 'single_video' | 'carousel';
 
-  // Media
-  mediaType?: 'image' | 'video' | 'carousel';
-  mediaUrls?: string[];
-  carouselCards?: any[];
-  videoThumbnailUrl?: string;
+  // Duplication Settings
+  duplicationSettings?: {
+    defaultBudgetPerAdSet?: number;
+    customBudgets?: Array<{
+      adSetIndex: number;
+      budget: number;
+    }>;
+    budgetDistributionType?: 'equal' | 'custom' | 'weighted';
+  };
+
+  // Additional fields
+  costCap?: number;
+  minRoas?: number;
+  bidAmount?: number;
+  campaignSpendingLimit?: number;
+  manualPixelId?: string;
+  publishDirectly?: boolean;
+  conversionLocation?: 'website' | 'calls';
 }
 
 export interface CampaignTemplate {
@@ -172,51 +243,21 @@ class TemplateApi {
     setAsDefault = false
   ): Promise<CampaignTemplate> {
     try {
-      const templateData: TemplateData = {
-        // Map form data to template structure
-        campaignName: formData.campaignName,
-        objective: formData.objective,
-        campaignBudgetOptimization: formData.campaignBudgetOptimization,
-        specialAdCategory: formData.specialAdCategory,
-
-        adSetName: formData.adSetName,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        bidStrategy: formData.bidStrategy,
-        billingEvent: formData.billingEvent,
-        budgetType: formData.budgetType,
-        dailyBudget: formData.dailyBudget,
-        lifetimeBudget: formData.lifetimeBudget,
-
-        locations: formData.locations,
-        ageMin: formData.ageMin,
-        ageMax: formData.ageMax,
-        genders: formData.genders,
-        detailedTargeting: formData.detailedTargeting,
-        customAudiences: formData.customAudiences,
-        placements: formData.placements,
-
-        adName: formData.adName,
-        facebookPage: formData.facebookPage,
-        instagramAccount: formData.instagramAccount,
-        primaryText: formData.primaryText,
-        headline: formData.headline,
-        description: formData.description,
-        websiteUrl: formData.websiteUrl,
-        displayLink: formData.displayLink,
-        urlParameters: formData.urlParameters,
-        callToAction: formData.callToAction,
-        pixelId: formData.pixelId,
-
-        mediaType: formData.mediaType,
-        mediaUrls: formData.mediaUrls,
-        carouselCards: formData.carouselCards,
-        videoThumbnailUrl: formData.videoThumbnailUrl,
-      };
+      // Strip out non-saveable fields (files, temporary state)
+      const {
+        mediaFiles,     // Don't save actual File objects
+        image,
+        video,
+        images,
+        postId,         // Don't save runtime post IDs
+        manualPostId,
+        useExistingPost,
+        ...templateData  // Everything else gets saved directly
+      } = formData;
 
       const request: CreateTemplateRequest = {
         templateName,
-        templateData,
+        templateData,   // Direct pass-through - preserves ALL editable fields
         mediaUrls: formData.mediaUrls,
         description,
         setAsDefault,

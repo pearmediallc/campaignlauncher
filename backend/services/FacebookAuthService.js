@@ -641,23 +641,13 @@ class FacebookAuthService {
       const encryptedToken = encryptToken(authData.accessToken);
       console.log('   Encrypted token starts with:', encryptedToken.substring(0, 20));
 
-      // CRITICAL: Check if this Facebook account is already linked to another user
-      const existingFbAuth = await FacebookAuth.findOne({
-        where: { facebookUserId: authData.facebookUserId },
-        transaction
-      });
-
-      if (existingFbAuth && existingFbAuth.userId !== userId) {
-        // Another user already owns this Facebook account
-        const error = new Error('This Facebook account is already linked to another user. Please disconnect it from the other account first.');
-        error.code = 'FACEBOOK_ACCOUNT_ALREADY_LINKED';
-        error.statusCode = 409;
-        throw error;
-      }
-
-      // Find or create auth record (now safe from unique constraint violations)
+      // Find or create auth record using compound key (userId + facebookUserId)
+      // This allows multiple users to connect the same Facebook account
       const [authRecord, created] = await FacebookAuth.findOrCreate({
-        where: { userId },
+        where: {
+          userId,
+          facebookUserId: authData.facebookUserId
+        },
         defaults: {
           userId,
           facebookUserId: authData.facebookUserId,

@@ -222,9 +222,24 @@ router.put('/:id/default', authenticate, async (req, res) => {
 
     await db.CampaignTemplate.setUserDefault(userId, id);
 
+    // Audit log
+    const AuditService = require('../services/AuditService');
+    await AuditService.log({
+      userId,
+      action: 'template.setDefault',
+      resource: 'template',
+      resourceId: id,
+      details: {
+        templateId: id,
+        templateName: template.templateName
+      },
+      ip: req.ip
+    });
+
     res.json({
       success: true,
-      message: 'Template set as default'
+      message: 'Template set as default',
+      data: template
     });
   } catch (error) {
     console.error('Set default template error:', error);
