@@ -486,6 +486,12 @@ router.get('/resources', authenticate, async (req, res) => {
     }
     
     // Return stored resources
+    // If no resources are explicitly selected, use the first available ones for display
+    const selectedAdAccount = facebookAuth.selectedAdAccount ||
+                              (facebookAuth.adAccounts && facebookAuth.adAccounts.length > 0 ? facebookAuth.adAccounts[0] : null);
+    const selectedPage = facebookAuth.selectedPage ||
+                        (facebookAuth.pages && facebookAuth.pages.length > 0 ? facebookAuth.pages[0] : null);
+
     res.json({
       success: true,
       data: {
@@ -493,8 +499,8 @@ router.get('/resources', authenticate, async (req, res) => {
         pages: facebookAuth.pages || [],
         pixels: facebookAuth.pixels || [],
         businessAccounts: [],
-        selectedAdAccount: facebookAuth.selectedAdAccount,
-        selectedPage: facebookAuth.selectedPage,
+        selectedAdAccount: selectedAdAccount,
+        selectedPage: selectedPage,
         selectedPixel: facebookAuth.selectedPixel,
         storagePreference: facebookAuth.storagePreference
       }

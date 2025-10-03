@@ -325,17 +325,14 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       where: { userId: req.user.id, isActive: true }
     });
 
-    if (!facebookAuth || !facebookAuth.selectedAdAccount) {
+    if (!facebookAuth) {
       return res.status(400).json({
-        error: 'Please select an ad account before creating campaigns'
+        error: 'Please authenticate with Facebook before creating campaigns'
       });
     }
 
-    if (!facebookAuth.selectedPage) {
-      return res.status(400).json({
-        error: 'Please select a Facebook page before creating campaigns'
-      });
-    }
+    // NOTE: Don't validate selectedAdAccount/selectedPage here yet - they might come from active resource config
+    // Validation will happen after checking UserResourceConfig
 
     // Get pixel ID - either from selected pixel or fetch from ad account
     let pixelId = facebookAuth.selectedPixel?.id;
@@ -433,6 +430,17 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       selectedPageId = facebookAuth.selectedPage?.id;
       selectedPixelId = facebookAuth.selectedPixel?.id || pixelId;
 
+      // If still no resources selected, use the first available ones
+      if (!selectedAdAccountId && facebookAuth.adAccounts && facebookAuth.adAccounts.length > 0) {
+        console.log('⚠️ No ad account selected, using first available ad account');
+        selectedAdAccountId = facebookAuth.adAccounts[0].id;
+      }
+
+      if (!selectedPageId && facebookAuth.pages && facebookAuth.pages.length > 0) {
+        console.log('⚠️ No page selected, using first available page');
+        selectedPageId = facebookAuth.pages[0].id;
+      }
+
       console.log('  Ad Account:', facebookAuth.selectedAdAccount?.name || selectedAdAccountId);
       console.log('  Page:', facebookAuth.selectedPage?.name || selectedPageId);
       console.log('  Pixel:', facebookAuth.selectedPixel?.name || selectedPixelId || 'None');
@@ -442,6 +450,19 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
     if (req.body.selectedPageId) {
       console.log('  Overriding page with request body:', req.body.selectedPageId);
       selectedPageId = req.body.selectedPageId;
+    }
+
+    // NOW validate that we have required resources (after checking both FacebookAuth and UserResourceConfig)
+    if (!selectedAdAccountId) {
+      return res.status(400).json({
+        error: 'Please select an ad account before creating campaigns'
+      });
+    }
+
+    if (!selectedPageId) {
+      return res.status(400).json({
+        error: 'Please select a Facebook page before creating campaigns'
+      });
     }
 
     // Create FacebookAPI instance with SELECTED resources (switched or original)
