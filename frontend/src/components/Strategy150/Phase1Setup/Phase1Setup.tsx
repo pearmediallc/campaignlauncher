@@ -61,7 +61,14 @@ const Phase1Setup: React.FC<Phase1SetupProps> = ({ onSubmit, error }) => {
       dailyBudget: 50,
       lifetimeBudget: undefined,
       scheduleType: 'run_continuously',
-      spendingLimits: {}
+      spendingLimits: {
+        enabled: false,
+        valueType: 'percentage',
+        dailyMin: undefined,
+        dailyMax: undefined,
+        lifetimeMin: undefined,
+        lifetimeMax: undefined
+      }
     },
 
     // Ad Level Defaults

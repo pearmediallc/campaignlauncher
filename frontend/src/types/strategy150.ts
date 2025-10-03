@@ -38,8 +38,16 @@ export interface Strategy150FormData {
       endTime: string;
     }>;
     spendingLimits?: {
+      // Legacy fields (backward compatibility)
       daily?: number;
       lifetime?: number;
+      // New enhanced fields
+      enabled?: boolean;
+      valueType?: 'percentage' | 'dollar';
+      dailyMin?: number;
+      dailyMax?: number;
+      lifetimeMin?: number;
+      lifetimeMax?: number;
     };
   };
 

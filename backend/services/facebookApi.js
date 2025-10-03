@@ -264,7 +264,44 @@ class FacebookAPI {
         const bidAmountCents = this.parseBudgetValue(adSetData.bidAmount);
         if (bidAmountCents) params.bid_amount = bidAmountCents;
       }
-      
+
+      // Apply ad set spending limits if enabled
+      if (adSetData.spendingLimits && adSetData.spendingLimits.enabled) {
+        const limits = adSetData.spendingLimits;
+        const budgetAmount = adSetData.dailyBudget || adSetData.lifetimeBudget || 50;
+
+        console.log('  📊 Applying Spending Limits...');
+        console.log('    - Value Type:', limits.valueType || 'percentage');
+        console.log('    - Base Budget:', `$${budgetAmount}`);
+
+        // Calculate min/max based on value type (% or $)
+        if (limits.valueType === 'percentage') {
+          // Convert percentage to cents
+          if (limits.dailyMin !== undefined && limits.dailyMin !== null && limits.dailyMin !== '') {
+            params.daily_min_spend_target = Math.round((budgetAmount * parseFloat(limits.dailyMin) / 100) * 100);
+            console.log('    - Daily Min (%):', `${limits.dailyMin}% = $${params.daily_min_spend_target/100}`);
+          }
+          if (limits.dailyMax !== undefined && limits.dailyMax !== null && limits.dailyMax !== '') {
+            params.daily_spend_cap = Math.round((budgetAmount * parseFloat(limits.dailyMax) / 100) * 100);
+            console.log('    - Daily Max (%):', `${limits.dailyMax}% = $${params.daily_spend_cap/100}`);
+          }
+        } else {
+          // Direct dollar amounts to cents
+          if (limits.dailyMin !== undefined && limits.dailyMin !== null && limits.dailyMin !== '') {
+            params.daily_min_spend_target = Math.round(parseFloat(limits.dailyMin) * 100);
+            console.log('    - Daily Min ($):', `$${params.daily_min_spend_target/100}`);
+          }
+          if (limits.dailyMax !== undefined && limits.dailyMax !== null && limits.dailyMax !== '') {
+            params.daily_spend_cap = Math.round(parseFloat(limits.dailyMax) * 100);
+            console.log('    - Daily Max ($):', `$${params.daily_spend_cap/100}`);
+          }
+        }
+
+        if (params.daily_min_spend_target || params.daily_spend_cap) {
+          console.log('  ✅ Spending Limits Applied Successfully');
+        }
+      }
+
       // Build targeting from provided data with correct field names
       const targeting = {
         age_min: adSetData.targeting?.ageMin || adSetData.targeting?.age_min || 18,

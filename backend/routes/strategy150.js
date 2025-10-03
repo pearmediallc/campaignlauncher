@@ -165,6 +165,12 @@ const validateStrategy150 = [
   body('adSetBudget.scheduleType').optional().isIn(['run_continuously', 'scheduled']),
   body('adSetBudget.spendingLimits.daily').optional().isFloat({ min: 0 }),
   body('adSetBudget.spendingLimits.lifetime').optional().isFloat({ min: 0 }),
+  body('adSetBudget.spendingLimits.enabled').optional().isBoolean(),
+  body('adSetBudget.spendingLimits.valueType').optional().isIn(['percentage', 'dollar']),
+  body('adSetBudget.spendingLimits.dailyMin').optional().isFloat({ min: 0 }),
+  body('adSetBudget.spendingLimits.dailyMax').optional().isFloat({ min: 0 }),
+  body('adSetBudget.spendingLimits.lifetimeMin').optional().isFloat({ min: 0 }),
+  body('adSetBudget.spendingLimits.lifetimeMax').optional().isFloat({ min: 0 }),
   body('adSetBudget.dayparting').optional().isArray(),
 
   // Targeting validations
