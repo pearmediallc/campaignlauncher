@@ -765,14 +765,41 @@ class FacebookAuthService {
         where: { userId, facebookAuthId: facebookAuth.id },
         order: [['createdAt', 'DESC']]
       });
-      
+
+      // If no eligibility check exists, proceed anyway with valid auth
+      // This handles cases where:
+      // 1. Multiple users share same Facebook account
+      // 2. Legacy users who connected before eligibility checks
+      // 3. Re-authentication scenarios
       if (!latestEligibility) {
-        return { valid: false, reason: 'No eligibility check found' };
+        console.warn(`⚠️ No eligibility check found for user ${userId}, proceeding with valid auth`);
+
+        // Decrypt the token before returning
+        const decryptedToken = decryptToken(facebookAuth.accessToken);
+        if (!decryptedToken) {
+          return { valid: false, reason: 'Failed to decrypt access token' };
+        }
+
+        // Return with decrypted token
+        const authWithDecryptedToken = {
+          ...facebookAuth.toJSON(),
+          accessToken: decryptedToken
+        };
+
+        return {
+          valid: true,
+          facebookAuth: authWithDecryptedToken,
+          authRecord: authWithDecryptedToken,
+          eligibilityCheck: null // Backend should handle null eligibility gracefully
+        };
       }
-      
-      // Check if eligibility has expired
+
+      // If eligibility check exists but has expired, proceed anyway
+      // Facebook API will be the final validator of account eligibility
       if (new Date() > new Date(latestEligibility.expiresAt)) {
-        return { valid: false, reason: 'Eligibility check has expired' };
+        console.warn(`⚠️ Eligibility check expired for user ${userId}, proceeding anyway`);
+        // Don't fail - just log and continue
+        // Facebook API will reject if account is actually ineligible
       }
       
       // Decrypt the token before returning

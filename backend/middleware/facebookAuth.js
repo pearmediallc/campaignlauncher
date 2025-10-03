@@ -42,15 +42,18 @@ const requireFacebookAuth = async (req, res, next) => {
       });
     }
     
-    // Check if user is eligible
-    if (validationResult.eligibilityCheck.status !== 'eligible') {
-      return res.status(403).json({
-        success: false,
-        error: 'User is not eligible to create campaigns',
-        eligibilityStatus: validationResult.eligibilityCheck.status,
-        failureReasons: validationResult.eligibilityCheck.failureReasons,
-        requiresVerification: true
-      });
+    // Check if user is eligible (if eligibility check exists)
+    // Allow users without eligibility check to proceed - Facebook API will be final validator
+    if (validationResult.eligibilityCheck && validationResult.eligibilityCheck.status !== 'eligible') {
+      console.warn(`⚠️ User ${userId} has eligibility check but status is: ${validationResult.eligibilityCheck.status}`);
+      // Don't block - let Facebook API decide
+      // return res.status(403).json({
+      //   success: false,
+      //   error: 'User is not eligible to create campaigns',
+      //   eligibilityStatus: validationResult.eligibilityCheck.status,
+      //   failureReasons: validationResult.eligibilityCheck.failureReasons,
+      //   requiresVerification: true
+      // });
     }
     
     // Attach Facebook auth info to request
@@ -105,8 +108,10 @@ const checkFacebookAuth = async (req, res, next) => {
     }
     
     const validationResult = await FacebookAuthService.validateAuthStatus(userId);
-    
-    if (validationResult.valid && validationResult.eligibilityCheck.status === 'eligible') {
+
+    // Allow valid auth even without eligibility check or if not marked as eligible
+    // Facebook API will be the final validator
+    if (validationResult.valid) {
       req.hasFacebookAuth = true;
       const authRecord = validationResult.authRecord || validationResult.facebookAuth;
 
