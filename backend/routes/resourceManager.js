@@ -87,16 +87,22 @@ router.post('/switch', authenticate, async (req, res) => {
     const facebookAuth = await FacebookAuth.findOne({
       where: { userId }
     });
-    
+
     if (!facebookAuth) {
       return res.status(404).json({
         success: false,
         message: 'No Facebook authentication found. Please authenticate with Facebook first.'
       });
     }
-    
+
     // Verify user has access to these resources
-    const resources = await FacebookAuthService.fetchUserResources(facebookAuth.accessToken, userId);
+    // Use cached resources from facebookAuth instead of fetching again to avoid API calls
+    const resources = {
+      adAccounts: facebookAuth.adAccounts || [],
+      pages: facebookAuth.pages || [],
+      pixels: facebookAuth.pixels || [],
+      businessAccounts: facebookAuth.businessAccounts || []
+    };
     
     // Validate each provided resource
     if (adAccountId && !resources.adAccounts.find(acc => acc.id === adAccountId)) {
