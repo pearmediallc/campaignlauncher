@@ -632,16 +632,31 @@ class FacebookAuthService {
    */
   async saveAuthentication(userId, authData) {
     const transaction = await FacebookAuth.sequelize.transaction();
-    
+
     try {
       console.log('📝 Saving authentication for user:', userId);
       console.log('   Token starts with:', authData.accessToken.substring(0, 10));
-      
+
       // Encrypt the access token before saving
       const encryptedToken = encryptToken(authData.accessToken);
       console.log('   Encrypted token starts with:', encryptedToken.substring(0, 20));
-      
-      // Find or create auth record
+
+      // CRITICAL: Check if this Facebook account is already linked to another user
+      const existingFbAuth = await FacebookAuth.findOne({
+        where: { facebookUserId: authData.facebookUserId },
+        transaction
+      });
+
+      if (existingFbAuth && existingFbAuth.userId !== userId) {
+        // Another user already owns this Facebook account
+        await transaction.rollback();
+        const error = new Error('This Facebook account is already linked to another user. Please disconnect it from the other account first.');
+        error.code = 'FACEBOOK_ACCOUNT_ALREADY_LINKED';
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // Find or create auth record (now safe from unique constraint violations)
       const [authRecord, created] = await FacebookAuth.findOrCreate({
         where: { userId },
         defaults: {
@@ -658,7 +673,7 @@ class FacebookAuthService {
         },
         transaction
       });
-      
+
       if (!created) {
         // Update existing record
         await authRecord.update({
@@ -673,13 +688,13 @@ class FacebookAuthService {
           isActive: true
         }, { transaction });
       }
-      
+
       await transaction.commit();
-      
+
       // Verify what was actually saved
       const saved = await FacebookAuth.findOne({ where: { userId } });
       console.log('   ✅ Saved token starts with:', saved.accessToken.substring(0, 20));
-      
+
       return authRecord;
     } catch (error) {
       await transaction.rollback();
