@@ -1669,13 +1669,24 @@ class FacebookAPI {
             `${this.baseURL}/${originalAdSetId}`,
             {
               params: {
-                fields: 'name,targeting,daily_budget,lifetime_budget,optimization_goal,billing_event,bid_strategy,promoted_object',
+                fields: 'name,targeting,daily_budget,lifetime_budget,optimization_goal,billing_event,bid_strategy,promoted_object,daily_min_spend_target,daily_spend_cap',
                 access_token: this.accessToken
               }
             }
           );
 
           const originalAdSet = originalAdSetResponse.data;
+
+          // Log if spending limits were found on original ad set
+          if (originalAdSet.daily_min_spend_target || originalAdSet.daily_spend_cap) {
+            console.log(`  💰 Copying spending limits from original ad set:`);
+            if (originalAdSet.daily_min_spend_target) {
+              console.log(`     - Daily Min: $${originalAdSet.daily_min_spend_target / 100}`);
+            }
+            if (originalAdSet.daily_spend_cap) {
+              console.log(`     - Daily Max: $${originalAdSet.daily_spend_cap / 100}`);
+            }
+          }
 
           // Create new ad set with same settings + forced 1-day attribution
           console.log(`  ⚙️ Setting attribution to 1-day click, 1-day view for copy ${i + 1}`);
@@ -1697,6 +1708,15 @@ class FacebookAPI {
             status: 'ACTIVE',
             access_token: this.accessToken
           };
+
+          // CRITICAL: Copy spending limits if they exist on original ad set
+          // Only include if they were set by user (not undefined/null)
+          if (originalAdSet.daily_min_spend_target !== undefined && originalAdSet.daily_min_spend_target !== null) {
+            newAdSetData.daily_min_spend_target = originalAdSet.daily_min_spend_target;
+          }
+          if (originalAdSet.daily_spend_cap !== undefined && originalAdSet.daily_spend_cap !== null) {
+            newAdSetData.daily_spend_cap = originalAdSet.daily_spend_cap;
+          }
 
           const copyResponse = await axios.post(
             `${this.baseURL}/act_${campaignAccountId}/adsets`,
