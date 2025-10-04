@@ -243,6 +243,14 @@ class TemplateApi {
     setAsDefault = false
   ): Promise<CampaignTemplate> {
     try {
+      // DEBUG: Log incoming form data
+      console.log('🔍 DEBUG - Template Save (BEFORE stripping):');
+      console.log('  📦 Full formData keys:', Object.keys(formData));
+      console.log('  📦 formData.primaryText:', formData.primaryText);
+      console.log('  📦 formData.headline:', formData.headline);
+      console.log('  📦 formData.description:', formData.description);
+      console.log('  📦 formData.callToAction:', formData.callToAction);
+
       // Strip out non-saveable fields (files, temporary state)
       const {
         mediaFiles,     // Don't save actual File objects
@@ -255,6 +263,14 @@ class TemplateApi {
         ...templateData  // Everything else gets saved directly
       } = formData;
 
+      // DEBUG: Log what will be saved
+      console.log('🔍 DEBUG - Template Save (AFTER stripping):');
+      console.log('  📦 templateData keys:', Object.keys(templateData));
+      console.log('  📦 templateData.primaryText:', templateData.primaryText);
+      console.log('  📦 templateData.headline:', templateData.headline);
+      console.log('  📦 templateData.description:', templateData.description);
+      console.log('  📦 templateData.callToAction:', templateData.callToAction);
+
       const request: CreateTemplateRequest = {
         templateName,
         templateData,   // Direct pass-through - preserves ALL editable fields
@@ -262,6 +278,12 @@ class TemplateApi {
         description,
         setAsDefault,
       };
+
+      console.log('🔍 DEBUG - Final request being sent to backend:', {
+        templateName: request.templateName,
+        templateDataKeys: Object.keys(request.templateData),
+        description: request.description
+      });
 
       return await this.createTemplate(request);
     } catch (error) {
@@ -272,6 +294,17 @@ class TemplateApi {
 
   // Load template data into form
   loadTemplateIntoForm(template: CampaignTemplate): TemplateData {
+    // DEBUG: Log loaded template data
+    console.log('🔍 DEBUG - Template Load:');
+    console.log('  📦 template.templateName:', template.templateName);
+    console.log('  📦 template.id:', template.id);
+    console.log('  📦 templateData keys:', Object.keys(template.templateData));
+    console.log('  📦 templateData.primaryText:', template.templateData.primaryText);
+    console.log('  📦 templateData.headline:', template.templateData.headline);
+    console.log('  📦 templateData.description:', template.templateData.description);
+    console.log('  📦 templateData.callToAction:', template.templateData.callToAction);
+    console.log('  📦 Full templateData:', template.templateData);
+
     return template.templateData;
   }
 }

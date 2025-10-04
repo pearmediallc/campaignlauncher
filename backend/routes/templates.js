@@ -88,6 +88,16 @@ router.get('/:id', authenticate, async (req, res) => {
     // Increment usage count
     await template.incrementUsage();
 
+    // DEBUG: Log what's being returned
+    console.log('🔍 DEBUG - Backend Template Load:');
+    console.log('  📦 Template ID:', template.id);
+    console.log('  📦 Template Name:', template.templateName);
+    console.log('  📦 templateData keys:', template.templateData ? Object.keys(template.templateData) : 'NULL');
+    console.log('  📦 templateData.primaryText:', template.templateData?.primaryText);
+    console.log('  📦 templateData.headline:', template.templateData?.headline);
+    console.log('  📦 templateData.description:', template.templateData?.description);
+    console.log('  📦 templateData.callToAction:', template.templateData?.callToAction);
+
     res.json({
       success: true,
       data: template
@@ -115,6 +125,16 @@ router.post('/', authenticate, async (req, res) => {
       setAsDefault = false
     } = req.body;
 
+    // DEBUG: Log incoming template save request
+    console.log('🔍 DEBUG - Backend Template Save:');
+    console.log('  📦 templateName:', templateName);
+    console.log('  📦 templateData keys:', templateData ? Object.keys(templateData) : 'NULL');
+    console.log('  📦 templateData.primaryText:', templateData?.primaryText);
+    console.log('  📦 templateData.headline:', templateData?.headline);
+    console.log('  📦 templateData.description:', templateData?.description);
+    console.log('  📦 templateData.callToAction:', templateData?.callToAction);
+    console.log('  📦 Full templateData:', JSON.stringify(templateData, null, 2));
+
     if (!templateName || !templateData) {
       return res.status(400).json({
         success: false,
@@ -139,6 +159,14 @@ router.post('/', authenticate, async (req, res) => {
       category,
       isDefault: setAsDefault
     });
+
+    // DEBUG: Log what was saved
+    console.log('🔍 DEBUG - Backend Template Saved:');
+    console.log('  ✅ Template ID:', template.id);
+    console.log('  ✅ Saved templateData keys:', template.templateData ? Object.keys(template.templateData) : 'NULL');
+    console.log('  ✅ Saved templateData.primaryText:', template.templateData?.primaryText);
+    console.log('  ✅ Saved templateData.headline:', template.templateData?.headline);
+    console.log('  ✅ Saved templateData.description:', template.templateData?.description);
 
     res.status(201).json({
       success: true,
