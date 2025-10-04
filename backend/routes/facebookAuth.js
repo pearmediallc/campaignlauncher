@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const FacebookAuthService = require('../services/FacebookAuthService');
+const ResourceHelper = require('../services/ResourceHelper');
 const { decryptToken } = require('./facebookSDKAuth');
 const { AuthAuditLog, User, FacebookAuth, EligibilityCheck } = require('../models');
 const { authenticate, requireFacebookAuth, refreshFacebookToken } = require('../middleware/auth');
@@ -472,26 +473,20 @@ router.get('/audit-logs', authenticate, async (req, res) => {
 router.get('/resources', authenticate, async (req, res) => {
   try {
     const userId = req.userId || req.user.id;
-    
-    // Get Facebook auth record
-    const facebookAuth = await FacebookAuth.findOne({
-      where: { userId }
-    });
-    
-    if (!facebookAuth || !facebookAuth.accessToken) {
+
+    // Use universal ResourceHelper to get active resources
+    const activeResources = await ResourceHelper.getActiveResources(userId);
+
+    if (!activeResources || !activeResources.facebookAuth) {
       return res.status(404).json({
         success: false,
         message: 'Facebook authentication not found'
       });
     }
-    
-    // Return stored resources
-    // If no resources are explicitly selected, use the first available ones for display
-    const selectedAdAccount = facebookAuth.selectedAdAccount ||
-                              (facebookAuth.adAccounts && facebookAuth.adAccounts.length > 0 ? facebookAuth.adAccounts[0] : null);
-    const selectedPage = facebookAuth.selectedPage ||
-                        (facebookAuth.pages && facebookAuth.pages.length > 0 ? facebookAuth.pages[0] : null);
 
+    const facebookAuth = activeResources.facebookAuth;
+
+    // Return stored resources with active selections from ResourceHelper
     res.json({
       success: true,
       data: {
@@ -499,10 +494,16 @@ router.get('/resources', authenticate, async (req, res) => {
         pages: facebookAuth.pages || [],
         pixels: facebookAuth.pixels || [],
         businessAccounts: [],
-        selectedAdAccount: selectedAdAccount,
-        selectedPage: selectedPage,
-        selectedPixel: facebookAuth.selectedPixel,
-        storagePreference: facebookAuth.storagePreference
+
+        // Use active resources from ResourceHelper (single source of truth)
+        selectedAdAccount: activeResources.selectedAdAccount,
+        selectedPage: activeResources.selectedPage,
+        selectedPixel: activeResources.selectedPixel,
+
+        storagePreference: facebookAuth.storagePreference,
+
+        // Include source for debugging
+        _resourceSource: activeResources.source
       }
     });
   } catch (error) {

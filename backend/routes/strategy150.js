@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const FacebookAPI = require('../services/facebookApi');
+const ResourceHelper = require('../services/ResourceHelper');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireFacebookAuth, refreshFacebookToken } = require('../middleware/facebookAuth');
 const AuditService = require('../services/AuditService');
@@ -387,72 +388,26 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
     // Get userId safely from multiple possible sources
     const userId = req.user?.id || req.userId || req.user;
 
-    // Check for switched/active resource configuration if UserResourceConfig exists
-    let selectedAdAccountId, selectedPageId, selectedPixelId;
+    // Use universal ResourceHelper to get active resources
+    console.log('📋 Getting active resources using ResourceHelper...');
+    const activeResources = await ResourceHelper.getActiveResourcesWithFallback(userId);
 
-    try {
-      // Only try to use UserResourceConfig if it exists in the database models
-      const { UserResourceConfig } = db;
+    let selectedAdAccountId = activeResources.selectedAdAccountId;
+    let selectedPageId = activeResources.selectedPageId;
+    let selectedPixelId = activeResources.selectedPixelId || pixelId;
 
-      if (UserResourceConfig && typeof UserResourceConfig.getActiveConfig === 'function' && userId) {
-        // Try to get active config, but don't fail if it doesn't work
-        const activeConfig = await UserResourceConfig.getActiveConfig(userId).catch(err => {
-          console.log('⚠️ Could not fetch active config:', err.message);
-          return null;
-        });
-
-        if (activeConfig && (activeConfig.adAccountId || activeConfig.pageId)) {
-          // User has switched resources - use the active configuration
-          console.log('📋 Using switched resource configuration from UserResourceConfig');
-          selectedAdAccountId = activeConfig.adAccountId || facebookAuth.selectedAdAccount?.id;
-          selectedPageId = activeConfig.pageId || facebookAuth.selectedPage?.id;
-          selectedPixelId = activeConfig.pixelId || pixelId;
-
-          console.log('  Ad Account:', selectedAdAccountId);
-          console.log('  Page:', selectedPageId);
-          console.log('  Pixel:', selectedPixelId || 'None');
-
-          // Update pixelId to use the switched one if available
-          if (selectedPixelId) {
-            pixelId = selectedPixelId;
-          }
-        }
-      }
-    } catch (configError) {
-      // If UserResourceConfig doesn't exist or has issues, log but continue
-      console.log('⚠️ UserResourceConfig not available, using default resources');
-    }
-
-    // If no switched config or it failed, use original selected resources
-    if (!selectedAdAccountId || !selectedPageId) {
-      console.log('📋 Using original selected resources from FacebookAuth');
-      selectedAdAccountId = facebookAuth.selectedAdAccount?.id;
-      selectedPageId = facebookAuth.selectedPage?.id;
-      selectedPixelId = facebookAuth.selectedPixel?.id || pixelId;
-
-      // If still no resources selected, use the first available ones
-      if (!selectedAdAccountId && facebookAuth.adAccounts && facebookAuth.adAccounts.length > 0) {
-        console.log('⚠️ No ad account selected, using first available ad account');
-        selectedAdAccountId = facebookAuth.adAccounts[0].id;
-      }
-
-      if (!selectedPageId && facebookAuth.pages && facebookAuth.pages.length > 0) {
-        console.log('⚠️ No page selected, using first available page');
-        selectedPageId = facebookAuth.pages[0].id;
-      }
-
-      console.log('  Ad Account:', facebookAuth.selectedAdAccount?.name || selectedAdAccountId);
-      console.log('  Page:', facebookAuth.selectedPage?.name || selectedPageId);
-      console.log('  Pixel:', facebookAuth.selectedPixel?.name || selectedPixelId || 'None');
-    }
+    console.log('  ✓ Source:', activeResources.source);
+    console.log('  ✓ Ad Account:', activeResources.selectedAdAccount?.name || selectedAdAccountId);
+    console.log('  ✓ Page:', activeResources.selectedPage?.name || selectedPageId);
+    console.log('  ✓ Pixel:', activeResources.selectedPixel?.name || selectedPixelId || 'None');
 
     // Override with request body if provided (for backward compatibility)
     if (req.body.selectedPageId) {
-      console.log('  Overriding page with request body:', req.body.selectedPageId);
+      console.log('  ⚠️ Overriding page with request body:', req.body.selectedPageId);
       selectedPageId = req.body.selectedPageId;
     }
 
-    // NOW validate that we have required resources (after checking both FacebookAuth and UserResourceConfig)
+    // Validate that we have required resources
     if (!selectedAdAccountId) {
       return res.status(400).json({
         error: 'Please select an ad account before creating campaigns'
@@ -755,10 +710,20 @@ router.get('/post-id/:adId', authenticate, requireFacebookAuth, async (req, res)
       });
     }
 
+    // Use universal ResourceHelper to get active resources
+    const activeResources = await ResourceHelper.getActiveResourcesWithFallback(req.user.id);
+
+    if (!activeResources.selectedAdAccountId || !activeResources.selectedPageId) {
+      return res.status(400).json({
+        error: 'Please select an ad account and page before fetching post ID',
+        requiresReauth: false
+      });
+    }
+
     const userFacebookApi = new FacebookAPI({
       accessToken: decryptedToken,
-      adAccountId: facebookAuth.selectedAdAccount.id.replace('act_', ''),
-      pageId: facebookAuth.selectedPage.id
+      adAccountId: activeResources.selectedAdAccountId.replace('act_', ''),
+      pageId: activeResources.selectedPageId
     });
 
     const postId = await userFacebookApi.getPostIdFromAd(adId);
@@ -810,10 +775,20 @@ router.get('/verify/:campaignId', authenticate, requireFacebookAuth, refreshFace
       });
     }
 
+    // Use universal ResourceHelper to get active resources
+    const activeResources = await ResourceHelper.getActiveResourcesWithFallback(req.user.id);
+
+    if (!activeResources.selectedAdAccountId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please select an ad account before verifying campaigns'
+      });
+    }
+
     const userFacebookApi = new FacebookAPI({
       accessToken: decryptedToken,
-      adAccountId: facebookAuth.selectedAdAccount.id.replace('act_', ''),
-      pageId: facebookAuth.selectedPage?.id
+      adAccountId: activeResources.selectedAdAccountId.replace('act_', ''),
+      pageId: activeResources.selectedPageId
     });
 
     // Fetch campaign details

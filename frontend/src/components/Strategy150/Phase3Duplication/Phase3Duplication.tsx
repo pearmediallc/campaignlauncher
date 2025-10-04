@@ -40,10 +40,12 @@ const Phase3Duplication: React.FC<Phase3DuplicationProps> = ({
   const [isCompleted, setIsCompleted] = useState(false);
 
   useEffect(() => {
-    if (campaignResult && postId && formData) {
+    // Start duplication if we have campaign result and form data
+    // Post ID is optional - backend will fetch it automatically if missing
+    if (campaignResult && formData) {
       startDuplication();
     }
-  }, [campaignResult, postId, formData]);
+  }, [campaignResult, formData]); // Removed postId dependency
 
   const startDuplication = async () => {
     try {

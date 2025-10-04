@@ -1286,7 +1286,9 @@ class FacebookAPI {
         costCap: campaignData.costCap,
         minRoas: campaignData.minRoas,
         objective: campaignData.objective,
-        specialAdCategories: campaignData.specialAdCategories
+        specialAdCategories: campaignData.specialAdCategories,
+        // Pass spending limits from adSetBudget or root level
+        spendingLimits: campaignData.spendingLimits || campaignData.adSetBudget?.spendingLimits
       });
 
       if (!adSet || !adSet.id) {
