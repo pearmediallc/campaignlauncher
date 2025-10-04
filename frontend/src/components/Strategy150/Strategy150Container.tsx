@@ -151,9 +151,10 @@ const Strategy150Container: React.FC = () => {
         campaignBudgetOptimization: data.campaignBudgetOptimization,
 
         // Ad set budget (keep for backward compatibility)
-        adSetBudget: data.adSetBudget || {
-          dailyBudget: data.budgetType === 'daily' ? 50 : undefined,
-          lifetimeBudget: data.budgetType === 'lifetime' ? 350 : undefined
+        adSetBudget: {
+          dailyBudget: data.adSetBudget?.dailyBudget || (data.budgetType === 'daily' ? 50 : undefined),
+          lifetimeBudget: data.adSetBudget?.lifetimeBudget || (data.budgetType === 'lifetime' ? 350 : undefined),
+          spendingLimits: data.adSetBudget?.spendingLimits
         },
 
         // Meta API compliance fields
