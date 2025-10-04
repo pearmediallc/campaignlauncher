@@ -902,10 +902,24 @@ router.post('/duplicate', authenticate, requireFacebookAuth, refreshFacebookToke
     const decryptedToken = req.facebookAuth.accessToken;
     const facebookAuth = req.facebookAuth.authRecord;
 
+    // Use universal ResourceHelper to get active resources
+    const activeResources = await ResourceHelper.getActiveResourcesWithFallback(req.user.id);
+
+    if (!activeResources.selectedAdAccountId || !activeResources.selectedPageId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please select an ad account and page before duplicating ad sets'
+      });
+    }
+
+    console.log('📋 Using active resources for duplication:');
+    console.log('  ✓ Ad Account:', activeResources.selectedAdAccount?.name || activeResources.selectedAdAccountId);
+    console.log('  ✓ Page:', activeResources.selectedPage?.name || activeResources.selectedPageId);
+
     const userFacebookApi = new FacebookAPI({
       accessToken: decryptedToken,
-      adAccountId: facebookAuth.selectedAdAccount.id.replace('act_', ''),
-      pageId: facebookAuth.selectedPage.id
+      adAccountId: activeResources.selectedAdAccountId.replace('act_', ''),
+      pageId: activeResources.selectedPageId
     });
 
     // Start the duplication process with custom budgets
@@ -936,7 +950,7 @@ router.post('/duplicate', authenticate, requireFacebookAuth, refreshFacebookToke
         campaignId,
         count,
         status: 'in_progress',
-        adAccount: facebookAuth.selectedAdAccount, // Add ad account info
+        adAccount: activeResources.selectedAdAccount, // Add ad account info from active resources
         postId: postId || 'Will be fetched from original ad' // Include postId status
       }
     });
