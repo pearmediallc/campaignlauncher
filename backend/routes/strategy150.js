@@ -601,6 +601,13 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
     console.log('🟢 Special Ad Categories detail:', JSON.stringify(campaignData.specialAdCategories));
     console.log('🟢 Targeting detail:', JSON.stringify(campaignData.targeting));
 
+    // DEBUG: Check spending limits data
+    console.log('🔍 DEBUG - Spending Limits Data Flow:');
+    console.log('  📦 req.body.adSetBudget:', JSON.stringify(req.body.adSetBudget, null, 2));
+    console.log('  📦 campaignData.adSetBudget:', JSON.stringify(campaignData.adSetBudget, null, 2));
+    console.log('  📦 campaignData.adSetBudget?.spendingLimits:', JSON.stringify(campaignData.adSetBudget?.spendingLimits, null, 2));
+    console.log('  📦 campaignData.spendingLimits:', JSON.stringify(campaignData.spendingLimits, null, 2));
+
     // Log the final data being sent to Facebook API
     console.log('📤 Sending to Facebook API:');
     console.log('  Campaign Name:', campaignData.campaignName);

@@ -265,6 +265,13 @@ class FacebookAPI {
         if (bidAmountCents) params.bid_amount = bidAmountCents;
       }
 
+      // DEBUG: Log what createAdSet received
+      console.log('🔍 DEBUG - Inside createAdSet:');
+      console.log('  📦 adSetData.spendingLimits:', JSON.stringify(adSetData.spendingLimits, null, 2));
+      console.log('  📦 adSetData.spendingLimits?.enabled:', adSetData.spendingLimits?.enabled);
+      console.log('  📦 adSetData.dailyBudget:', adSetData.dailyBudget);
+      console.log('  📦 adSetData.lifetimeBudget:', adSetData.lifetimeBudget);
+
       // Apply ad set spending limits if enabled
       if (adSetData.spendingLimits && adSetData.spendingLimits.enabled) {
         const limits = adSetData.spendingLimits;
@@ -1266,6 +1273,17 @@ class FacebookAPI {
 
       // Create ad set with fallback mechanism for Strategy 150
       console.log('\n🔷 Step 2 of 3: Creating AdSet with fallback support...');
+
+      // DEBUG: Log spending limits before passing to createAdSet
+      console.log('🔍 DEBUG - Before createAdSet:');
+      console.log('  📦 campaignData.spendingLimits:', JSON.stringify(campaignData.spendingLimits, null, 2));
+      console.log('  📦 campaignData.adSetBudget?.spendingLimits:', JSON.stringify(campaignData.adSetBudget?.spendingLimits, null, 2));
+      const spendingLimitsToPass = campaignData.spendingLimits || campaignData.adSetBudget?.spendingLimits;
+      console.log('  📦 Final spendingLimits being passed:', JSON.stringify(spendingLimitsToPass, null, 2));
+      console.log('  📦 Campaign dailyBudget:', campaignData.dailyBudget);
+      console.log('  📦 Campaign lifetimeBudget:', campaignData.lifetimeBudget);
+      console.log('  📦 Using CBO?', useCampaignBudget);
+
       const adSet = await this.createAdSetWithFallback({
         campaignId: campaign.id,
         campaignName: campaignData.campaignName,
@@ -1288,7 +1306,7 @@ class FacebookAPI {
         objective: campaignData.objective,
         specialAdCategories: campaignData.specialAdCategories,
         // Pass spending limits from adSetBudget or root level
-        spendingLimits: campaignData.spendingLimits || campaignData.adSetBudget?.spendingLimits
+        spendingLimits: spendingLimitsToPass
       });
 
       if (!adSet || !adSet.id) {
