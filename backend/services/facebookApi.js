@@ -1759,43 +1759,74 @@ class FacebookAPI {
       // Now create ads for each copied adset
       if (newAdSetIds.length > 0) {
 
-        // Create ads for each copied adset
+        // Create ads for each copied adset with retry logic
         for (let i = 0; i < newAdSetIds.length; i++) {
-          try {
-            const newAdSetId = newAdSetIds[i];
+          const newAdSetId = newAdSetIds[i];
+          let adCreated = false;
+          let lastError = null;
 
-            // Create ad using existing post
-            const adData = {
-              name: `${formData.campaignName} - Ad Copy ${i + 1}`,
-              adset_id: newAdSetId,
-              creative: JSON.stringify({
-                object_story_id: actualPostId,
-                page_id: this.pageId
-              }),
-              status: 'ACTIVE',
-              access_token: this.accessToken
-            };
+          // Create ad using existing post
+          const adData = {
+            name: `${formData.campaignName} - Ad Copy ${i + 1}`,
+            adset_id: newAdSetId,
+            creative: JSON.stringify({
+              object_story_id: actualPostId,
+              page_id: this.pageId
+            }),
+            status: 'ACTIVE',
+            access_token: this.accessToken
+          };
 
-            console.log(`🔄 Creating Ad for AdSet ${newAdSetId}:`, adData);
+          console.log(`🔄 Creating Ad for AdSet ${newAdSetId} (Copy ${i + 1})...`);
 
-            await axios.post(
-              `${this.baseURL}/act_${campaignAccountId}/ads`,
-              null,
-              { params: adData }
-            );
+          // Retry up to 3 times with exponential backoff
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              await axios.post(
+                `${this.baseURL}/act_${campaignAccountId}/ads`,
+                null,
+                { params: adData }
+              );
 
-            results.adSets.push({
-              id: newAdSetId,
-              name: `AdSet Copy ${i + 1}`
-            });
+              results.adSets.push({
+                id: newAdSetId,
+                name: `AdSet Copy ${i + 1}`
+              });
 
-            console.log(`✅ Created ad for AdSet copy ${i + 1}: ${newAdSetId}`);
+              console.log(`✅ Created ad for AdSet copy ${i + 1}: ${newAdSetId}`);
+              adCreated = true;
+              break; // Success - exit retry loop
 
-          } catch (adError) {
-            console.error(`❌ Error creating ad for AdSet ${i + 1}:`, adError.response?.data || adError.message);
+            } catch (adError) {
+              lastError = adError;
+              const fbError = adError.response?.data?.error;
+              const isTransient = fbError?.is_transient || fbError?.code === 2;
+
+              console.error(`❌ Attempt ${attempt}/3 failed for AdSet ${i + 1}:`, fbError?.message || adError.message);
+
+              // If transient error and we have retries left, wait and retry
+              if (isTransient && attempt < 3) {
+                const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+                console.log(`   ⏳ Waiting ${waitTime/1000}s before retry...`);
+                await this.delay(waitTime);
+              } else if (!isTransient) {
+                // Non-transient error - don't retry
+                console.error(`   ⚠️ Non-transient error - skipping retries`);
+                break;
+              }
+            }
+          }
+
+          // If all retries failed, track it
+          if (!adCreated) {
+            const fbError = lastError?.response?.data?.error || lastError;
+            console.error(`❌ Failed to create ad for AdSet ${i + 1} after 3 attempts`);
             results.errors.push({
+              adSetId: newAdSetId,
               adSetIndex: i + 1,
-              error: `Ad creation failed: ${adError.message}`
+              error: `Ad creation failed after 3 retries: ${fbError?.message || lastError?.message}`,
+              errorCode: fbError?.code,
+              isTransient: fbError?.is_transient
             });
           }
         }
@@ -1830,7 +1861,49 @@ class FacebookAPI {
         }
       }
 
-      console.log(`Strategy 1-50-1 duplication completed. Success: ${results.adSets.length}, Errors: ${results.errors.length}`);
+      // Final summary with detailed breakdown
+      const totalExpected = count;
+      const totalSuccess = results.adSets.length;
+      const totalFailed = results.errors.length;
+      const adSetCreationErrors = results.errors.filter(e => !e.adSetId).length;
+      const adCreationErrors = results.errors.filter(e => e.adSetId).length;
+
+      console.log('\n🎯 ========== DUPLICATION SUMMARY ==========');
+      console.log(`📊 Total Expected: ${totalExpected}`);
+      console.log(`✅ Successfully Created: ${totalSuccess}/${totalExpected} (${Math.round(totalSuccess/totalExpected*100)}%)`);
+
+      if (totalFailed > 0) {
+        console.log(`❌ Failed: ${totalFailed}/${totalExpected}`);
+        if (adSetCreationErrors > 0) {
+          console.log(`   - Ad Set creation failures: ${adSetCreationErrors}`);
+        }
+        if (adCreationErrors > 0) {
+          console.log(`   - Ad creation failures: ${adCreationErrors}`);
+        }
+        console.log(`\n📋 Failed Items:`);
+        results.errors.forEach((err, idx) => {
+          console.log(`   ${idx + 1}. ${err.adSetId ? `AdSet ${err.adSetId}` : `Copy ${err.copyNumber || err.adSetIndex}`}: ${err.error}`);
+        });
+      } else {
+        console.log(`🎉 All ${totalSuccess} ad sets created successfully!`);
+      }
+      console.log('==========================================\n');
+
+      // Add summary to results for frontend
+      results.summary = {
+        totalExpected,
+        totalSuccess,
+        totalFailed,
+        successRate: Math.round(totalSuccess/totalExpected*100),
+        hasFailures: totalFailed > 0,
+        failedAdSets: results.errors.filter(e => e.adSetId).map(e => ({
+          adSetId: e.adSetId,
+          adSetIndex: e.adSetIndex,
+          error: e.error,
+          canRetry: e.isTransient
+        }))
+      };
+
       return results;
 
     } catch (error) {
