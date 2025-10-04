@@ -513,13 +513,19 @@ router.post('/create', authenticate, requireFacebookAuth, refreshFacebookToken, 
       attributionSetting: req.body.attributionSetting || '1_day_click_1_day_view',
       attributionWindow: req.body.attributionWindow || '7_day',
 
-      // Ad set budget & schedule (only set if not using CBO)
+      // Ad set budget & schedule
+      // IMPORTANT: Always include spendingLimits even when using CBO (campaign-level budget)
+      // Spending limits apply at ad set level regardless of budget level
       adSetBudget: req.body.budgetLevel === 'adset' ? {
         ...req.body.adSetBudget,
         dailyBudget: parseBudget(req.body.adSetBudget?.dailyBudget) || parseBudget(req.body.dailyBudget) || 50,
         lifetimeBudget: parseBudget(req.body.adSetBudget?.lifetimeBudget) || parseBudget(req.body.lifetimeBudget),
         scheduleType: req.body.adSetBudget?.scheduleType || 'run_continuously'
-      } : {},
+      } : {
+        // When using CBO, still preserve spendingLimits (they apply at ad set level)
+        spendingLimits: req.body.adSetBudget?.spendingLimits,
+        scheduleType: req.body.adSetBudget?.scheduleType || 'run_continuously'
+      },
       budgetType: req.body.budgetType || 'daily',
 
       // Also send budgets at root level for FacebookAPI compatibility
