@@ -266,6 +266,9 @@ const Strategy150Container: React.FC = () => {
         workingCampaignData.dailyBudget = campaignData.dailyBudget || campaignData.adSetBudget?.dailyBudget || 50;
       }
 
+      // CRITICAL: Include adSetBudget with spendingLimits for ad set level controls
+      workingCampaignData.adSetBudget = campaignData.adSetBudget;
+
       // Log to verify budget is being set
       console.log('💰 Budget configuration:', {
         budgetType: workingCampaignData.budgetType,
